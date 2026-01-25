@@ -20,6 +20,10 @@
 * If something is unclear: write TODO + propose **2 explicit options**. Do not guess.
 * Follow existing project conventions over “best practices” if they conflict.
 
+## Code Style
+* Do NOT add `from __future__ import annotations` - not needed for Python 3.11+
+* Keep imports minimal and explicit
+
 ## Stack (EDITABLE)
 ### Defaults
 * Language: Python 3.11+
