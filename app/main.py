@@ -1,20 +1,27 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.configs.settings import Settings
+from app.configs.app_settings import *
+from app.routes.jobs import router as jobs_router
 
-settings = Settings()
-app = FastAPI(title=settings.app_name)
+app = FastAPI(title=APP_NAME,
+              description=APP_DESCRIPTION,
+              version=APP_VERSION)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[],
+    allow_credentials=True,
+    allow_methods=["GET","POST"],
+    allow_headers=["*"]
+)
 
 
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(_: Request, __: Exception) -> JSONResponse:
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "type": "internal_error",
-                "message": "Unexpected error",
-            }
-        },
-    )
+@app.get("/")
+async def root():
+    return {"message":"Welcome to my Task Manager API"}
+
+api_router = APIRouter(prefix=ROUTER_PREFIX)
+api_router.include_router(jobs_router)
+
+app.include_router(api_router)

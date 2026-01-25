@@ -6,10 +6,10 @@ class ArtifactType(Enum):
     MP4 = "mp4"
     JSON = "json"
     ZIP = "zip"
+    TXT = "txt"
     LOG = "log"
     METADATA = "metadata"
-
-
+    
 class Artifact(BaseModel):
     artifact_type: ArtifactType = Field(..., alias="artifcat_type")
     path: str
