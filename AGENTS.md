@@ -23,6 +23,7 @@
 ## Stack (EDITABLE)
 ### Defaults
 * Language: Python 3.11+
+* Package manager: uv
 * Web API: FastAPI
 * Validation: Pydantic v2
 * Async tasks / queue: Redis + Celery worker

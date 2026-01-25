@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from enum import Enum
+from typing import Dict, FrozenSet
+
+
+class JobStatus(str, Enum):
+    CREATED = "CREATED"
+    PLANNING = "PLANNING"
+    PLANNED = "PLANNED"
+    APPROVED = "APPROVED"
+    CODEGEN = "CODEGEN"
+    CODED = "CODED"
+    RENDER_QUEUED = "RENDER_QUEUED"
+    RENDERING = "RENDERING"
+    RENDERED = "RENDERED"
+    FAILED_PLANNING = "FAILED_PLANNING"
+    FAILED_CODEGEN = "FAILED_CODEGEN"
+    FAILED_RENDER = "FAILED_RENDER"
+
+
+ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
+    JobStatus.CREATED: frozenset({JobStatus.PLANNING}),
+    JobStatus.PLANNING: frozenset({JobStatus.PLANNED, JobStatus.FAILED_PLANNING}),
+    JobStatus.PLANNED: frozenset({JobStatus.APPROVED}),
+    JobStatus.APPROVED: frozenset({JobStatus.CODEGEN}),
+    JobStatus.CODEGEN: frozenset({JobStatus.CODED, JobStatus.FAILED_CODEGEN}),
+    JobStatus.CODED: frozenset({JobStatus.RENDER_QUEUED}),
+    JobStatus.RENDER_QUEUED: frozenset({JobStatus.RENDERING}),
+    JobStatus.RENDERING: frozenset({JobStatus.RENDERED, JobStatus.FAILED_RENDER}),
+    JobStatus.RENDERED: frozenset(),
+    JobStatus.FAILED_PLANNING: frozenset(),
+    JobStatus.FAILED_CODEGEN: frozenset(),
+    JobStatus.FAILED_RENDER: frozenset(),
+}
+
+
+def can_transition(current: JobStatus, target: JobStatus) -> bool:
+    return target in ALLOWED_TRANSITIONS.get(current, frozenset())
+
+
+class InvalidTransitionError(ValueError):
+    pass
+
+
+def require_transition(current: JobStatus, target: JobStatus) -> None:
+    if not can_transition(current, target):
+        raise InvalidTransitionError(
+            f"Invalid transition from {current.value} to {target.value}"
+        )
