@@ -17,21 +17,22 @@ class JobStatus(str, Enum):
     FAILED_PLANNING = "FAILED_PLANNING"
     FAILED_CODEGEN = "FAILED_CODEGEN"
     FAILED_RENDER = "FAILED_RENDER"
-
+    CANCELLED = "CANCELLED"
 
 ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
-    JobStatus.CREATED: frozenset({JobStatus.PLANNING}),
+    JobStatus.CREATED: frozenset({JobStatus.PLANNING, JobStatus.CANCELLED}),
     JobStatus.PLANNING: frozenset({JobStatus.PLANNED, JobStatus.FAILED_PLANNING}),
-    JobStatus.PLANNED: frozenset({JobStatus.APPROVED}),
-    JobStatus.APPROVED: frozenset({JobStatus.CODEGEN}),
+    JobStatus.PLANNED: frozenset({JobStatus.APPROVED, JobStatus.CANCELLED}),
+    JobStatus.APPROVED: frozenset({JobStatus.CODEGEN, JobStatus.CANCELLED}),
     JobStatus.CODEGEN: frozenset({JobStatus.CODED, JobStatus.FAILED_CODEGEN}),
-    JobStatus.CODED: frozenset({JobStatus.RENDER_QUEUED}),
-    JobStatus.RENDER_QUEUED: frozenset({JobStatus.RENDERING}),
+    JobStatus.CODED: frozenset({JobStatus.RENDER_QUEUED, JobStatus.CANCELLED}),
+    JobStatus.RENDER_QUEUED: frozenset({JobStatus.RENDERING, JobStatus.CANCELLED}),
     JobStatus.RENDERING: frozenset({JobStatus.RENDERED, JobStatus.FAILED_RENDER}),
-    JobStatus.RENDERED: frozenset(),
-    JobStatus.FAILED_PLANNING: frozenset(),
-    JobStatus.FAILED_CODEGEN: frozenset(),
-    JobStatus.FAILED_RENDER: frozenset(),
+    JobStatus.RENDERED: frozenset({JobStatus.CANCELLED}),
+    JobStatus.FAILED_PLANNING: frozenset({JobStatus.CANCELLED}),
+    JobStatus.FAILED_CODEGEN: frozenset({JobStatus.CANCELLED}),
+    JobStatus.FAILED_RENDER: frozenset({JobStatus.CANCELLED}),
+    JobStatus.CANCELLED: frozenset()
 }
 
 
