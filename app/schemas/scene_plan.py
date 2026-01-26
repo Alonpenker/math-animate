@@ -6,5 +6,5 @@ class ScenePlan(BaseModel):
     learning_objective: str
     visual_storyboard: str
     voice_notes: str
-    duration_seconds: int = Field(..., ge=1)
     template_hints: Optional[str] = None
+    scene_number: int = Field(..., ge=1, le=3)

@@ -9,6 +9,7 @@ class ArtifactType(Enum):
     TXT = "txt"
     LOG = "log"
     METADATA = "metadata"
+    PYTHON_FILE = "py"
     
 class Artifact(BaseModel):
     artifact_type: ArtifactType = Field(..., alias="artifcat_type")
