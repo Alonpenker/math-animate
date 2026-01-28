@@ -19,6 +19,7 @@
 * Keep the system runnable locally at all times.
 * If something is unclear: write TODO + propose **2 explicit options**. Do not guess.
 * Follow existing project conventions over “best practices” if they conflict.
+* Always use the uv package manager to run commands.
 
 ## Code Style
 * Do NOT add `from __future__ import annotations` - not needed for Python 3.11+
@@ -26,7 +27,7 @@
 
 ## Stack (EDITABLE)
 ### Defaults
-* Language: Python 3.11+
+* Language: Python 3.13+
 * Package manager: uv
 * Web API: FastAPI
 * Validation: Pydantic v2

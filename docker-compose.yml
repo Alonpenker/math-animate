@@ -1,0 +1,73 @@
+name: manim-generator-backend
+
+services:
+  api:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    command: ["uv","run","uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+    command: ["uv","run","celery", "-A", "app.workers.planner:planner", "worker", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli","ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD-SHELL","rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: manim
+      POSTGRES_USER: manim
+      POSTGRES_PASSWORD: manim
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U manim"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

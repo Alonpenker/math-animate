@@ -1,0 +1,67 @@
+from celery import Celery
+from celery.signals import worker_process_init, worker_process_shutdown
+
+from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
+from app.domain.job_state import JobStatus, require_transition
+from app.repositories.jobs_repository import JobsRepository
+from app.repositories.plans_repository import PlansRepository
+from app.schemas.jobs import JobRequest
+from app.schemas.scene_plan import ScenePlan
+from app.schemas.user_request import UserRequest
+from app.schemas.video_plan import VideoPlan
+
+BROKER = "amqp://guest:guest@rabbitmq:5672//"
+BACKEND = "redis://redis:6379/0"
+
+planner = Celery('manim-generator-planner',broker=BROKER, backend=BACKEND)
+
+@worker_process_init.connect
+def init_worker(**kwargs) -> None:
+    init_db_pool()
+
+@worker_process_shutdown.connect
+def shutdown_worker(**kwargs) -> None:
+    close_db_pool()
+
+def dummy_openai_call(user_request: UserRequest) -> VideoPlan:
+    scenes = []
+    for scene_number in range(1, user_request.number_of_scenes + 1):
+        scenes.append(
+            ScenePlan(
+                learning_objective=f"Learn {user_request.topic} (scene {scene_number})",
+                visual_storyboard=f"Show {user_request.topic} example {scene_number}.",
+                voice_notes=f"Explain {user_request.topic} step {scene_number}.",
+                scene_number=scene_number,
+            )
+        )
+    return VideoPlan(scenes=scenes)
+
+@planner.task(max_retries=0)
+def generate_plan(job_request_payload: dict) -> None:
+    job_request = JobRequest(**job_request_payload)
+    require_transition(job_request.status, JobStatus.PLANNING)
+
+    with get_worker_cursor() as cursor:
+        JobsRepository.update_job_status(
+            cursor, job_request.job_id, JobStatus.PLANNING.value
+        )
+
+    try:
+        plan = dummy_openai_call(job_request.data)
+        require_transition(JobStatus.PLANNING, JobStatus.PLANNED)
+        with get_worker_cursor() as cursor:
+            PlansRepository.create_plan(cursor, job_request.job_id, plan)
+            JobsRepository.update_job_status(
+                cursor, job_request.job_id, JobStatus.PLANNED.value
+            )
+
+
+    except Exception as error:
+        require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        with get_worker_cursor() as cursor:
+            JobsRepository.update_job_status(
+                cursor, job_request.job_id, JobStatus.FAILED_PLANNING.value
+            )
+        raise
+
+    
