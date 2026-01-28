@@ -1,6 +1,6 @@
 from app.domain.job_state import JobStatus
 from app.schemas.jobs import JobRequest
-from app.workers.planner import generate_plan
+from app.workers.worker import generate_plan, generate_code
 
 class WorkerRunner:
     """Coordinates job steps; actual implementations live in planner.py and render.py"""
@@ -9,7 +9,7 @@ class WorkerRunner:
     def advance(job_request: JobRequest) -> None:
         if job_request.status == JobStatus.CREATED:
             WorkerRunner.handle_planning(job_request)
-        elif job_request.status == JobStatus.PLANNED:
+        elif job_request.status == JobStatus.APPROVED:
             WorkerRunner.handle_codegen(job_request)
         elif job_request.status == JobStatus.CODED:
             WorkerRunner.handle_render(job_request)
@@ -22,8 +22,7 @@ class WorkerRunner:
     
     @staticmethod
     def handle_codegen(job_request: JobRequest) -> None:
-        # TODO: Implement codegen step orchestration.
-        pass
+        generate_code.delay(job_request.model_dump(mode="json"))
 
     @staticmethod
     def handle_render(job_request: JobRequest) -> None:

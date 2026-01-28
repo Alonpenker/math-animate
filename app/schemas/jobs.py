@@ -12,8 +12,14 @@ class Job(BaseModel):
     status: JobStatus
 
 class JobRequest(Job):
+    pass
+
+class JobUserRequest(JobRequest):
     data: UserRequest
+    
+class JobPlanRequest(JobRequest):
+    data: VideoPlan
 
 class JobResponse(BaseModel):
     job: Job
-    data: Optional[List[VideoPlan] | List[Artifact]] = None
+    data: Optional[VideoPlan | List[Artifact]] = None

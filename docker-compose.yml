@@ -18,7 +18,7 @@ services:
   worker:
     build:
       context: .
-    command: ["uv","run","celery", "-A", "app.workers.planner:planner", "worker", "--loglevel=info"]
+    command: ["uv","run","celery", "-A", "app.workers.worker", "worker", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy

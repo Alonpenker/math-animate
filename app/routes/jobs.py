@@ -3,7 +3,8 @@ from uuid import UUID
 
 from app.dependencies.db import get_cursor
 from app.repositories.jobs_repository import JobsRepository
-from app.schemas.jobs import Job, JobRequest, JobResponse
+from app.repositories.plans_repository import PlansRepository
+from app.schemas.jobs import *
 from app.schemas.user_request import UserRequest
 from app.domain.job_state import JobStatus
 from app.workers.runner import WorkerRunner
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 @router.post("",response_model=JobResponse)
 def create_job(user_request: UserRequest, cursor=Depends(get_cursor)) -> JobResponse:
     job = Job(status=JobStatus.CREATED)
-    job_request = JobRequest(job_id=job.job_id, status=job.status, data=user_request)
+    job_request = JobUserRequest(job_id=job.job_id, status=job.status, data=user_request)
     JobsRepository.create_job(cursor, job)
     WorkerRunner.advance(job_request)
     return JobResponse(job=job)
@@ -29,21 +30,28 @@ def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
 
 
 @router.get("/{job_id}/plan",response_model=JobResponse)
-def get_plan(job_id: str) -> JobResponse:
-    # Get plan logic...
-    job = Job(job_id=UUID(job_id),status=JobStatus.PLANNED)
-    return JobResponse(job=job)
+def get_plan(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
+    plan = PlansRepository.get_plan(cursor, job_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    job = Job(job_id=job_id, status=JobStatus.PLANNED)
+    return JobResponse(job=job, data=plan)
 
 
 @router.post("/{job_id}/approve",response_model=JobResponse)
-def approve_plan(job_id: str, approved: bool) -> JobResponse:
+def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> JobResponse:
+    plan = PlansRepository.approve_plan(cursor, job_id, approved)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
     if approved:
-        # Approved plan logic...
-        job = Job(job_id=UUID(job_id),status=JobStatus.APPROVED)
+        job = Job(job_id=job_id, status=JobStatus.APPROVED)
+        JobsRepository.update_job_status(cursor, job_id, JobStatus.APPROVED.value)
+        job_request = JobPlanRequest(job_id=job.job_id, status=job.status, data=plan)
+        WorkerRunner.advance(job_request)
     else:
-        # not approved plan logic...
-        job = Job(job_id=UUID(job_id),status=JobStatus.CANCELLED)
-    return JobResponse(job=job)
+        job = Job(job_id=job_id, status=JobStatus.CANCELLED)
+        JobsRepository.update_job_status(cursor, job_id, JobStatus.CANCELLED.value)
+    return JobResponse(job=job, data=plan)
 
 
 @router.get("/{job_id}/artifacts", response_model=JobResponse)
