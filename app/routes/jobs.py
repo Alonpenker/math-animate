@@ -3,6 +3,8 @@ from uuid import UUID
 
 from app.dependencies.db import get_cursor
 from app.repositories.jobs_repository import JobsRepository
+from app.repositories.artifacts_repository import ArtifactsRepository
+from app.schemas.artifact import Artifact, ArtifactType
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
 from app.schemas.user_request import UserRequest
@@ -38,7 +40,7 @@ def get_plan(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     return JobResponse(job=job, data=plan)
 
 
-@router.post("/{job_id}/approve",response_model=JobResponse)
+@router.patch("/{job_id}/approve",response_model=JobResponse)
 def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> JobResponse:
     plan = PlansRepository.approve_plan(cursor, job_id, approved)
     if plan is None:
@@ -55,10 +57,25 @@ def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> Jo
 
 
 @router.get("/{job_id}/artifacts", response_model=JobResponse)
-def get_artifacts(job_id: str) -> JobResponse:
-    # Get artifacts logic...
-    job = Job(job_id=UUID(job_id),status=JobStatus.CANCELLED)
-    return JobResponse(job=job)
+def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
+    job_row = JobsRepository.get_job(cursor, job_id)
+    if job_row is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    artifacts = ArtifactsRepository.get_artifacts(cursor, job_id)
+    if artifacts is None:
+        raise HTTPException(status_code=404, detail="Artifacts not found")
+    job = Job(job_id=UUID(job_row["job_id"]), status=JobStatus(job_row["status"]))
+    artifact_list = [
+        Artifact(
+            job_id=job_id,
+            artifact_type=ArtifactType(item["artifact_type"]),
+            path=item["path"],
+            size=item["size"],
+            sha256=item["sha256"],
+        )
+        for item in artifacts
+    ]
+    return JobResponse(job=job, data=artifact_list)
 
 
 @router.get("/{job_id}/artifacts/{artifact_id}")

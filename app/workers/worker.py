@@ -5,12 +5,15 @@ from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.domain.job_state import JobStatus, require_transition
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
-from app.schemas.jobs import JobUserRequest
+from app.repositories.artifacts_repository import ArtifactsRepository
+from app.schemas.jobs import JobUserRequest, JobPlanRequest
 from app.schemas.scene_plan import ScenePlan
 from app.schemas.user_request import UserRequest
 from app.schemas.video_plan import VideoPlan
 from app.schemas.artifact import Artifact, ArtifactType
-from services.file_system_storage import FileSystemStorage
+from services.files_storage_service import FilesStorageService
+from pathlib import Path
+import hashlib
 
 BROKER = "amqp://guest:guest@rabbitmq:5672//"
 BACKEND = "redis://redis:6379/0"
@@ -38,7 +41,7 @@ def dummy_openai_call(user_request: UserRequest) -> VideoPlan:
         )
     return VideoPlan(scenes=scenes)
 
-def dummy_codegen_call() -> str:
+def dummy_codegen_call(data) -> str:
     return "def main():\n    print('hello world')\n"
 
 @app.task(max_retries=1)
@@ -72,7 +75,7 @@ def generate_plan(job_request_payload: dict) -> None:
     
 @app.task(max_retries=2)
 def generate_code(job_request_payload: dict) -> None:
-    job_request = JobUserRequest(**job_request_payload)
+    job_request = JobPlanRequest(**job_request_payload)
     
     require_transition(job_request.status, JobStatus.CODEGEN)
     with get_worker_cursor() as cursor:
@@ -81,13 +84,22 @@ def generate_code(job_request_payload: dict) -> None:
         )
 
     try:
-        code = dummy_codegen_call()
-        #TODO: create an artifact from the python code and fill all parameters, 
-        # should save the artifact data in the database using the repository and the real file
-        # exists in the MiniIO
-        # artifact = Artifact(artifcat_type=ArtifactType.PYTHON_FILE,)
-        
-        FileSystemStorage.save_artifact(job_request.job_id, code)
+        code = dummy_codegen_call(job_request.data)
+        job_dir = Path("job_artifacts") / str(job_request.job_id)
+        job_dir.mkdir(parents=True, exist_ok=True)
+        file_path = job_dir / "code.py"
+        file_bytes = code.encode("utf-8")
+        file_path.write_bytes(file_bytes)
+        object_path = FilesStorageService().save_artifact(job_request.job_id, str(file_path))
+        artifact = Artifact(
+            job_id=job_request.job_id,
+            artifact_type=ArtifactType.PYTHON_FILE,
+            path=object_path,
+            size=len(file_bytes),
+            sha256=hashlib.sha256(file_bytes).hexdigest(),
+        )
+        with get_worker_cursor() as cursor:
+            ArtifactsRepository.create_artifact(cursor, artifact)
         require_transition(JobStatus.CODEGEN, JobStatus.CODED)
         with get_worker_cursor() as cursor:
             JobsRepository.update_job_status(
