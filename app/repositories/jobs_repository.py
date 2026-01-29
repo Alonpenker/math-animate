@@ -3,6 +3,10 @@ from uuid import UUID
 
 from app.schemas.jobs import Job
 
+#TODO:
+# - solve the table not exists situation (this approach is not ok)
+# - implement the solution to all repositories
+# - force returned values on a class (for all functions in all repositories)
 class JobsRepository:
     
     @staticmethod

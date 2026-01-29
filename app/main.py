@@ -27,6 +27,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+#TODO:
+# - should add an exception handler
 
 @app.get("/")
 async def root():

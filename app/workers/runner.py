@@ -1,6 +1,6 @@
 from app.domain.job_state import JobStatus
 from app.schemas.jobs import JobRequest
-from app.workers.worker import generate_plan, generate_code
+from app.workers.worker import generate_plan, generate_code, generate_render
 
 class WorkerRunner:
     """Coordinates job steps; actual implementations live in planner.py and render.py"""
@@ -26,5 +26,4 @@ class WorkerRunner:
 
     @staticmethod
     def handle_render(job_request: JobRequest) -> None:
-        # TODO: Implement render step orchestration.
-        pass
+        generate_render.delay(job_request.model_dump(mode="json"))

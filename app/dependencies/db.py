@@ -3,6 +3,8 @@ from psycopg2.pool import SimpleConnectionPool
 
 db_pool = None
 
+# TODO:
+# - move the connections to .env file
 DB_HOST = "postgres"
 DB_PORT = 5432
 DB_NAME = "manim"
@@ -36,6 +38,9 @@ def get_cursor():
     finally:
         cursor.close()
         db_pool.putconn(conn)
+
+#TODO:
+# - copied code should be as a function (maybe just call the get_cursor()?)
 
 @contextmanager
 def get_worker_cursor():
