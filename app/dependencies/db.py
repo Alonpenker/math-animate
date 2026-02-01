@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from psycopg2.pool import SimpleConnectionPool
 
+from app.repositories import *
+
 db_pool = None
 
 # TODO: move the connections to .env file
@@ -38,17 +40,21 @@ def get_cursor():
         cursor.close()
         db_pool.putconn(conn)
 
-# TODO: copied code should be as a function (maybe just call the get_cursor()?)
-
 @contextmanager
 def get_worker_cursor():
+    return get_cursor()
+
+def init_db_tables() -> None:
     if db_pool is None:
         raise RuntimeError("DB pool not initialized, Call init_db_pool() first.")
     conn = db_pool.getconn()
     cursor = conn.cursor()
     try:
-        yield cursor
+        cursor.execute(JobsRepository._create())
+        cursor.execute(PlansRepository._create())
+        cursor.execute(ArtifactsRepository._create())
         conn.commit()
     finally:
         cursor.close()
         db_pool.putconn(conn)
+

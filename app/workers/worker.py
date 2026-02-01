@@ -165,14 +165,14 @@ def generate_render(job_request_payload: dict) -> None:
     try:
         with get_worker_cursor() as cursor:
             artifacts = ArtifactsRepository.get_artifacts(cursor, job_request.job_id)
-        if artifacts is None:
+        if not artifacts:
             raise RuntimeError("No input artifacts found for render.")
 
         input_dir.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for item in artifacts:
-            object_path = item["path"]
+            object_path = item.path
             dest_path = input_dir / Path(object_path).name
             storage.download_artifact(object_path, str(dest_path))
 

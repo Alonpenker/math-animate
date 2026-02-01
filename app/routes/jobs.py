@@ -6,7 +6,6 @@ from app.dependencies.storage import get_storage_service
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.services.files_storage_service import FilesStorageService
-from app.schemas.artifact import Artifact, ArtifactType
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
 from app.schemas.user_request import UserRequest
@@ -26,10 +25,9 @@ def create_job(user_request: UserRequest, cursor=Depends(get_cursor)) -> JobResp
 
 @router.get("/{job_id}",response_model=JobResponse)
 def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
-    job_row = JobsRepository.get_job(cursor, job_id)
-    if job_row is None:
+    job = JobsRepository.get_job(cursor, job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = Job(job_id=UUID(job_row["job_id"]), status=JobStatus(job_row["status"]))
     return JobResponse(job=job)
 
 
@@ -60,24 +58,13 @@ def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> Jo
 
 @router.get("/{job_id}/artifacts", response_model=JobResponse)
 def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
-    job_row = JobsRepository.get_job(cursor, job_id)
-    if job_row is None:
+    job = JobsRepository.get_job(cursor, job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     artifacts = ArtifactsRepository.get_artifacts(cursor, job_id)
-    if artifacts is None:
+    if not artifacts:
         raise HTTPException(status_code=404, detail="Artifacts not found")
-    job = Job(job_id=UUID(job_row["job_id"]), status=JobStatus(job_row["status"]))
-    artifact_list = [
-        Artifact(
-            job_id=job_id,
-            artifact_type=ArtifactType(item["artifact_type"]),
-            path=item["path"],
-            size=item["size"],
-            sha256=item["sha256"],
-        )
-        for item in artifacts
-    ]
-    return JobResponse(job=job, data=artifact_list)
+    return JobResponse(job=job, data=artifacts)
 
 # TODO: learn how to retrieve files using the api from the minio
 # TODO: implement the get specific artifact logic (need to add artifact_id apperently)

@@ -1,24 +1,26 @@
-from typing import Optional, List, Dict
+from typing import List
 from uuid import UUID
 
-from app.schemas.artifact import Artifact
+from app.schemas.artifact import Artifact, ArtifactType
+from app.repositories.repository import Repository
 
 
-class ArtifactsRepository:
-    
-    @staticmethod
-    def _verify_table(cursor) -> None:
+class ArtifactsRepository(Repository):
+
+    TABLE_NAME = 'artifacts'
+    COLUMNS = [
+        ("job_id","UUID PRIMARY KEY"),
+        ("artifact_type","TEXT"),
+        ("path","TEXT"),
+        ("size","INTEGER"),
+        ("sha256","TEXT"),
+    ]
+    PRIMARY_KEY = 'job_id'
+
+    @classmethod
+    def create_artifact(cls, cursor, artifact: Artifact) -> None:
         cursor.execute(
-            "CREATE TABLE IF NOT EXISTS artifacts (job_id TEXT, artifact_type TEXT, path TEXT, size INTEGER, sha256 TEXT)"
-        )
-        
-    @staticmethod
-    def create_artifact(
-        cursor, artifact: Artifact
-    ) -> None:
-        ArtifactsRepository._verify_table(cursor)
-        cursor.execute(
-            "INSERT INTO artifacts (job_id, artifact_type, path, size, sha256) VALUES (%s, %s, %s, %s, %s)",
+            cls.insert(),
             (
                 str(artifact.job_id),
                 artifact.artifact_type.value,
@@ -28,17 +30,17 @@ class ArtifactsRepository:
             ),
         )
 
-    @staticmethod
-    def get_artifacts(cursor, job_id: UUID) -> Optional[List[Dict]]:
-        ArtifactsRepository._verify_table(cursor)
-        cursor.execute(
-            "SELECT artifact_type, path, size, sha256 FROM artifacts WHERE job_id = %s",
-            (str(job_id),),
-        )
+    @classmethod
+    def get_artifacts(cls, cursor, job_id: UUID) -> List[Artifact]:
+        cursor.execute(cls.get_all_by_key(), (str(job_id),))
         rows = cursor.fetchall()
-        if not rows:
-            return None
         return [
-            {"artifact_type": row[0], "path": row[1], "size": row[2], "sha256": row[3]}
+            Artifact(
+                job_id=job_id,
+                artifact_type=ArtifactType(row[1]),
+                path=row[2],
+                size=row[3],
+                sha256=row[4],
+            )
             for row in rows
         ]
