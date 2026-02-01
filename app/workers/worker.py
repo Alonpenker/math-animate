@@ -1,6 +1,7 @@
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
 from pathlib import Path
+from uuid import uuid4
 import hashlib
 import shutil
 import subprocess
@@ -123,6 +124,7 @@ def generate_code(job_request_payload: dict) -> None:
                 )
         object_path = storage.save_artifact(job_request.job_id, str(file_path))
         artifact = Artifact(
+            artifact_id=uuid4(),
             job_id=job_request.job_id,
             artifact_type=ArtifactType.PYTHON_FILE,
             path=object_path,
@@ -202,6 +204,7 @@ def generate_render(job_request_payload: dict) -> None:
             file_bytes = output_file.read_bytes()
             object_path = storage.save_artifact(job_request.job_id, str(output_file))
             artifact = Artifact(
+                artifact_id=uuid4(),
                 job_id=job_request.job_id,
                 artifact_type=_artifact_type_for_path(output_file),
                 path=object_path,

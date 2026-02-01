@@ -13,6 +13,7 @@ class ArtifactType(Enum):
     PYTHON_FILE = "py"
     
 class Artifact(BaseModel):
+    artifact_id: UUID
     job_id: UUID
     artifact_type: ArtifactType = Field(..., alias="artifact_type")
     path: str

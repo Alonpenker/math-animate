@@ -1,4 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
+from pathlib import Path
+from starlette.background import BackgroundTask
+import tempfile
 from uuid import UUID
 
 from app.dependencies.db import get_cursor
@@ -66,9 +70,25 @@ def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
         raise HTTPException(status_code=404, detail="Artifacts not found")
     return JobResponse(job=job, data=artifacts)
 
-# TODO: learn how to retrieve files using the api from the minio
-# TODO: implement the get specific artifact logic (need to add artifact_id apperently)
 @router.get("/{job_id}/artifacts/{artifact_id}")
-def get_artifact(job_id: str, artifact_id: str, storage: FilesStorageService = Depends(get_storage_service)) -> None:
-    # Get specific artifact logic...
-    pass
+def get_artifact(
+    job_id: UUID,
+    artifact_id: UUID,
+    cursor=Depends(get_cursor),
+    storage: FilesStorageService = Depends(get_storage_service),
+) -> FileResponse:
+    job = JobsRepository.get_job(cursor, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    artifact = ArtifactsRepository.get_artifact_by_id(cursor, artifact_id)
+    if artifact is None or artifact.job_id != job_id:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    file_name = Path(artifact.path).name
+    with tempfile.NamedTemporaryFile(prefix="artifact_", suffix=f"_{file_name}", delete=False) as tmp:
+        dest_path = Path(tmp.name)
+    storage.download_artifact(artifact.path, str(dest_path))
+    return FileResponse(
+        path=dest_path,
+        filename=file_name,
+        background=BackgroundTask(dest_path.unlink, missing_ok=True),
+    )

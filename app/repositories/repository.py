@@ -35,6 +35,10 @@ class Repository(ABC):
         return f"SELECT * FROM {cls.TABLE_NAME} WHERE {cls.PRIMARY_KEY}=%s"
     
     @classmethod
+    def get_all_by_job(cls):
+        return f"SELECT * FROM {cls.TABLE_NAME} WHERE job_id=%s"
+    
+    @classmethod
     def _create(cls):
         return f"CREATE TABLE IF NOT EXISTS {cls.TABLE_NAME} (" + \
                 ', '.join(f"{col} {typ}" for col, typ in cls.COLUMNS) + ")"

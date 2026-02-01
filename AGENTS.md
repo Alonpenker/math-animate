@@ -33,7 +33,7 @@
 * Validation: Pydantic v2
 * Async tasks / queue: Redis + Celery worker
 * Database: SQLite (MVP), Postgres later
-* Rendering: Manim (pinned version) in Docker
+* Rendering: Manim (pinned version) in Docker image
 * Storage: Local filesystem (artifact abstraction required)
 * LLM integration: OpenAI (planner + codegen), optional RAG
 ### Forbidden
@@ -51,31 +51,24 @@
 ### Package layout (guideline)
 * `app/routes/` – FastAPI routers + request/response DTOs
 * `app/schemas/` – models + request/response DTOs
-* `app/persistence/` – data mapping (ORM).
+* `app/repositories/` – data mapping (ORM) and executing queries.
 * `app/configs/` – configuration files + global constants
 * `app/services/` – business logic
+* `app/dependencies` - application dependencies
 * `app/utils/` – utility functions, loggers, and shared helpers
+* `app/workers/` – worker functions and middleware logic
 * `app/main.py` - FastAPI app entry point + middleware
-* `domain/` – schemas, job state machine, enums (no FastAPI, no IO)
-* `services/` – planner, codegen, storage, queue abstractions
-* `worker/` – job consumers and step execution
-* `render/` – render contracts and Docker invocation logic
-* `templates/` – Manim scene templates (parameterized)
-* `shared/` – constants, utilities used across services
 * `tests/` - unit tests + integration test
 ### Dependency rules
 * API → services
-* Worker → domain + services
-* Domain → no FastAPI, no Redis, no Docker, no filesystem
+* Worker → repositories | services
 * Renderer → **no dependency on app code**
 
 ## Job & State Model (NON-NEGOTIABLE)
 * Canonical states:
-  * `CREATED → PLANNING → PLANNED → APPROVED → CODEGEN → CODED → RENDER_QUEUED → RENDERING → RENDERED`
+  * `CREATED → PLANNING → PLANNED → APPROVED → CODEGEN → CODED → RENDERING → RENDERED`
   * Failure states: `FAILED_PLANNING`, `FAILED_CODEGEN`, `FAILED_RENDER`
 * Only **approved plans** may proceed to code generation.
-* Each plan, code bundle, and render run is **versioned and immutable**.
-* Retries must be explicit and recorded.
 
 ## API & Error Model (EDITABLE)
 ### REST conventions
