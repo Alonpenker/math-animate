@@ -5,7 +5,9 @@ import hashlib
 import shutil
 import subprocess
 
+from app.configs.app_settings import settings
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
+from app.dependencies.storage import init_storage, get_storage_client
 from app.domain.job_state import JobStatus, require_transition
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
@@ -27,6 +29,7 @@ app = Celery('manim-generator-planner',broker=BROKER, backend=BACKEND)
 
 @worker_process_init.connect
 def init_worker(**kwargs) -> None:
+    init_storage()
     init_db_pool()
 
 @worker_process_shutdown.connect
@@ -114,7 +117,11 @@ def generate_code(job_request_payload: dict) -> None:
         file_path = job_dir / "code.py"
         file_bytes = code.encode("utf-8")
         file_path.write_bytes(file_bytes)
-        object_path = FilesStorageService().save_artifact(job_request.job_id, str(file_path))
+        storage = FilesStorageService(
+                    client=get_storage_client(),
+                    bucket=settings.storage_bucket,
+                )
+        object_path = storage.save_artifact(job_request.job_id, str(file_path))
         artifact = Artifact(
             job_id=job_request.job_id,
             artifact_type=ArtifactType.PYTHON_FILE,
@@ -151,8 +158,10 @@ def generate_render(job_request_payload: dict) -> None:
     render_root = Path("/tmp/render") / str(job_request.job_id)
     input_dir = render_root / "input"
     output_dir = render_root / "output"
-    storage = FilesStorageService()
-
+    storage = FilesStorageService(
+                    client=get_storage_client(),
+                    bucket=settings.storage_bucket,
+                )
     try:
         with get_worker_cursor() as cursor:
             artifacts = ArtifactsRepository.get_artifacts(cursor, job_request.job_id)

@@ -4,12 +4,14 @@ from contextlib import asynccontextmanager
 
 from app.configs.app_settings import *
 from app.dependencies.db import init_db_pool, close_db_pool
+from app.dependencies.storage import init_storage
 from app.routes.jobs import router as jobs_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     init_db_pool()
+    init_storage()
     yield
     # Shutdown
     close_db_pool()

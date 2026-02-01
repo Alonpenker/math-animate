@@ -9,6 +9,11 @@ ROUTER_PREFIX = "/api/v1"
 
 # TODO: add here all the environment variables
 class Settings(BaseSettings):
-    openai_key: str = "abcd1234"
+    openai_key: str
+    
+    storage_endpoint: str
+    storage_access_point: str
+    storage_secret_key: str
+    storage_bucket: str
     
 settings = Settings()

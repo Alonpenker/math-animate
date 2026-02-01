@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from uuid import UUID
 
 from app.dependencies.db import get_cursor
+from app.dependencies.storage import get_storage_service
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
+from app.services.files_storage_service import FilesStorageService
 from app.schemas.artifact import Artifact, ArtifactType
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
@@ -80,6 +82,6 @@ def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
 # TODO: learn how to retrieve files using the api from the minio
 # TODO: implement the get specific artifact logic (need to add artifact_id apperently)
 @router.get("/{job_id}/artifacts/{artifact_id}")
-def get_artifact(job_id: str, artifact_id: str) -> None:
+def get_artifact(job_id: str, artifact_id: str, storage: FilesStorageService = Depends(get_storage_service)) -> None:
     # Get specific artifact logic...
     pass
