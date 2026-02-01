@@ -77,9 +77,8 @@ def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     ]
     return JobResponse(job=job, data=artifact_list)
 
-#TODO:
-# - learn how to retrieve files using the api from the minio
-# - implement the get specific artifact logic (need to add artifact_id apperently)
+# TODO: learn how to retrieve files using the api from the minio
+# TODO: implement the get specific artifact logic (need to add artifact_id apperently)
 @router.get("/{job_id}/artifacts/{artifact_id}")
 def get_artifact(job_id: str, artifact_id: str) -> None:
     # Get specific artifact logic...

@@ -18,9 +18,8 @@ from app.schemas.artifact import Artifact, ArtifactType
 from app.services.files_storage_service import FilesStorageService
 from app.workers.runner import WorkerRunner
 
-# TODO:
-# - move the connections to .env file
-# - use consts for all the scattered strings
+# TODO: move the connections to .env file
+# TODO: use consts for all the scattered strings
 BROKER = "amqp://guest:guest@rabbitmq:5672//"
 BACKEND = "redis://redis:6379/0"
 
@@ -50,8 +49,7 @@ def dummy_openai_call(user_request: UserRequest) -> VideoPlan:
 def dummy_codegen_call(data) -> str:
     return "def main():\n    print('hello world')\n"
 
-#TODO:
-# - delete this crap and use a more clean way (implement a feature in the ArtifactType)
+# TODO: delete this crap and use a more clean way (implement a feature in the ArtifactType)
 def _artifact_type_for_path(path: Path) -> ArtifactType:
     suffix = path.suffix.lower()
     if suffix == ".mp4":
@@ -107,10 +105,9 @@ def generate_code(job_request_payload: dict) -> None:
             cursor, job_request.job_id, JobStatus.CODEGEN.value
         )
 
-    try:
-        # TODO: 
-        # - need to find an approach to save in one file multiple scenes and than save it do
-        # the rendering proccess can corrrectly run the same file multiple time one for each scene
+    try: 
+        # TODO: need to find an approach to save in one file multiple scenes and than save it do
+        # TODO: rendering proccess can corrrectly run the same file multiple time one for each scene
         code = dummy_codegen_call(job_request.data)
         job_dir = Path("job_artifacts") / str(job_request.job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -175,10 +172,9 @@ def generate_render(job_request_payload: dict) -> None:
             raise RuntimeError("No python code artifact found for render.")
 
         code_path = code_files[0]
-        #TODO: 
-        # - the worker image is not able to run docker commands, needs to change the Dockerfile
-        # - the command should run multiple times, one for each scene and save all
-        # - No need for logs from the docker for now
+        # TODO: the worker image is not able to run docker commands, needs to change the Dockerfile
+        # TODO: the command should run multiple times, one for each scene and save all
+        # TODO: No need for logs from the docker for now
         command = [
             "docker","run","--rm","--network","none","--cpus","1","--memory","2g","-v",
             f"{input_dir}:/input:ro","-v",

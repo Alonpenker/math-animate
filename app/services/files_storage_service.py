@@ -7,8 +7,7 @@ MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
 MINIO_BUCKET = "artifacts"
 
-# TODO:
-# - should transform into a more robust solution, so the worker/api intialize a connection once
+# TODO: should transform into a more robust solution, so the worker/api intialize a connection once
 # and then uses the same connection over and over
 class FilesStorageService:
     def __init__(self) -> None:
