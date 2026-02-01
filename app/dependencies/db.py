@@ -1,26 +1,16 @@
 from contextlib import contextmanager
 from psycopg2.pool import SimpleConnectionPool
 
+from app.configs.app_settings import settings
 from app.repositories import *
 
 db_pool = None
-
-# TODO: move the connections to .env file
-DB_HOST = "postgres"
-DB_PORT = 5432
-DB_NAME = "manim"
-DB_USER = "manim"
-DB_PASSWORD = "manim"
 
 def init_db_pool():
     global db_pool
     if db_pool is None:
         db_pool = SimpleConnectionPool(minconn=1,maxconn=10,
-                                       host=DB_HOST,
-                                       port=DB_PORT,
-                                       dbname=DB_NAME,
-                                       user=DB_USER,
-                                       password=DB_PASSWORD)
+                                       dsn=settings.database_url)
 
 def close_db_pool():
     global db_pool
