@@ -20,4 +20,7 @@ class Settings(BaseSettings):
     
     database_url: str
     
+    broker_url: str
+    backend_url: str
+    
 settings = Settings()
