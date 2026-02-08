@@ -1,9 +1,11 @@
 from abc import ABC
 
+from app.schemas.schema import Schema
+
 class Repository(ABC):
     
     TABLE_NAME = "table_name"
-    COLUMNS = [("column_name","column_type")]
+    SCHEMA = Schema
     PRIMARY_KEY = "primary_key"
     
     @classmethod
@@ -12,15 +14,15 @@ class Repository(ABC):
     
     @classmethod
     def insert(cls):
-        placeholders = ",".join(['%s']*len(cls.COLUMNS))
-        columns = ','.join(f"{col}" for col, _ in cls.COLUMNS)
+        placeholders = ",".join(['%s']*cls.SCHEMA.field_count())
+        columns = ','.join(col for col in cls.SCHEMA.column_names())
         return f"""INSERT INTO {cls.TABLE_NAME} ({columns}) VALUES ({placeholders})"""
     
     @classmethod
     def modify(cls, field: str):
-        if field.lower() not in [col.lower() for col, _ in cls.COLUMNS]:
+        if field.upper() not in [col.upper() for col in cls.SCHEMA.column_names()]:
             raise ValueError(f"Field {field} not found in table {cls.TABLE_NAME}")
-        return f"UPDATE {cls.TABLE_NAME} SET {field.upper()}=%s WHERE {cls.PRIMARY_KEY}=%s"
+        return f"UPDATE {cls.TABLE_NAME} SET {field.upper()}=%s, {Schema.UPDATED_AT.name}=CURRENT_TIMESTAMP WHERE {cls.PRIMARY_KEY}=%s"
     
     @classmethod
     def delete(cls):
@@ -41,7 +43,7 @@ class Repository(ABC):
     @classmethod
     def _create(cls):
         return f"CREATE TABLE IF NOT EXISTS {cls.TABLE_NAME} (" + \
-                ', '.join(f"{col} {typ}" for col, typ in cls.COLUMNS) + ")"
+                ', '.join(f"{col.name} {col.sql_type}" for col in cls.SCHEMA.columns()) + ")"
     
     @classmethod
     def _truncate(cls):

@@ -1,14 +1,14 @@
 from typing import Optional
 from uuid import UUID
 
-from app.schemas.jobs import Job
+from app.schemas.jobs import Job, JobSchema
 from app.domain.job_state import JobStatus
 from app.repositories.repository import Repository
 
 class JobsRepository(Repository):
 
     TABLE_NAME = 'jobs'
-    COLUMNS = [("job_id","UUID PRIMARY KEY"),("status","TEXT")]
+    SCHEMA = JobSchema
     PRIMARY_KEY = 'job_id'
 
     @classmethod
@@ -21,9 +21,11 @@ class JobsRepository(Repository):
         row = cursor.fetchone()
         if row is None:
             return None
-        return Job(job_id=UUID(row[0]), status=JobStatus(row[1]))
+        return Job(
+            job_id=row[JobSchema.JOB_ID.name],
+            status=JobStatus(row[JobSchema.STATUS.name]),
+        )
 
     @classmethod
-    def update_job_status(cls, cursor, job_id: UUID, status: str) -> None:
-        FIELD = "status"
-        cursor.execute(cls.modify(FIELD), (status, str(job_id)))
+    def update_job_status(cls, cursor, job_id: UUID, status: JobStatus) -> None:
+        cursor.execute(cls.modify(cls.SCHEMA.STATUS.name), (status.value, str(job_id)))

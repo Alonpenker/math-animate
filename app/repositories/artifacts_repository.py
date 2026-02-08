@@ -1,21 +1,14 @@
 from typing import List
 from uuid import UUID
 
-from app.schemas.artifact import Artifact, ArtifactType
+from app.schemas.artifact import Artifact, ArtifactType, ArtifactSchema
 from app.repositories.repository import Repository
 
 
 class ArtifactsRepository(Repository):
 
     TABLE_NAME = 'artifacts'
-    COLUMNS = [
-        ("artifact_id","UUID PRIMARY KEY"),
-        ("job_id","UUID"),
-        ("artifact_type","TEXT"),
-        ("path","TEXT"),
-        ("size","INTEGER"),
-        ("sha256","TEXT"),
-    ]
+    SCHEMA = ArtifactSchema
     PRIMARY_KEY = "artifact_id"
 
     @classmethod
@@ -41,12 +34,12 @@ class ArtifactsRepository(Repository):
         rows = cursor.fetchall()
         return [
             Artifact(
-                artifact_id=row[0],
-                job_id=row[1],
-                artifact_type=ArtifactType(row[2]),
-                path=row[3],
-                size=row[4],
-                sha256=row[5],
+                artifact_id=row[ArtifactSchema.ARTIFACT_ID.name],
+                job_id=row[ArtifactSchema.JOB_ID.name],
+                artifact_type=ArtifactType(row[ArtifactSchema.ARTIFACT_TYPE.name]),
+                path=row[ArtifactSchema.PATH.name],
+                size=row[ArtifactSchema.SIZE.name],
+                sha256=row[ArtifactSchema.SHA256.name],
             )
             for row in rows
         ]
@@ -58,10 +51,10 @@ class ArtifactsRepository(Repository):
         if row is None:
             return None
         return Artifact(
-            artifact_id=row[0],
-            job_id=row[1],
-            artifact_type=ArtifactType(row[2]),
-            path=row[3],
-            size=row[4],
-            sha256=row[5],
+            artifact_id=row[ArtifactSchema.ARTIFACT_ID.name],
+            job_id=row[ArtifactSchema.JOB_ID.name],
+            artifact_type=ArtifactType(row[ArtifactSchema.ARTIFACT_TYPE.name]),
+            path=row[ArtifactSchema.PATH.name],
+            size=row[ArtifactSchema.SIZE.name],
+            sha256=row[ArtifactSchema.SHA256.name],
         )

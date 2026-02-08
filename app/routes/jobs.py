@@ -12,6 +12,7 @@ from app.repositories.artifacts_repository import ArtifactsRepository
 from app.services.files_storage_service import FilesStorageService
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
+from app.schemas.video_plan import VideoPlan
 from app.schemas.user_request import UserRequest
 from app.domain.job_state import JobStatus
 from app.workers.runner import WorkerRunner
@@ -21,13 +22,13 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 @router.post("",response_model=JobResponse)
 def create_job(user_request: UserRequest, cursor=Depends(get_cursor)) -> JobResponse:
     job = Job(status=JobStatus.CREATED)
-    job_request = JobUserRequest(job_id=job.job_id, status=job.status, data=user_request)
+    job_request = JobUserRequest(job=job, user_request=user_request)
     JobsRepository.create_job(cursor, job)
     WorkerRunner.advance(job_request)
     return JobResponse(job=job)
 
 
-@router.get("/{job_id}",response_model=JobResponse)
+@router.get("/{job_id}/status",response_model=JobResponse)
 def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(cursor, job_id)
     if job is None:
@@ -51,12 +52,13 @@ def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> Jo
         raise HTTPException(status_code=404, detail="Plan not found")
     if approved:
         job = Job(job_id=job_id, status=JobStatus.APPROVED)
-        JobsRepository.update_job_status(cursor, job_id, JobStatus.APPROVED.value)
-        job_request = JobPlanRequest(job_id=job.job_id, status=job.status, data=plan)
+        JobsRepository.update_job_status(cursor, job_id, JobStatus.APPROVED)
+        video_plan = VideoPlan.model_validate_json(plan.plan)
+        job_request = JobPlanRequest(job=job, plan=video_plan)
         WorkerRunner.advance(job_request)
     else:
         job = Job(job_id=job_id, status=JobStatus.CANCELLED)
-        JobsRepository.update_job_status(cursor, job_id, JobStatus.CANCELLED.value)
+        JobsRepository.update_job_status(cursor, job_id, JobStatus.CANCELLED)
     return JobResponse(job=job, data=plan)
 
 
@@ -83,8 +85,9 @@ def get_artifact(
     artifact = ArtifactsRepository.get_artifact_by_id(cursor, artifact_id)
     if artifact is None or artifact.job_id != job_id:
         raise HTTPException(status_code=404, detail="Artifact not found")
+    
     file_name = Path(artifact.path).name
-    with tempfile.NamedTemporaryFile(prefix="artifact_", suffix=f"_{file_name}", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=f"_{file_name}", delete=False) as tmp:
         dest_path = Path(tmp.name)
     storage.download_artifact(artifact.path, str(dest_path))
     return FileResponse(

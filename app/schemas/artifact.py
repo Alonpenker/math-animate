@@ -1,6 +1,9 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 from uuid import UUID
+
+from app.schemas.db_column import DBColumn
+from app.schemas.schema import Schema
 from pathlib import Path
 
 
@@ -29,3 +32,11 @@ class Artifact(BaseModel):
     path: str
     size: int = Field(..., ge=0)
     sha256: str
+
+class ArtifactSchema(Schema):
+    ARTIFACT_ID = DBColumn(name="artifact_id", type="UUID", attributes=["PRIMARY KEY"])
+    JOB_ID = DBColumn(name="job_id", type="UUID", attributes=["NOT NULL"])
+    ARTIFACT_TYPE = DBColumn(name="artifact_type", type="TEXT", attributes=["NOT NULL"])
+    PATH = DBColumn(name="path", type="TEXT", attributes=["NOT NULL"])
+    SIZE = DBColumn(name="size", type="INTEGER", attributes=["NOT NULL"])
+    SHA256 = DBColumn(name="sha256", type="TEXT", attributes=["NOT NULL"])
