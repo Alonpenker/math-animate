@@ -8,9 +8,9 @@ class FilesStorageService:
         self._client = client
         self._bucket = bucket
     
-    def save_artifact(self, job_id: UUID, file_path: str) -> str:
-        object_name = f"{job_id}/{Path(file_path).name}"
-        self._client.fput_object(self._bucket, object_name, file_path)
+    def save_artifact(self, job_id: UUID, file_path: Path) -> str:
+        object_name = f"{job_id}/{file_path.name}"
+        self._client.fput_object(self._bucket, object_name, str(file_path))
         return object_name
 
     def download_artifact(self, object_name: str, file_path: str) -> None:

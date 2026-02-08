@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     openai_key: str
     
     storage_endpoint: str
-    storage_access_point: str
+    storage_access_key: str
     storage_secret_key: str
     storage_bucket: str
     
