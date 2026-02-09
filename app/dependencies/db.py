@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from psycopg2.pool import SimpleConnectionPool
+from psycopg2.extras import RealDictCursor
 
 from app.configs.app_settings import settings
 from app.repositories import *
@@ -22,10 +23,13 @@ def get_cursor():
     if db_pool is None:
         raise RuntimeError("DB pool not initialized, Call init_db_pool() first.")
     conn = db_pool.getconn()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         yield cursor
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cursor.close()
         db_pool.putconn(conn)
@@ -44,6 +48,9 @@ def init_db_tables() -> None:
         cursor.execute(PlansRepository._create())
         cursor.execute(ArtifactsRepository._create())
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cursor.close()
         db_pool.putconn(conn)

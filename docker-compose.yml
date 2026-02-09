@@ -16,11 +16,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+    env_file:
+      - .env
 
   worker:
     build:
       context: .
-    command: ["uv","run","celery", "-A", "app.workers.worker", "worker", "--loglevel=info"]
+    command: ["uv", "run", "celery", "-A", "app.workers.worker", "worker"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,6 +32,14 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      docker-daemon:
+        condition: service_healthy
+    environment:
+      DOCKER_HOST: tcp://docker-daemon:2375
+    env_file:
+      - .env
+    volumes:
+      - render_data:/job
 
   redis:
     image: redis:7-alpine
@@ -45,6 +55,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit log_levels [{connection,warning}]"
     healthcheck:
       test: ["CMD-SHELL","rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -60,31 +71,41 @@ services:
       POSTGRES_DB: manim
       POSTGRES_USER: manim
       POSTGRES_PASSWORD: manim
+    command: ["postgres", "-c", "log_min_messages=WARNING"]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U manim"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   minio:
     image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: ["server", "/data", "--console-address", ":9001","--quiet"]
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
+  
+  docker-daemon:
+    image: docker:dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - render_data:/job
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
 
 
 volumes:
   rabbitmq_data:
   postgres_data:
   minio_data:
+  render_data:

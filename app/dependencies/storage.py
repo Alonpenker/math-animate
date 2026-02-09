@@ -8,8 +8,8 @@ def get_storage_client() -> Minio:
     global _minio_client
     if _minio_client is None:
         _minio_client = Minio(
-            settings.storage_access_point,
-            access_key=settings.storage_access_point,
+            settings.storage_endpoint,
+            access_key=settings.storage_access_key,
             secret_key=settings.storage_secret_key,
             secure=False,
         )

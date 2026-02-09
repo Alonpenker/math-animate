@@ -7,11 +7,11 @@ class WorkerRunner:
     
     @staticmethod
     def advance(job_request: JobRequest) -> None:
-        if job_request.status == JobStatus.CREATED:
+        if job_request.job.status == JobStatus.CREATED:
             WorkerRunner.handle_planning(job_request)
-        elif job_request.status == JobStatus.APPROVED:
+        elif job_request.job.status == JobStatus.APPROVED:
             WorkerRunner.handle_codegen(job_request)
-        elif job_request.status == JobStatus.CODED:
+        elif job_request.job.status == JobStatus.CODED:
             WorkerRunner.handle_render(job_request)
         else:
             raise NotImplementedError
