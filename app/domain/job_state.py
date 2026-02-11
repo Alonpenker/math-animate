@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Dict, FrozenSet
 
+from app.exceptions.invalid_transition_error import InvalidTransitionError
+
 
 class JobStatus(str, Enum):
     CREATED = "CREATED"
@@ -35,11 +37,6 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
 
 def can_transition(current: JobStatus, target: JobStatus) -> bool:
     return target in ALLOWED_TRANSITIONS.get(current, frozenset())
-
-
-class InvalidTransitionError(ValueError):
-    pass
-
 
 def require_transition(current: JobStatus, target: JobStatus) -> None:
     if not can_transition(current, target):

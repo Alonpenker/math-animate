@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.configs.app_settings import *
 from app.dependencies.db import init_db_pool, init_db_tables, close_db_pool
 from app.dependencies.storage import init_storage
+from app.exceptions.exception_handler import handle_exceptions
 from app.routes.jobs import router as jobs_router
 
 @asynccontextmanager
@@ -30,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# TODO: should add an exception handler
+app.add_exception_handler(Exception, handle_exceptions)
 
 @app.get("/")
 async def root():

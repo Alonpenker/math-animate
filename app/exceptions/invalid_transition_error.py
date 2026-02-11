@@ -1,0 +1,2 @@
+class InvalidTransitionError(ValueError):
+    pass

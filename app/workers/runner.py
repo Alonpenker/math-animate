@@ -14,7 +14,7 @@ class WorkerRunner:
         elif job_request.job.status == JobStatus.CODED:
             WorkerRunner.handle_render(job_request)
         else:
-            raise NotImplementedError
+            raise ValueError(f"Unsupported job status: {job_request.job.status}")
     
     @staticmethod
     def handle_planning(job_request: JobRequest) -> None:
