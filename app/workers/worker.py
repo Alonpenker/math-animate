@@ -1,4 +1,5 @@
-from celery import Celery
+from typing import Optional
+from celery import Celery, current_task
 from celery.signals import worker_process_init, worker_process_shutdown
 from pathlib import Path
 from uuid import uuid4
@@ -6,6 +7,7 @@ import tempfile
 import hashlib
 import shutil
 import subprocess
+import os
 
 from app.configs.app_settings import settings
 from app.workers.worker_settings import PathNames, DockerCommands
@@ -20,10 +22,23 @@ from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
 from app.services.files_storage_service import FilesStorageService
+from app.utils.logging import get_logger
 
 app = Celery('manim-generator-worker',
              broker=settings.broker_url, 
              backend=settings.backend_url)
+
+logger = get_logger(__name__)
+
+def log_context(job_id: Optional[str] = None) -> str:
+    parts: list[str] = [f"pid={os.getpid()}"]
+    if current_task is not None and getattr(current_task, "request", None) is not None:
+        hostname = getattr(current_task.request, "hostname", None)
+        if hostname:
+            parts.append(f"worker={hostname}")
+    if job_id:
+        parts.append(f"job_id={job_id}")
+    return " ".join(parts)
 
 @worker_process_init.connect
 def init_worker(**kwargs) -> None:
@@ -35,18 +50,22 @@ def shutdown_worker(**kwargs) -> None:
     close_db_pool()
 
 
-
 @app.task(max_retries=1)
 def generate_plan(job_request_payload: dict) -> None:
-    job_request = JobUserRequest(**job_request_payload)
-    
-    require_transition(job_request.job.status, JobStatus.PLANNING)
-    with get_worker_cursor() as cursor:
-        JobsRepository.update_job_status(
-            cursor, job_request.job.job_id, JobStatus.PLANNING
-        )
-
     try:
+        job_request = JobUserRequest(**job_request_payload)
+    except Exception:
+        logger.exception("Invalid user request payload (%s)", log_context())
+        raise
+    
+    try:
+        logger.info("Planning started (%s)", log_context(str(job_request.job.job_id)))
+        require_transition(job_request.job.status, JobStatus.PLANNING)
+        with get_worker_cursor() as cursor:
+            JobsRepository.update_job_status(
+                cursor, job_request.job.job_id, JobStatus.PLANNING
+            )
+        logger.info("LLM planning call started (%s)", log_context(str(job_request.job.job_id)))
         plan: VideoPlan = LLMService.plan_call(job_request.user_request)
         require_transition(JobStatus.PLANNING, JobStatus.PLANNED)
         with get_worker_cursor() as cursor:
@@ -54,28 +73,36 @@ def generate_plan(job_request_payload: dict) -> None:
             JobsRepository.update_job_status(
                 cursor, job_request.job.job_id, JobStatus.PLANNED
             )
+        logger.info("Planning completed (%s)", log_context(str(job_request.job.job_id)))
 
 
     except Exception:
         require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         with get_worker_cursor() as cursor:
+            logger.exception("Planning failed (%s)", log_context(str(job_request.job.job_id)))
             JobsRepository.update_job_status(
                 cursor, job_request.job.job_id, JobStatus.FAILED_PLANNING
             )
         raise
 
     
-@app.task(max_retries=2)
+@app.task(max_retries=1)
 def generate_code(job_request_payload: dict) -> None:
-    job_request = JobPlanRequest(**job_request_payload)
+    try:
+        job_request = JobPlanRequest(**job_request_payload)
+    except Exception:
+        logger.exception("Invalid plan request payload (%s)", log_context())
+        raise
     
-    require_transition(job_request.job.status, JobStatus.CODEGEN)
-    with get_worker_cursor() as cursor:
-        JobsRepository.update_job_status(
-            cursor, job_request.job.job_id, JobStatus.CODEGEN
-        )
-
     try: 
+        require_transition(job_request.job.status, JobStatus.CODEGEN)
+        with get_worker_cursor() as cursor:
+            JobsRepository.update_job_status(
+                cursor, job_request.job.job_id, JobStatus.CODEGEN
+            )
+
+    
+        logger.info("Codegen LLM call started (%s)", log_context(str(job_request.job.job_id)))
         code = LLMService.codegen_call(job_request.plan)
         job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_request.job.job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -113,6 +140,7 @@ def generate_code(job_request_payload: dict) -> None:
             JobsRepository.update_job_status(
                 cursor, job_request.job.job_id, JobStatus.CODED
             )
+        logger.info("Codegen completed; render enqueued (%s)", log_context(str(job_request.job.job_id)))
         generate_render.delay(
             JobRequest(job=Job(job_id=job_request.job.job_id, 
                                status=JobStatus.CODED)).model_dump(mode="json")
@@ -120,6 +148,7 @@ def generate_code(job_request_payload: dict) -> None:
     except Exception:
         require_transition(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         with get_worker_cursor() as cursor:
+            logger.exception("Codegen failed (%s)", log_context(str(job_request.job.job_id)))
             JobsRepository.update_job_status(
                 cursor, job_request.job.job_id, JobStatus.FAILED_CODEGEN
             )
@@ -127,22 +156,28 @@ def generate_code(job_request_payload: dict) -> None:
 
 @app.task(max_retries=1)
 def generate_render(job_request_payload: dict) -> None:
-    job_request = JobRequest(**job_request_payload)
-
-    require_transition(job_request.job.status, JobStatus.RENDERING)
-    with get_worker_cursor() as cursor:
-        JobsRepository.update_job_status(
-            cursor, job_request.job.job_id, JobStatus.RENDERING
-        )
-
-    render_root = Path(PathNames.TMP_RENDER_FOLDER)
-    input_dir = render_root / str(job_request.job.job_id) / PathNames.INPUT_FOLDER
-    
-    storage = FilesStorageService(
-                    client=get_storage_client(),
-                    bucket=settings.storage_bucket,
-                )
     try:
+        job_request = JobRequest(**job_request_payload)
+    except Exception:
+        logger.exception("Invalid job request payload (%s)", log_context())
+        raise
+    
+    try:
+        require_transition(job_request.job.status, JobStatus.RENDERING)
+        with get_worker_cursor() as cursor:
+            JobsRepository.update_job_status(
+                cursor, job_request.job.job_id, JobStatus.RENDERING
+            )
+        logger.info("Render started (%s)", log_context(str(job_request.job.job_id)))
+
+        render_root = Path(PathNames.TMP_RENDER_FOLDER)
+        input_dir = render_root / str(job_request.job.job_id) / PathNames.INPUT_FOLDER
+        
+        storage = FilesStorageService(
+                        client=get_storage_client(),
+                        bucket=settings.storage_bucket,
+                    )
+        
         with get_worker_cursor() as cursor:
             plan = PlansRepository.get_plan(cursor, job_request.job.job_id)
         if plan is None:
@@ -192,9 +227,21 @@ def generate_render(job_request_payload: dict) -> None:
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
-            print(f"Docker render failed: {exc}")
-            print(f"Docker stdout:\n{exc.stdout or ''}")
-            print(f"Docker stderr:\n{exc.stderr or ''}")
+            logger.error(
+                "Docker render failed (%s) exit=%s",
+                log_context(str(job_request.job.job_id)),
+                exc.returncode,
+            )
+            logger.error(
+                "Docker stdout (%s) size=%s",
+                log_context(str(job_request.job.job_id)),
+                len(exc.stdout or ""),
+            )
+            logger.error(
+                "Docker stderr (%s) size=%s",
+                log_context(str(job_request.job.job_id)),
+                len(exc.stderr or ""),
+            )
             raise
         
         videos_dir = media_dir / PathNames.VIDEOS_FOLDER / code_path.stem / PathNames.RESOLUTION_FOLDER
@@ -236,7 +283,9 @@ def generate_render(job_request_payload: dict) -> None:
             JobsRepository.update_job_status(
                 cursor, job_request.job.job_id, JobStatus.RENDERED
             )
+        logger.info("Render completed (%s)", log_context(str(job_request.job.job_id)))
     except Exception:
+        logger.exception("Render failed (%s)", log_context(str(job_request.job.job_id)))
         require_transition(JobStatus.RENDERING, JobStatus.FAILED_RENDER)
         with get_worker_cursor() as cursor:
             JobsRepository.update_job_status(

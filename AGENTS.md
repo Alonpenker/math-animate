@@ -102,12 +102,7 @@
 * Renderer must be reproducible (pinned Manim + deps).
 
 ## Logging & Observability
-* Structured logs with: job_id, step, attempt, duration.
-* Every failure must store:
-  * error category
-  * stderr/stdout paths
-  * render exit code (if applicable)
-* Silence is failure. If something breaks, it must be traceable.
+* 
 
 ## Testing
 * Unit tests for:
