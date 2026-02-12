@@ -14,7 +14,7 @@
 
 ## Operating Rules (anti-hallucination, ALWAYS)
 * Do not invent endpoints, schemas, job states, or services. Search the repo first.
-* Prefer minimal, local changes. No unrelated refactors.
+* Prefer minimal, local changes. No unrelated refactors or non-essential functions.
 * Respect the job state machine; never bypass required transitions.
 * Keep the system runnable locally at all times.
 * If something is unclear: write TODO + propose **2 explicit options**. Do not guess.
@@ -32,15 +32,14 @@
 * Web API: FastAPI
 * Validation: Pydantic v2
 * Async tasks / queue: Redis + Celery worker
-* Database: SQLite (MVP), Postgres later
+* Database: Postgres
 * Rendering: Manim (pinned version) in Docker image
-* Storage: Local filesystem (artifact abstraction required)
-* LLM integration: OpenAI (planner + codegen), optional RAG
+* Storage: MinIO (local)
+* LLM integration: OpenAI (planner + codegen), RAG with vector database (postgres)
 ### Forbidden
 * Executing Manim or generated code inside API or worker process
 * Long-running or blocking work in API routes
 * Skipping schema validation
-* Writing files outside the job workspace
 * Logging secrets, API keys, or full prompts with sensitive data
 
 ## Architecture
@@ -53,14 +52,14 @@
 * `app/schemas/` – models + request/response DTOs
 * `app/repositories/` – data mapping (ORM) and executing queries.
 * `app/configs/` – configuration files + global constants
-* `app/services/` – business logic
+* `app/services/` – External systems abstraction layer
 * `app/dependencies` - application dependencies
 * `app/utils/` – utility functions, loggers, and shared helpers
 * `app/workers/` – worker functions and middleware logic
 * `app/main.py` - FastAPI app entry point + middleware
 * `tests/` - unit tests + integration test
 ### Dependency rules
-* API → services
+* API → repositories | services
 * Worker → repositories | services
 * Renderer → **no dependency on app code**
 
@@ -100,9 +99,6 @@
   * Invoking renderer
   * Collecting outputs and logs
 * Renderer must be reproducible (pinned Manim + deps).
-
-## Logging & Observability
-* 
 
 ## Testing
 * Unit tests for:
