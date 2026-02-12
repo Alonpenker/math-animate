@@ -27,7 +27,7 @@ class DockerCommands:
     def volume(src: str, dst: Path, mode: str):
         return ("-v", f"{src}:{dst}:{mode}")
     
-    IMAGE = ("manimcommunity/manim",)
+    IMAGE = ("manimcommunity/manim:v0.19.2",)
     
     @staticmethod
     def manim_command(code_path: Path, media_dir: Path):

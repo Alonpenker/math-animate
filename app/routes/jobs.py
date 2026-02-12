@@ -41,13 +41,19 @@ def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
 
 @router.get("/{job_id}/plan",response_model=JobResponse)
 def get_plan(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
+    job = JobsRepository.get_job(cursor, job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job not found. (job_id={job_id})",
+        )
     plan = PlansRepository.get_plan(cursor, job_id)
     if plan is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Plan not found for this job. (job_id={job_id})",
         )
-    job = Job(job_id=job_id, status=JobStatus.PLANNED)
+    job = Job(job_id=job_id, status=job.status)
     return JobResponse(job=job, data=plan)
 
 
