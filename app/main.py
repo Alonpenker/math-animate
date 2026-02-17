@@ -7,6 +7,7 @@ from app.dependencies.db import init_db_pool, init_db_tables, close_db_pool
 from app.dependencies.storage import init_storage
 from app.exceptions.exception_handler import handle_exceptions
 from app.routes.jobs import router as jobs_router
+from app.routes.knowledge import router as knowledge_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +28,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
     allow_credentials=True,
-    allow_methods=["GET","POST"],
+    allow_methods=["GET","POST","PATCH","DELETE"],
     allow_headers=["*"]
 )
 
@@ -39,5 +40,6 @@ async def root():
 
 api_router = APIRouter(prefix=ROUTER_PREFIX)
 api_router.include_router(jobs_router)
+api_router.include_router(knowledge_router)
 
 app.include_router(api_router)

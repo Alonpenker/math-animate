@@ -19,7 +19,7 @@ from app.workers.runner import WorkerRunner
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-@router.post("",response_model=JobResponse)
+@router.post("",status_code=status.HTTP_201_CREATED)
 def create_job(user_request: UserRequest, cursor=Depends(get_cursor)) -> JobResponse:
     job = Job(status=JobStatus.CREATED)
     job_request = JobUserRequest(job=job, user_request=user_request)
@@ -28,7 +28,7 @@ def create_job(user_request: UserRequest, cursor=Depends(get_cursor)) -> JobResp
     return JobResponse(job=job)
 
 
-@router.get("/{job_id}/status",response_model=JobResponse)
+@router.get("/{job_id}/status")
 def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(cursor, job_id)
     if job is None:
@@ -39,7 +39,7 @@ def get_job_status(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     return JobResponse(job=job)
 
 
-@router.get("/{job_id}/plan",response_model=JobResponse)
+@router.get("/{job_id}/plan")
 def get_plan(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(cursor, job_id)
     if job is None:
@@ -57,7 +57,7 @@ def get_plan(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
     return JobResponse(job=job, data=plan)
 
 
-@router.patch("/{job_id}/approve",response_model=JobResponse)
+@router.patch("/{job_id}/approve")
 def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(cursor, job_id)
     if job is None:
@@ -105,6 +105,7 @@ def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
         )
     artifacts = ArtifactsRepository.get_artifacts(cursor, job_id)
     return JobResponse(job=job, data=artifacts)
+
 
 @router.get("/{job_id}/artifacts/{artifact_id}")
 def get_artifact(

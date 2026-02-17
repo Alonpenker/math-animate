@@ -41,6 +41,22 @@ class Repository(ABC):
         return f"SELECT * FROM {cls.TABLE_NAME} WHERE job_id=%s"
     
     @classmethod
+    def get_all_by_field(cls, field: str):
+        if field not in cls.SCHEMA.column_names():
+            raise ValueError(f"Field {field} not found in table {cls.TABLE_NAME}")
+        return f"SELECT * FROM {cls.TABLE_NAME} WHERE {field}=%s"
+    
+    @classmethod
+    def search_by_vector(cls, vector_field: str, filter_field: str):
+        return (
+            f"SELECT *, {vector_field} <=> %s AS distance "
+            f"FROM {cls.TABLE_NAME} "
+            f"WHERE {filter_field} = %s "
+            f"ORDER BY distance "
+            f"LIMIT %s"
+        )
+
+    @classmethod
     def _create(cls):
         return f"CREATE TABLE IF NOT EXISTS {cls.TABLE_NAME} (" + \
                 ', '.join(f"{col.name} {col.sql_type}" for col in cls.SCHEMA.columns()) + ")"

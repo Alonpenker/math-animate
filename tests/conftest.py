@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 # Ensure settings can load during module imports in tests.
-os.environ.setdefault("openai_key", "test-openai-key")
+os.environ.setdefault("api_key", "test-api-key")
 os.environ.setdefault("storage_endpoint", "localhost:9000")
 os.environ.setdefault("storage_access_key", "minioadmin")
 os.environ.setdefault("storage_secret_key", "minioadmin")
@@ -23,6 +23,7 @@ def test_store() -> dict[str, Any]:
         "plans": {},
         "artifacts": {},
         "objects": {},
+        "knowledge": {},
         "worker_runner_calls": [],
         "render_delay_payloads": [],
         "status_updates": [],
@@ -232,3 +233,89 @@ def capture_render_delay(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, 
         test_store["render_delay_payloads"].append(payload)
 
     monkeypatch.setattr(worker_module.generate_render, "delay", fake_delay)
+
+
+@pytest.fixture
+def mock_rag_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import rag_service as rag_module
+    import numpy as np
+
+    monkeypatch.setattr(
+        rag_module.RAGService, "embed_text",
+        staticmethod(lambda text: np.zeros(1536, dtype=np.float32)),
+    )
+
+
+@pytest.fixture
+def mock_knowledge_repository(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any]) -> None:
+    from app.repositories.knowledge_repository import KnowledgeRepository
+    from app.schemas.knowledge import KnowledgeDocument, KnowledgeDocumentSchema, KnowledgeType
+
+    S = KnowledgeDocumentSchema
+
+    def create_document(cursor, document_id, content, doc_type, title, embedding):
+        test_store["knowledge"][document_id] = {
+            S.DOCUMENT_ID.name: document_id,
+            S.CONTENT.name: content,
+            S.DOC_TYPE.name: doc_type,
+            S.TITLE.name: title,
+            S.EMBEDDING.name: embedding,
+        }
+
+    def get_document(cursor, document_id):
+        row = test_store["knowledge"].get(document_id)
+        if row is None:
+            return None
+        return KnowledgeDocument(
+            document_id=row[S.DOCUMENT_ID.name],
+            content=row[S.CONTENT.name],
+            doc_type=KnowledgeType(row[S.DOC_TYPE.name]),
+            title=row[S.TITLE.name],
+        )
+
+    def delete_document(cursor, document_id):
+        return test_store["knowledge"].pop(document_id, None) is not None
+    
+    def get_documents(cursor, doc_type):
+        docs = []
+        for row in test_store["knowledge"].values():
+            if row[S.DOC_TYPE.name] != doc_type:
+                continue
+            docs.append(
+                KnowledgeDocument(
+                    document_id=row[S.DOCUMENT_ID.name],
+                    content=row[S.CONTENT.name],
+                    doc_type=KnowledgeType(row[S.DOC_TYPE.name]),
+                    title=row[S.TITLE.name],
+                )
+            )
+        return docs
+
+    def search_similar(cursor, embedding, doc_type, limit=3):
+        docs = []
+        for row in test_store["knowledge"].values():
+            if row[S.DOC_TYPE.name] != doc_type:
+                continue
+            docs.append(KnowledgeDocument(
+                document_id=row[S.DOCUMENT_ID.name],
+                content=row[S.CONTENT.name],
+                doc_type=KnowledgeType(row[S.DOC_TYPE.name]),
+                title=row[S.TITLE.name],
+            ))
+        return docs[:limit]
+
+    monkeypatch.setattr(KnowledgeRepository, "create_document", staticmethod(create_document))
+    monkeypatch.setattr(KnowledgeRepository, "get_document", staticmethod(get_document))
+    monkeypatch.setattr(KnowledgeRepository, "get_documents", staticmethod(get_documents))
+    monkeypatch.setattr(KnowledgeRepository, "delete_document", staticmethod(delete_document))
+    monkeypatch.setattr(KnowledgeRepository, "search_similar", staticmethod(search_similar))
+
+
+@pytest.fixture
+def knowledge_routes_with_mocks(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_knowledge_repository: None,
+    mock_rag_service: None,
+):
+    from app.routes import knowledge as knowledge_routes
+    return knowledge_routes

@@ -8,6 +8,7 @@ ColumnType = Literal[
     "BOOLEAN",
     "INTEGER",
     "TIMESTAMP",
+    "VECTOR(1536)",
 ]
 
 class DBColumn(BaseModel):

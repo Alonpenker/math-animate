@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 APP_NAME = "Manim-Generator"
@@ -11,8 +12,8 @@ APP_VERSION = "0.0.1"
 ROUTER_PREFIX = "/api/v1"
 
 class Settings(BaseSettings):
-    openai_key: str
-    
+    api_key: SecretStr
+
     storage_endpoint: str
     storage_access_key: str
     storage_secret_key: str

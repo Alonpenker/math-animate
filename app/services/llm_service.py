@@ -1,62 +1,107 @@
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
-
+from app.configs.app_settings import settings
+from app.configs.llm_settings import (
+    LLMProvider, LLM_PROVIDER, LLM_CHAT_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
+    PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
+)
+from app.dependencies.db import get_worker_cursor
+from app.repositories.knowledge_repository import KnowledgeRepository
+from app.schemas.knowledge import KnowledgeType
 from app.schemas.user_request import UserRequest
 from app.schemas.video_plan import VideoPlan
+from app.services.rag_service import RAGService
 
-CODEGEN_EXAMPLE = """from manim import *
-
-class Scene1(Scene):
-    def construct(self):
-        example_text = Tex(
-            "This is a some text",
-            tex_to_color_map={"text": YELLOW},
-        )
-        example_tex = MathTex(
-            "\\\\sum_{k=1}^\\\\infty {1 \\\\over k^2} = {\\\\pi^2 \\\\over 6}",
-        )
-        group = VGroup(example_text, example_tex)
-        group.arrange(DOWN)
-        group.width = config["frame_width"] - 2 * LARGE_BUFF
-
-        self.play(Write(example_text))
-        self.play(Write(example_tex))
-        self.wait()
-
-class Scene2(Scene):
-    def construct(self):
-        circle = Circle()
-        square = Square()
-        square.flip(RIGHT)
-        square.rotate(-3 * TAU / 8)
-        circle.set_fill(PINK, opacity=0.5)
-
-        self.play(Create(square))
-        self.play(Transform(square, circle))
-        self.play(FadeOut(square))
-"""
-PLAN_EXAMPLE = """{
-  "scenes": [
-    {
-      "learning_objective": "Understand what a variable represents in a linear equation.",
-      "visual_storyboard": "Show a simple linear equation on a whiteboard and highlight the variable.",
-      "voice_notes": "Explain that a variable stands for an unknown number in the equation.",
-      "scene_number": 1
-    },
-    {
-      "learning_objective": "Solve a one-step linear equation by isolating the variable.",
-      "visual_storyboard": "Animate subtracting the same number from both sides of the equation.",
-      "voice_notes": "Walk through the steps to isolate the variable and find its value.",
-      "scene_number": 2
-    }
-  ]
-}"""
 
 class LLMService:
-    
+
+    PROVIDERS = {
+        LLMProvider.OPENAI: lambda: ChatOpenAI(
+            model=LLM_CHAT_MODEL,
+            temperature=LLM_TEMPERATURE,
+            max_completion_tokens=LLM_MAX_TOKENS,
+            api_key=settings.api_key,
+        ),
+        LLMProvider.ANTHROPIC: lambda: ChatAnthropic(
+            model_name=LLM_CHAT_MODEL,
+            temperature=LLM_TEMPERATURE,
+            max_tokens_to_sample=LLM_MAX_TOKENS,
+            api_key=settings.api_key,
+            timeout=None,
+            stop=None
+        ),
+    }
+
+    _chat_model = None
+
+    @classmethod
+    def get_chat_model(cls) -> ChatOpenAI | ChatAnthropic:
+        if cls._chat_model is None:
+            builder = cls.PROVIDERS.get(LLM_PROVIDER)
+            if builder is None:
+                raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+            cls._chat_model = builder()
+        return cls._chat_model
+
+    @classmethod
+    def retrieve_examples(cls, cursor, query: str, doc_type: KnowledgeType) -> str:
+        embedding = RAGService.embed_text(query)
+        docs = KnowledgeRepository.search_similar(
+            cursor, embedding, doc_type.value, limit=RAG_SIMILARITY_TOP_K
+        )
+        if not docs:
+            return "(No examples available.)"
+        parts = []
+        for i, doc in enumerate(docs, 1):
+            parts.append(f"--- Example {i} ---\n{doc.content}")
+        return "\n\n".join(parts)
+
     @staticmethod
     def plan_call(user_request: UserRequest) -> VideoPlan:
-        return VideoPlan.model_validate_json(PLAN_EXAMPLE)
-    
+        query = (
+            f"Topic: {user_request.topic}\n"
+            f"Misconceptions: {', '.join(user_request.misconceptions)}\n"
+            f"Constraints: {', '.join(user_request.constraints)}\n"
+            f"Number of scenes: {user_request.number_of_scenes}"
+        )
+
+        with get_worker_cursor() as cursor:
+            examples = LLMService.retrieve_examples(cursor, query, KnowledgeType.PLAN)
+
+        system_prompt = PLAN_SYSTEM_PROMPT.format(examples=examples)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{query}"),
+        ])
+
+        model = LLMService.get_chat_model()
+        structured_model = model.with_structured_output(VideoPlan)
+        chain = prompt | structured_model
+        plan = chain.invoke({"query": query})
+        if isinstance(plan, VideoPlan):
+            return plan
+        raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
+        
+
     @staticmethod
     def codegen_call(plan: VideoPlan) -> str:
-        return CODEGEN_EXAMPLE
+        plan_text = plan.model_dump_json(indent=2)
+
+        with get_worker_cursor() as cursor:
+            examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE)
+
+        system_prompt = CODEGEN_SYSTEM_PROMPT.format(examples=examples)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "Generate Manim code for this plan:\n{plan}"),
+        ])
+
+        model = LLMService.get_chat_model()
+        chain = prompt | model
+        response = chain.invoke({"plan": plan_text})
+        content = response.content
+        if isinstance(content, str):
+            return content
+        raise ValueError("LLM returned non-text response content for code generation.")
