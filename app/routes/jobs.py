@@ -1,15 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
-from pathlib import Path
-from starlette.background import BackgroundTask
-import tempfile
 from uuid import UUID
 
 from app.dependencies.db import get_cursor
-from app.dependencies.storage import get_storage_service
 from app.repositories.jobs_repository import JobsRepository
-from app.repositories.artifacts_repository import ArtifactsRepository
-from app.services.files_storage_service import FilesStorageService
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
 from app.schemas.video_plan import VideoPlan
@@ -86,53 +79,10 @@ def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> Jo
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Invalid stored plan JSON (job_id={job_id})",
             )
-        job_request = JobPlanRequest(job=job, 
+        job_request = JobPlanRequest(job=job,
                                      plan=video_plan)
         WorkerRunner.advance(job_request)
     else:
         job = Job(job_id=job_id, status=JobStatus.CANCELLED)
         JobsRepository.update_job_status(cursor, job_id, JobStatus.CANCELLED)
     return JobResponse(job=job)
-
-
-@router.get("/{job_id}/artifacts", response_model=JobResponse)
-def get_artifacts(job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
-    job = JobsRepository.get_job(cursor, job_id)
-    if job is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job not found. (job_id={job_id})",
-        )
-    artifacts = ArtifactsRepository.get_artifacts(cursor, job_id)
-    return JobResponse(job=job, data=artifacts)
-
-
-@router.get("/{job_id}/artifacts/{artifact_id}")
-def get_artifact(
-    job_id: UUID,
-    artifact_id: UUID,
-    cursor=Depends(get_cursor),
-    storage: FilesStorageService = Depends(get_storage_service),
-) -> FileResponse:
-    job = JobsRepository.get_job(cursor, job_id)
-    if job is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job not found. (job_id={job_id})",
-        )
-    artifact = ArtifactsRepository.get_artifact_by_id(cursor, artifact_id)
-    if artifact is None or artifact.job_id != job_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Artifact not found. (job_id={job_id}, artifact_id={artifact_id})",
-        )
-    
-    file_name = Path(artifact.path).name
-    with tempfile.NamedTemporaryFile(suffix=f"_{file_name}", delete=False) as tmp:
-        dest_path = Path(tmp.name)
-    storage.download_artifact(artifact.path, str(dest_path))
-    return FileResponse(
-        path=dest_path,
-        filename=file_name,
-        background=BackgroundTask(dest_path.unlink, missing_ok=True),
-    )

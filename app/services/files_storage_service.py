@@ -15,3 +15,6 @@ class FilesStorageService:
 
     def download_artifact(self, object_name: str, file_path: str) -> None:
         self._client.fget_object(self._bucket, object_name, file_path)
+
+    def delete_artifact(self, object_name: str) -> None:
+        self._client.remove_object(self._bucket, object_name)
