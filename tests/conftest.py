@@ -130,6 +130,19 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
         artifact = test_store["artifacts"].get(artifact_id)
         return None if artifact is None else artifact.model_copy(deep=True)
 
+    def get_all_artifacts(cursor: object, artifact_type=None, job_id=None):
+        results = []
+        for artifact in test_store["artifacts"].values():
+            if artifact_type is not None and artifact.artifact_type != artifact_type:
+                continue
+            if job_id is not None and artifact.job_id != job_id:
+                continue
+            results.append(artifact.model_copy(deep=True))
+        return results
+
+    def delete_artifact(cursor: object, artifact_id):
+        return test_store["artifacts"].pop(artifact_id, None) is not None
+
     monkeypatch.setattr(JobsRepository, "create_job", staticmethod(create_job))
     monkeypatch.setattr(JobsRepository, "get_job", staticmethod(get_job))
     monkeypatch.setattr(JobsRepository, "update_job_status", staticmethod(update_job_status))
@@ -139,6 +152,8 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
     monkeypatch.setattr(ArtifactsRepository, "create_artifact", staticmethod(create_artifact))
     monkeypatch.setattr(ArtifactsRepository, "get_artifacts", staticmethod(get_artifacts))
     monkeypatch.setattr(ArtifactsRepository, "get_artifact_by_id", staticmethod(get_artifact_by_id))
+    monkeypatch.setattr(ArtifactsRepository, "get_all_artifacts", staticmethod(get_all_artifacts))
+    monkeypatch.setattr(ArtifactsRepository, "delete_artifact", staticmethod(delete_artifact))
 
 
 @pytest.fixture
@@ -154,6 +169,33 @@ def jobs_routes_with_runner_mock(
 
     monkeypatch.setattr(jobs_routes.WorkerRunner, "advance", staticmethod(fake_advance))
     return jobs_routes
+
+
+@pytest.fixture
+def mock_storage_service(test_store: dict[str, Any]):
+    from app.services.files_storage_service import FilesStorageService
+
+    class FakeFilesStorageService:
+        def download_artifact(self, object_name: str, file_path: str) -> None:
+            target = Path(file_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            data = test_store["objects"].get(object_name, b"fake-content")
+            target.write_bytes(data)
+
+        def delete_artifact(self, object_name: str) -> None:
+            test_store["objects"].pop(object_name, None)
+
+    return FakeFilesStorageService()
+
+
+@pytest.fixture
+def artifacts_routes_with_mocks(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_repositories: None,
+    mock_storage_service,
+):
+    from app.routes import artifacts as artifacts_routes
+    return artifacts_routes
 
 
 @pytest.fixture

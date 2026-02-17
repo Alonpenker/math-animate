@@ -4,7 +4,6 @@ import pytest
 from fastapi import HTTPException
 
 from app.domain.job_state import JobStatus
-from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.jobs import Job
 from app.schemas.plan import Plan
 
@@ -157,38 +156,3 @@ def test_approve_plan_invalid_state_returns_409(
     assert test_store["worker_runner_calls"] == []
 
 
-def test_get_artifacts_returns_job_artifact_list(
-    jobs_routes_with_runner_mock,
-    fake_cursor,
-    test_store,
-):
-    job = Job(status=JobStatus.RENDERED)
-    test_store["jobs"][job.job_id] = job
-
-    code_artifact = Artifact(
-        artifact_id=uuid4(),
-        job_id=job.job_id,
-        artifact_type=ArtifactType.PYTHON_FILE,
-        path=f"{job.job_id}/code.py",
-        size=10,
-        sha256="a" * 64,
-    )
-    video_artifact = Artifact(
-        artifact_id=uuid4(),
-        job_id=job.job_id,
-        artifact_type=ArtifactType.MP4,
-        path=f"{job.job_id}/scene1.mp4",
-        size=20,
-        sha256="b" * 64,
-    )
-    test_store["artifacts"][code_artifact.artifact_id] = code_artifact
-    test_store["artifacts"][video_artifact.artifact_id] = video_artifact
-
-    response = jobs_routes_with_runner_mock.get_artifacts(job.job_id, cursor=fake_cursor)
-
-    assert response.job.job_id == job.job_id
-    assert len(response.data) == 2
-    assert {artifact.artifact_type for artifact in response.data} == {
-        ArtifactType.PYTHON_FILE,
-        ArtifactType.MP4,
-    }
