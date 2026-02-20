@@ -4,7 +4,7 @@ from langchain_anthropic import ChatAnthropic
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import (
-    LLMProvider, LLM_PROVIDER, LLM_CHAT_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
+    LLMProvider, LLM_PROVIDER, LLM_PLAN_MODEL, LLM_CODE_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
     PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
 )
 from app.dependencies.db import get_worker_cursor
@@ -18,14 +18,14 @@ from app.services.rag_service import RAGService
 class LLMService:
 
     PROVIDERS = {
-        LLMProvider.OPENAI: lambda: ChatOpenAI(
-            model=LLM_CHAT_MODEL,
+        LLMProvider.OPENAI: lambda model_name: ChatOpenAI(
+            model=model_name,
             temperature=LLM_TEMPERATURE,
             max_completion_tokens=LLM_MAX_TOKENS,
             api_key=settings.api_key,
         ),
-        LLMProvider.ANTHROPIC: lambda: ChatAnthropic(
-            model_name=LLM_CHAT_MODEL,
+        LLMProvider.ANTHROPIC: lambda model_name: ChatAnthropic(
+            model_name=model_name,
             temperature=LLM_TEMPERATURE,
             max_tokens_to_sample=LLM_MAX_TOKENS,
             api_key=settings.api_key,
@@ -34,16 +34,16 @@ class LLMService:
         ),
     }
 
-    _chat_model = None
+    _chat_models = {}
 
     @classmethod
-    def get_chat_model(cls) -> ChatOpenAI | ChatAnthropic:
-        if cls._chat_model is None:
+    def get_chat_model(cls, model_name: str) -> ChatOpenAI | ChatAnthropic:
+        if model_name not in cls._chat_models:
             builder = cls.PROVIDERS.get(LLM_PROVIDER)
             if builder is None:
                 raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
-            cls._chat_model = builder()
-        return cls._chat_model
+            cls._chat_models[model_name] = builder(model_name)
+        return cls._chat_models[model_name]
 
     @classmethod
     def retrieve_examples(cls, cursor, query: str, doc_type: KnowledgeType) -> str:
@@ -76,7 +76,7 @@ class LLMService:
             ("human", "{query}"),
         ])
 
-        model = LLMService.get_chat_model()
+        model = LLMService.get_chat_model(LLM_PLAN_MODEL)
         structured_model = model.with_structured_output(VideoPlan)
         chain = prompt | structured_model
         plan = chain.invoke({"query": query})
@@ -98,7 +98,7 @@ class LLMService:
             ("human", "Generate Manim code for this plan:\n{plan}"),
         ])
 
-        model = LLMService.get_chat_model()
+        model = LLMService.get_chat_model(LLM_CODE_MODEL)
         chain = prompt | model
         response = chain.invoke({"plan": plan_text})
         content = response.content

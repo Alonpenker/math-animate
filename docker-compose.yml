@@ -16,6 +16,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      ollama:
+        condition: service_healthy
     env_file:
       - .env
 
@@ -33,6 +35,8 @@ services:
       minio:
         condition: service_started
       docker-daemon:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     environment:
       DOCKER_HOST: tcp://docker-daemon:2375
@@ -90,6 +94,23 @@ services:
     volumes:
       - minio_data:/data
   
+  ollama:
+    image: ollama/ollama:latest
+    entrypoint: /bin/sh
+    command: >-
+      -c "ollama serve &
+          until curl -sf http://localhost:11434/api/tags > /dev/null; do sleep 1; done &&
+          ollama pull nomic-embed-text &&
+          wait"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags | grep -q nomic-embed-text"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    volumes:
+      - ollama_data:/root/.ollama
+
   docker-daemon:
     image: docker:dind
     privileged: true
@@ -109,3 +130,4 @@ volumes:
   postgres_data:
   minio_data:
   render_data:
+  ollama_data:

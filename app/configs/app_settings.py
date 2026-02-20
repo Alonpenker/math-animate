@@ -23,5 +23,7 @@ class Settings(BaseSettings):
     
     broker_url: str
     backend_url: str
-    
+
+    ollama_base_url: str
+
 settings = Settings()

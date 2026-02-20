@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Literal, List
 
+from app.configs.llm_settings import LLM_EMBEDDING_DIMENSIONS
+
 ColumnType = Literal[
     "UUID",
     "TEXT",
@@ -8,7 +10,7 @@ ColumnType = Literal[
     "BOOLEAN",
     "INTEGER",
     "TIMESTAMP",
-    "VECTOR(1536)",
+    f"VECTOR({LLM_EMBEDDING_DIMENSIONS})",
 ]
 
 class DBColumn(BaseModel):

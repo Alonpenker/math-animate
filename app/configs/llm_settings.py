@@ -8,13 +8,14 @@ class LLMProvider(str, Enum):
 
 # --- Provider & model defaults ---
 LLM_PROVIDER = LLMProvider.OPENAI
-LLM_CHAT_MODEL = "gpt-4o-mini"
+LLM_PLAN_MODEL = "gpt-5.2"
+LLM_CODE_MODEL = "gpt-5.1-codex"
 LLM_TEMPERATURE = 0.2
 LLM_MAX_TOKENS = 4096
 
 # --- Embedding defaults ---
-LLM_EMBEDDING_MODEL = "text-embedding-3-small"
-LLM_EMBEDDING_DIMENSIONS = 1536
+LLM_EMBEDDING_MODEL = "nomic-embed-text"
+LLM_EMBEDDING_DIMENSIONS = 768
 
 # --- RAG defaults ---
 RAG_SIMILARITY_TOP_K = 3

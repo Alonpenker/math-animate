@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.db_column import DBColumn
 from app.schemas.schema import Schema
+from app.configs.llm_settings import LLM_EMBEDDING_DIMENSIONS
 
 
 class KnowledgeType(str, Enum):
@@ -36,4 +37,4 @@ class KnowledgeDocumentSchema(Schema):
     CONTENT = DBColumn(name="content", type="TEXT", attributes=["NOT NULL"])
     DOC_TYPE = DBColumn(name="doc_type", type="TEXT", attributes=["NOT NULL"])
     TITLE = DBColumn(name="title", type="TEXT", attributes=["NOT NULL", "DEFAULT ''"])
-    EMBEDDING = DBColumn(name="embedding", type="VECTOR(1536)", attributes=["NOT NULL"])
+    EMBEDDING = DBColumn(name="embedding", type=f"VECTOR({LLM_EMBEDDING_DIMENSIONS})", attributes=["NOT NULL"])

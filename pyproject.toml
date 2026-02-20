@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "redis>=7.1.0",
     "uvicorn>=0.40.0",
+    "langchain-ollama>=1.0.1",
 ]
 
 [project.optional-dependencies]
