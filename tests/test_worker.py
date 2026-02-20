@@ -15,6 +15,7 @@ def test_generate_plan_success_transitions_and_saves_plan(
     mock_repositories,
     mock_worker_cursor,
     mock_worker_llm,
+    mock_worker_budget,
     sample_user_request,
     test_store,
 ):
@@ -38,14 +39,19 @@ def test_generate_plan_failure_sets_failed_planning(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_worker_budget,
     sample_user_request,
     test_store,
 ):
     from app.workers import worker as worker_module
 
-    def failing_plan_call(user_request):
+    def fake_render_plan_prompt(user_request):
+        return "fake-system-prompt", "fake-user-query"
+
+    def failing_plan_call(system_prompt, user_query):
         raise RuntimeError("planning failed")
 
+    monkeypatch.setattr(worker_module.LLMService, "render_plan_prompt", staticmethod(fake_render_plan_prompt))
     monkeypatch.setattr(worker_module.LLMService, "plan_call", staticmethod(failing_plan_call))
 
     job = Job(status=JobStatus.CREATED)
@@ -65,6 +71,7 @@ def test_generate_code_success_persists_python_artifact_and_enqueues_render(
     mock_worker_paths,
     mock_worker_storage,
     mock_worker_llm,
+    mock_worker_budget,
     capture_render_delay,
     sample_video_plan,
     test_store,
@@ -107,14 +114,19 @@ def test_generate_code_failure_sets_failed_codegen(
     mock_worker_cursor,
     mock_worker_paths,
     mock_worker_storage,
+    mock_worker_budget,
     sample_video_plan,
     test_store,
 ):
     from app.workers import worker as worker_module
 
-    def failing_codegen_call(plan):
+    def fake_render_codegen_prompt(plan):
+        return "fake-system-prompt", "fake-user-query"
+
+    def failing_codegen_call(system_prompt, user_query):
         raise RuntimeError("codegen failed")
 
+    monkeypatch.setattr(worker_module.LLMService, "render_codegen_prompt", staticmethod(fake_render_codegen_prompt))
     monkeypatch.setattr(worker_module.LLMService, "codegen_call", staticmethod(failing_codegen_call))
 
     job = Job(status=JobStatus.APPROVED)

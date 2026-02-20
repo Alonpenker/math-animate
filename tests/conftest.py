@@ -14,6 +14,7 @@ os.environ.setdefault("storage_bucket", "test-bucket")
 os.environ.setdefault("database_url", "postgresql://manim:manim@localhost:5432/manim")
 os.environ.setdefault("broker_url", "redis://localhost:6379/0")
 os.environ.setdefault("backend_url", "redis://localhost:6379/1")
+os.environ.setdefault("ollama_base_url", "http://localhost:11434")
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def test_store() -> dict[str, Any]:
         "artifacts": {},
         "objects": {},
         "knowledge": {},
+        "token_ledger": [],
         "worker_runner_calls": [],
         "render_delay_payloads": [],
         "status_updates": [],
@@ -252,19 +254,47 @@ def mock_worker_storage(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, A
 def mock_worker_llm(monkeypatch: pytest.MonkeyPatch, sample_video_plan) -> None:
     from app.workers import worker as worker_module
 
-    def fake_plan_call(user_request):
-        return sample_video_plan
+    fake_code = (
+        "from manim import *\n\n"
+        "class Scene1(Scene):\n"
+        "    def construct(self):\n"
+        "        self.wait()\n"
+    )
 
-    def fake_codegen_call(plan) -> str:
-        return (
-            "from manim import *\n\n"
-            "class Scene1(Scene):\n"
-            "    def construct(self):\n"
-            "        self.wait()\n"
-        )
+    def fake_render_plan_prompt(user_request):
+        return "fake-system-prompt", "fake-user-query"
 
+    def fake_render_codegen_prompt(plan):
+        return "fake-system-prompt", "fake-user-query"
+
+    def fake_plan_call(system_prompt, user_query):
+        return sample_video_plan, 100
+
+    def fake_codegen_call(system_prompt, user_query):
+        return fake_code, 200
+
+    monkeypatch.setattr(worker_module.LLMService, "render_plan_prompt", staticmethod(fake_render_plan_prompt))
+    monkeypatch.setattr(worker_module.LLMService, "render_codegen_prompt", staticmethod(fake_render_codegen_prompt))
     monkeypatch.setattr(worker_module.LLMService, "plan_call", staticmethod(fake_plan_call))
     monkeypatch.setattr(worker_module.LLMService, "codegen_call", staticmethod(fake_codegen_call))
+
+
+@pytest.fixture
+def mock_worker_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.workers import worker as worker_module
+
+    def fake_reserve(cursor, call_id, job_id, stage, provider, model, prompt_text):
+        return 1000
+
+    def fake_reconcile(cursor, call_id, consumed_tokens):
+        pass
+
+    def fake_release_on_error(cursor, call_id, reserved_tokens):
+        pass
+
+    monkeypatch.setattr(worker_module.BudgetService, "reserve", staticmethod(fake_reserve))
+    monkeypatch.setattr(worker_module.BudgetService, "reconcile", staticmethod(fake_reconcile))
+    monkeypatch.setattr(worker_module.BudgetService, "release_on_error", staticmethod(fake_release_on_error))
 
 
 @pytest.fixture
@@ -361,3 +391,75 @@ def knowledge_routes_with_mocks(
 ):
     from app.routes import knowledge as knowledge_routes
     return knowledge_routes
+
+
+@pytest.fixture
+def mock_token_ledger_repository(
+    monkeypatch: pytest.MonkeyPatch,
+    test_store: dict[str, Any],
+) -> None:
+    from datetime import date as date_type, timezone, datetime as dt
+
+    from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
+    from app.repositories.token_repository import TokenLedgerRepository
+    from app.schemas.token_usage import BreakdownEntry, DailySummary
+
+    def get_daily_summary(cursor, day: date_type):
+        rows = [
+            r for r in test_store["token_ledger"]
+            if r["day"] == day
+        ]
+
+        breakdown = []
+        total_consumed = 0
+        total_reserved = 0
+
+        groups: dict[tuple, dict] = {}
+        for row in rows:
+            key = (row["provider"], row["model"], row["stage"])
+            if key not in groups:
+                groups[key] = {"consumed": 0, "reserved": 0}
+            if row["state"] == "RELEASED":
+                groups[key]["consumed"] += row["consumed_tokens"]
+            if row["state"] == "ACTIVE":
+                groups[key]["reserved"] += row["reserved_tokens"]
+
+        for (provider, model, stage), totals in groups.items():
+            breakdown.append(BreakdownEntry(
+                provider=provider,
+                model=model,
+                stage=stage,
+                consumed=totals["consumed"],
+                reserved=totals["reserved"],
+            ))
+            total_consumed += totals["consumed"]
+            total_reserved += totals["reserved"]
+
+        used = total_consumed + total_reserved
+        remaining = max(0, DAILY_TOKEN_LIMIT - used)
+        remaining_pct = round((remaining / DAILY_TOKEN_LIMIT) * 100, 2) if DAILY_TOKEN_LIMIT > 0 else 0.0
+        soft_threshold = int(DAILY_TOKEN_LIMIT * SOFT_THRESHOLD_RATIO)
+
+        return DailySummary(
+            daily_limit=DAILY_TOKEN_LIMIT,
+            consumed=total_consumed,
+            reserved=total_reserved,
+            remaining=remaining,
+            remaining_pct=remaining_pct,
+            soft_threshold_exceeded=used >= soft_threshold,
+            breakdown=breakdown,
+        )
+
+    monkeypatch.setattr(
+        TokenLedgerRepository, "get_daily_summary",
+        staticmethod(get_daily_summary),
+    )
+
+
+@pytest.fixture
+def usage_routes_with_mocks(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_token_ledger_repository: None,
+):
+    from app.routes import usage as usage_routes
+    return usage_routes

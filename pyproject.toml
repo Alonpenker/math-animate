@@ -20,6 +20,7 @@ dependencies = [
     "redis>=7.1.0",
     "uvicorn>=0.40.0",
     "langchain-ollama>=1.0.1",
+    "tiktoken>=0.7",
 ]
 
 [project.optional-dependencies]

@@ -10,10 +10,14 @@ import subprocess
 import os
 
 from app.configs.app_settings import settings
+from app.configs.llm_settings import (
+    LLM_PROVIDER, LLM_PLAN_MODEL, LLM_CODE_MODEL,
+)
 from app.workers.worker_settings import PathNames, DockerCommands
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.storage import init_storage, get_storage_client
 from app.domain.job_state import JobStatus, require_transition
+from app.exceptions.quota import QuotaExceededException
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
@@ -21,6 +25,7 @@ from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job
 from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
+from app.services.budget_service import BudgetService
 from app.services.files_storage_service import FilesStorageService
 from app.utils.logging import get_logger
 
@@ -57,32 +62,56 @@ def generate_plan(job_request_payload: dict) -> None:
     except Exception:
         logger.exception("Invalid user request payload (%s)", log_context())
         raise
+
+    job_id = job_request.job.job_id
+    call_id = uuid4()
+    reserved = 0
+    total_tokens = 0
     
     try:
-        logger.info("Planning started (%s)", log_context(str(job_request.job.job_id)))
+        logger.info("Planning started (%s)", log_context(str(job_id)))
         require_transition(job_request.job.status, JobStatus.PLANNING)
         with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.PLANNING
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.PLANNING)
+
+        system_prompt, user_query = LLMService.render_plan_prompt(
+            job_request.user_request
+        )
+        prompt_text = f"{system_prompt}\n{user_query}"
+
+        with get_worker_cursor() as cursor:
+            reserved = BudgetService.reserve(
+                cursor, call_id, job_id, JobStatus.PLANNING.value,
+                LLM_PROVIDER.value, LLM_PLAN_MODEL, prompt_text,
             )
-        logger.info("LLM planning call started (%s)", log_context(str(job_request.job.job_id)))
-        plan: VideoPlan = LLMService.plan_call(job_request.user_request)
+
+        logger.info("LLM planning call started (%s)", log_context(str(job_id)))
+        plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
+
+        with get_worker_cursor() as cursor:
+            BudgetService.reconcile(cursor, call_id, total_tokens)
+
         require_transition(JobStatus.PLANNING, JobStatus.PLANNED)
         with get_worker_cursor() as cursor:
-            PlansRepository.create_plan(cursor, job_request.job.job_id, plan)
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.PLANNED
-            )
-        logger.info("Planning completed (%s)", log_context(str(job_request.job.job_id)))
+            PlansRepository.create_plan(cursor, job_id, plan)
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.PLANNED)
+        logger.info("Planning completed (%s)", log_context(str(job_id)))
 
-
-    except Exception:
+    except QuotaExceededException:
+        logger.exception("Planning quota exceeded (%s)", log_context(str(job_id)))
         require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         with get_worker_cursor() as cursor:
-            logger.exception("Planning failed (%s)", log_context(str(job_request.job.job_id)))
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.FAILED_PLANNING
-            )
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_PLANNING)
+        raise
+
+    except Exception:
+        if reserved:
+            with get_worker_cursor() as cursor:
+                BudgetService.release_on_error(cursor, call_id, max(reserved, total_tokens))
+        require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        with get_worker_cursor() as cursor:
+            logger.exception("Planning failed (%s)", log_context(str(job_id)))
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_PLANNING)
         raise
 
     
@@ -93,18 +122,35 @@ def generate_code(job_request_payload: dict) -> None:
     except Exception:
         logger.exception("Invalid plan request payload (%s)", log_context())
         raise
-    
-    try: 
+
+    job_id = job_request.job.job_id
+    call_id = uuid4()
+    reserved = 0
+    total_tokens = 0
+
+    try:
         require_transition(job_request.job.status, JobStatus.CODEGEN)
         with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.CODEGEN
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.CODEGEN)
+
+        system_prompt, user_query = LLMService.render_codegen_prompt(
+            job_request.plan
+        )
+        prompt_text = f"{system_prompt}\n{user_query}"
+
+        with get_worker_cursor() as cursor:
+            reserved = BudgetService.reserve(
+                cursor, call_id, job_id, JobStatus.CODEGEN.value,
+                LLM_PROVIDER.value, LLM_CODE_MODEL, prompt_text,
             )
 
-    
-        logger.info("Codegen LLM call started (%s)", log_context(str(job_request.job.job_id)))
-        code = LLMService.codegen_call(job_request.plan)
-        job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_request.job.job_id)
+        logger.info("Codegen LLM call started (%s)", log_context(str(job_id)))
+        code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
+
+        with get_worker_cursor() as cursor:
+            BudgetService.reconcile(cursor, call_id, total_tokens)
+
+        job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
         file_bytes = code.encode("utf-8")
         file_path = None
@@ -120,10 +166,10 @@ def generate_code(job_request_payload: dict) -> None:
                         client=get_storage_client(),
                         bucket=settings.storage_bucket,
                     )
-            object_path = storage.save_artifact(job_request.job.job_id, file_path)
+            object_path = storage.save_artifact(job_id, file_path)
             artifact = Artifact(
                 artifact_id=uuid4(),
-                job_id=job_request.job.job_id,
+                job_id=job_id,
                 artifact_type=ArtifactType.PYTHON_FILE,
                 path=object_path,
                 size=len(file_bytes),
@@ -137,21 +183,28 @@ def generate_code(job_request_payload: dict) -> None:
 
         require_transition(JobStatus.CODEGEN, JobStatus.CODED)
         with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.CODED
-            )
-        logger.info("Codegen completed; render enqueued (%s)", log_context(str(job_request.job.job_id)))
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.CODED)
+        logger.info("Codegen completed; render enqueued (%s)", log_context(str(job_id)))
         generate_render.delay(
-            JobRequest(job=Job(job_id=job_request.job.job_id, 
+            JobRequest(job=Job(job_id=job_id,
                                status=JobStatus.CODED)).model_dump(mode="json")
         )
-    except Exception:
+
+    except QuotaExceededException:
+        logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id)))
         require_transition(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         with get_worker_cursor() as cursor:
-            logger.exception("Codegen failed (%s)", log_context(str(job_request.job.job_id)))
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.FAILED_CODEGEN
-            )
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_CODEGEN)
+        raise
+
+    except Exception:
+        if reserved:
+            with get_worker_cursor() as cursor:
+                BudgetService.release_on_error(cursor, call_id, max(reserved, total_tokens))
+        require_transition(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        with get_worker_cursor() as cursor:
+            logger.exception("Codegen failed (%s)", log_context(str(job_id)))
+            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_CODEGEN)
         raise
 
 @app.task(max_retries=1)

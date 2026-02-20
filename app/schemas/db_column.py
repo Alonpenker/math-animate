@@ -9,7 +9,9 @@ ColumnType = Literal[
     "JSONB",
     "BOOLEAN",
     "INTEGER",
+    "DATE",
     "TIMESTAMP",
+    "TIMESTAMPTZ",
     f"VECTOR({LLM_EMBEDDING_DIMENSIONS})",
 ]
 

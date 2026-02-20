@@ -60,6 +60,8 @@ def init_db_tables() -> None:
         cursor.execute(PlansRepository._create())
         cursor.execute(ArtifactsRepository._create())
         cursor.execute(KnowledgeRepository._create())
+        cursor.execute(TokenLedgerRepository._create())
+        cursor.execute(TokenLedgerRepository._create_index())
         conn.commit()
     except Exception:
         conn.rollback()

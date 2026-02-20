@@ -59,49 +59,63 @@ class LLMService:
         return "\n\n".join(parts)
 
     @staticmethod
-    def plan_call(user_request: UserRequest) -> VideoPlan:
+    def _extract_total_tokens(response) -> int:
+        usage = getattr(response, "usage_metadata", None) or {}
+        return int(usage.get("total_tokens", 0))
+
+    @staticmethod
+    def render_plan_prompt(user_request: UserRequest) -> tuple[str, str]:
+        """Return (system_prompt, user_query) for the planning LLM call."""
         query = (
             f"Topic: {user_request.topic}\n"
             f"Misconceptions: {', '.join(user_request.misconceptions)}\n"
             f"Constraints: {', '.join(user_request.constraints)}\n"
             f"Number of scenes: {user_request.number_of_scenes}"
         )
-
         with get_worker_cursor() as cursor:
             examples = LLMService.retrieve_examples(cursor, query, KnowledgeType.PLAN)
-
         system_prompt = PLAN_SYSTEM_PROMPT.format(examples=examples)
+        return system_prompt, query
+
+    @staticmethod
+    def render_codegen_prompt(plan: VideoPlan) -> tuple[str, str]:
+        """Return (system_prompt, user_query) for the codegen LLM call."""
+        plan_text = plan.model_dump_json(indent=2)
+        with get_worker_cursor() as cursor:
+            examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE)
+        system_prompt = CODEGEN_SYSTEM_PROMPT.format(examples=examples)
+        user_query = f"Generate Manim code for this plan:\n{plan_text}"
+        return system_prompt, user_query
+
+    @staticmethod
+    def plan_call(system_prompt: str, user_query: str) -> tuple[VideoPlan, int]:
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "{query}"),
         ])
 
         model = LLMService.get_chat_model(LLM_PLAN_MODEL)
-        structured_model = model.with_structured_output(VideoPlan)
+        structured_model = model.with_structured_output(VideoPlan, include_raw=True)
         chain = prompt | structured_model
-        plan = chain.invoke({"query": query})
+        result = chain.invoke({"query": user_query})
+        plan = result["parsed"]
+        total_tokens = LLMService._extract_total_tokens(result["raw"])
         if isinstance(plan, VideoPlan):
-            return plan
+            return plan, total_tokens
         raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
-        
 
     @staticmethod
-    def codegen_call(plan: VideoPlan) -> str:
-        plan_text = plan.model_dump_json(indent=2)
-
-        with get_worker_cursor() as cursor:
-            examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE)
-
-        system_prompt = CODEGEN_SYSTEM_PROMPT.format(examples=examples)
+    def codegen_call(system_prompt: str, user_query: str) -> tuple[str, int]:
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
-            ("human", "Generate Manim code for this plan:\n{plan}"),
+            ("human", "{plan}"),
         ])
 
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
         chain = prompt | model
-        response = chain.invoke({"plan": plan_text})
+        response = chain.invoke({"plan": user_query})
+        total_tokens = LLMService._extract_total_tokens(response)
         content = response.content
         if isinstance(content, str):
-            return content
+            return content, total_tokens
         raise ValueError("LLM returned non-text response content for code generation.")

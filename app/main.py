@@ -9,6 +9,7 @@ from app.exceptions.exception_handler import handle_exceptions
 from app.routes.jobs import router as jobs_router
 from app.routes.artifacts import router as artifacts_router
 from app.routes.knowledge import router as knowledge_router
+from app.routes.usage import router as usage_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,5 +44,6 @@ api_router = APIRouter(prefix=ROUTER_PREFIX)
 api_router.include_router(jobs_router)
 api_router.include_router(artifacts_router)
 api_router.include_router(knowledge_router)
+api_router.include_router(usage_router)
 
 app.include_router(api_router)

@@ -20,6 +20,14 @@ LLM_EMBEDDING_DIMENSIONS = 768
 # --- RAG defaults ---
 RAG_SIMILARITY_TOP_K = 3
 
+# --- Token budget defaults ---
+DAILY_TOKEN_LIMIT = 250_000
+SOFT_THRESHOLD_RATIO = 0.8
+PLANNING_OUTPUT_BUFFER = 2_048
+CODEGEN_OUTPUT_BUFFER = 4_096
+STALE_RESERVATION_TTL_MINUTES = 30
+STALE_RESERVATION_CLEANUP_INTERVAL_MINUTES = 15
+
 # --- System prompts ---
 PLAN_SYSTEM_PROMPT = """You are an expert educational video planner for 8th-grade math.
 Given a teacher's lesson request, produce a structured scene plan.
