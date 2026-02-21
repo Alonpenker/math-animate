@@ -1,5 +1,15 @@
 from pathlib import Path
 
+ALLOWED_IMPORTS: frozenset[str] = frozenset({
+    "manim", "numpy", "math", "colour", "scipy", "random", "typing",
+})
+
+DANGEROUS_BUILTINS: frozenset[str] = frozenset({
+    "exec", "eval", "open", "__import__", "compile",
+})
+
+RENDER_TIMEOUT_SECONDS: int = 900
+
 class PathNames:
     ARTIFACTS_FOLDER = 'job_artifacts'
     MANIM_CODE = 'code.py'

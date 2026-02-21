@@ -1,61 +1,58 @@
-from typing import Optional
-from celery import Celery, current_task
+from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
 from pathlib import Path
 from uuid import uuid4
 import tempfile
-import hashlib
 import shutil
 import subprocess
-import os
 
 from app.configs.app_settings import settings
-from app.configs.llm_settings import (
-    LLM_PROVIDER, LLM_PLAN_MODEL, LLM_CODE_MODEL,
-)
-from app.workers.worker_settings import PathNames, DockerCommands
+from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
+from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOUT_SECONDS
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
-from app.dependencies.storage import init_storage, get_storage_client
+from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus, require_transition
+from app.exceptions.code_verification_error import CodeVerificationError
 from app.exceptions.quota import QuotaExceededException
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job
-from app.schemas.artifact import Artifact, ArtifactType
+from app.schemas.artifact import ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
-from app.services.budget_service import BudgetService
-from app.services.files_storage_service import FilesStorageService
+from app.workers.worker_helpers import (
+    log_context,
+    transition_job,
+    reserve_budget,
+    reconcile_budget,
+    release_budget_on_error,
+    get_storage,
+    save_artifact_to_storage,
+    verify_code,
+    store_render_logs,
+)
 from app.utils.logging import get_logger
 
 app = Celery('manim-generator-worker',
-             broker=settings.broker_url, 
+             broker=settings.broker_url,
              backend=settings.backend_url)
 
 logger = get_logger(__name__)
 
-def log_context(job_id: Optional[str] = None) -> str:
-    parts: list[str] = [f"pid={os.getpid()}"]
-    if current_task is not None and getattr(current_task, "request", None) is not None:
-        hostname = getattr(current_task.request, "hostname", None)
-        if hostname:
-            parts.append(f"worker={hostname}")
-    if job_id:
-        parts.append(f"job_id={job_id}")
-    return " ".join(parts)
 
 @worker_process_init.connect
 def init_worker(**kwargs) -> None:
     init_storage()
     init_db_pool()
 
+
 @worker_process_shutdown.connect
 def shutdown_worker(**kwargs) -> None:
     close_db_pool()
 
 
-@app.task(max_retries=1)
+@app.task()
 def generate_plan(job_request_payload: dict) -> None:
     try:
         job_request = JobUserRequest(**job_request_payload)
@@ -67,29 +64,20 @@ def generate_plan(job_request_payload: dict) -> None:
     call_id = uuid4()
     reserved = 0
     total_tokens = 0
-    
+
     try:
         logger.info("Planning started (%s)", log_context(str(job_id)))
-        require_transition(job_request.job.status, JobStatus.PLANNING)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.PLANNING)
+        transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
 
-        system_prompt, user_query = LLMService.render_plan_prompt(
-            job_request.user_request
+        system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
+        reserved = reserve_budget(
+            call_id, job_id, JobStatus.PLANNING.value, LLM_PLAN_MODEL,
+            f"{system_prompt}\n{user_query}",
         )
-        prompt_text = f"{system_prompt}\n{user_query}"
-
-        with get_worker_cursor() as cursor:
-            reserved = BudgetService.reserve(
-                cursor, call_id, job_id, JobStatus.PLANNING.value,
-                LLM_PROVIDER.value, LLM_PLAN_MODEL, prompt_text,
-            )
 
         logger.info("LLM planning call started (%s)", log_context(str(job_id)))
         plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
-
-        with get_worker_cursor() as cursor:
-            BudgetService.reconcile(cursor, call_id, total_tokens)
+        reconcile_budget(call_id, total_tokens)
 
         require_transition(JobStatus.PLANNING, JobStatus.PLANNED)
         with get_worker_cursor() as cursor:
@@ -99,24 +87,18 @@ def generate_plan(job_request_payload: dict) -> None:
 
     except QuotaExceededException:
         logger.exception("Planning quota exceeded (%s)", log_context(str(job_id)))
-        require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_PLANNING)
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         raise
 
     except Exception:
-        if reserved:
-            with get_worker_cursor() as cursor:
-                BudgetService.release_on_error(cursor, call_id, max(reserved, total_tokens))
-        require_transition(JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
-        with get_worker_cursor() as cursor:
-            logger.exception("Planning failed (%s)", log_context(str(job_id)))
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_PLANNING)
+        release_budget_on_error(call_id, reserved, total_tokens)
+        logger.exception("Planning failed (%s)", log_context(str(job_id)))
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         raise
 
-    
-@app.task(max_retries=1)
-def generate_code(job_request_payload: dict) -> None:
+
+@app.task(bind=True, max_retries=1)
+def generate_code(self, job_request_payload: dict) -> None:
     try:
         job_request = JobPlanRequest(**job_request_payload)
     except Exception:
@@ -129,30 +111,27 @@ def generate_code(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
-        require_transition(job_request.job.status, JobStatus.CODEGEN)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.CODEGEN)
+        transition_job(job_id, job_request.job.status, JobStatus.CODEGEN)
 
-        system_prompt, user_query = LLMService.render_codegen_prompt(
-            job_request.plan
+        system_prompt, user_query = LLMService.render_codegen_prompt(job_request.plan)
+        reserved = reserve_budget(
+            call_id, job_id, JobStatus.CODEGEN.value, LLM_CODE_MODEL,
+            f"{system_prompt}\n{user_query}",
         )
-        prompt_text = f"{system_prompt}\n{user_query}"
-
-        with get_worker_cursor() as cursor:
-            reserved = BudgetService.reserve(
-                cursor, call_id, job_id, JobStatus.CODEGEN.value,
-                LLM_PROVIDER.value, LLM_CODE_MODEL, prompt_text,
-            )
 
         logger.info("Codegen LLM call started (%s)", log_context(str(job_id)))
         code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
+        reconcile_budget(call_id, total_tokens)
 
-        with get_worker_cursor() as cursor:
-            BudgetService.reconcile(cursor, call_id, total_tokens)
+        failures = verify_code(code)
+        if failures:
+            failure_msg = "; ".join(failures)
+            logger.warning("Code verification failed (%s): %s", log_context(str(job_id)), failure_msg)
+            raise self.retry(exc=CodeVerificationError(failure_msg), countdown=0)
 
+        storage = get_storage()
         job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
-        file_bytes = code.encode("utf-8")
         file_path = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -160,79 +139,51 @@ def generate_code(job_request_payload: dict) -> None:
                 dir=job_dir,
                 delete=False,
             ) as tmp:
-                tmp.write(file_bytes)
+                tmp.write(code.encode("utf-8"))
                 file_path = Path(tmp.name)
-            storage = FilesStorageService(
-                        client=get_storage_client(),
-                        bucket=settings.storage_bucket,
-                    )
-            object_path = storage.save_artifact(job_id, file_path)
-            artifact = Artifact(
-                artifact_id=uuid4(),
-                job_id=job_id,
-                artifact_type=ArtifactType.PYTHON_FILE,
-                path=object_path,
-                size=len(file_bytes),
-                sha256=hashlib.sha256(file_bytes).hexdigest(),
-            )
-            with get_worker_cursor() as cursor:
-                ArtifactsRepository.create_artifact(cursor, artifact)
+            save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
         finally:
             if file_path is not None and file_path.exists():
                 file_path.unlink()
 
-        require_transition(JobStatus.CODEGEN, JobStatus.CODED)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.CODED)
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
         logger.info("Codegen completed; render enqueued (%s)", log_context(str(job_id)))
         generate_render.delay(
-            JobRequest(job=Job(job_id=job_id,
-                               status=JobStatus.CODED)).model_dump(mode="json")
+            JobRequest(job=Job(job_id=job_id, status=JobStatus.CODED)).model_dump(mode="json")
         )
 
     except QuotaExceededException:
         logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id)))
-        require_transition(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_CODEGEN)
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         raise
 
     except Exception:
-        if reserved:
-            with get_worker_cursor() as cursor:
-                BudgetService.release_on_error(cursor, call_id, max(reserved, total_tokens))
-        require_transition(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
-        with get_worker_cursor() as cursor:
-            logger.exception("Codegen failed (%s)", log_context(str(job_id)))
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.FAILED_CODEGEN)
+        release_budget_on_error(call_id, reserved, total_tokens)
+        logger.exception("Codegen failed (%s)", log_context(str(job_id)))
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         raise
 
-@app.task(max_retries=1)
+
+@app.task()
 def generate_render(job_request_payload: dict) -> None:
     try:
         job_request = JobRequest(**job_request_payload)
     except Exception:
         logger.exception("Invalid job request payload (%s)", log_context())
         raise
-    
-    try:
-        require_transition(job_request.job.status, JobStatus.RENDERING)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.RENDERING
-            )
-        logger.info("Render started (%s)", log_context(str(job_request.job.job_id)))
 
-        render_root = Path(PathNames.TMP_RENDER_FOLDER)
-        input_dir = render_root / str(job_request.job.job_id) / PathNames.INPUT_FOLDER
-        
-        storage = FilesStorageService(
-                        client=get_storage_client(),
-                        bucket=settings.storage_bucket,
-                    )
-        
+    job_id = job_request.job.job_id
+    render_root = Path(PathNames.TMP_RENDER_FOLDER)
+    input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
+
+    try:
+        transition_job(job_id, job_request.job.status, JobStatus.RENDERING)
+        logger.info("Render started (%s)", log_context(str(job_id)))
+
+        storage = get_storage()
+
         with get_worker_cursor() as cursor:
-            plan = PlansRepository.get_plan(cursor, job_request.job.job_id)
+            plan = PlansRepository.get_plan(cursor, job_id)
         if plan is None:
             raise RuntimeError("No plan found for render.")
         video_plan = VideoPlan.model_validate_json(plan.plan)
@@ -240,26 +191,25 @@ def generate_render(job_request_payload: dict) -> None:
             raise RuntimeError("No plan scenes found for render.")
 
         with get_worker_cursor() as cursor:
-            artifacts = ArtifactsRepository.get_artifacts(cursor, job_request.job.job_id)
-        if not artifacts:
-            raise RuntimeError("No input artifacts found for render.")
-
-        input_dir.mkdir(parents=True, exist_ok=True)
-
-        for artifact in artifacts:
-            dest_path = input_dir / Path(artifact.path).name
-            storage.download_artifact(artifact.path, str(dest_path))
-
-        code_files = list(input_dir.glob(f"*.{ArtifactType.PYTHON_FILE.value}"))
-        if not code_files:
+            python_artifacts = ArtifactsRepository.get_all_artifacts(
+                cursor,
+                artifact_type=ArtifactType.PYTHON_FILE,
+                job_id=job_id,
+            )
+        if not python_artifacts:
             raise RuntimeError("No python code artifact found for render.")
-        if len(code_files) > 1:
+        if len(python_artifacts) > 1:
             raise RuntimeError("Multiple python code artifacts were found for render.")
 
-        code_path = code_files.pop()
+        input_dir.mkdir(parents=True, exist_ok=True)
+        python_artifact = python_artifacts[0]
+        code_path = input_dir / Path(python_artifact.path).name
+        storage.download_artifact(python_artifact.path, str(code_path))
+        
         media_dir = input_dir / PathNames.MEDIA_FOLDER
         media_dir.mkdir(parents=True, exist_ok=True)
         media_dir.chmod(0o777)
+
         command = [
             *DockerCommands.BIN,
             *DockerCommands.NETWORK,
@@ -271,80 +221,48 @@ def generate_render(job_request_payload: dict) -> None:
             *DockerCommands.IMAGE,
             *DockerCommands.manim_command(code_path=code_path, media_dir=media_dir),
         ]
+
+        render_failed: Exception | None = None
         try:
-            subprocess.run(
-                command,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=RENDER_TIMEOUT_SECONDS,
             )
-        except subprocess.CalledProcessError as exc:
-            logger.error(
-                "Docker render failed (%s) exit=%s",
-                log_context(str(job_request.job.job_id)),
-                exc.returncode,
-            )
-            logger.error(
-                "Docker stdout (%s) size=%s",
-                log_context(str(job_request.job.job_id)),
-                len(exc.stdout or ""),
-            )
-            logger.error(
-                "Docker stderr (%s) size=%s",
-                log_context(str(job_request.job.job_id)),
-                len(exc.stderr or ""),
-            )
-            raise
-        
+            render_stdout, render_stderr = result.stdout or "", result.stderr or ""
+            if result.returncode != 0:
+                render_failed = RuntimeError(f"Docker render exited with code {result.returncode}")
+        except subprocess.TimeoutExpired as exc:
+            render_stdout = exc.stdout if isinstance(exc.stdout, str) else (bytes(exc.stdout).decode() if exc.stdout else "")
+            render_stderr = exc.stderr if isinstance(exc.stderr, str) else (bytes(exc.stderr).decode() if exc.stderr else "")
+            render_failed = exc
+
+        store_render_logs(storage, job_id, render_stdout, render_stderr)
+
+        if render_failed is not None:
+            logger.error("Docker render failed (%s): %s", log_context(str(job_id)), render_failed)
+            raise render_failed
+
         videos_dir = media_dir / PathNames.VIDEOS_FOLDER / code_path.stem / PathNames.RESOLUTION_FOLDER
         if not videos_dir.exists():
-            raise RuntimeError(f"Render output folder not found: {videos_dir}.")
+            raise RuntimeError(f"Render output folder not found, should have been created by the renderer: {videos_dir}.")
 
-        output_files = [
-            path
-            for path in videos_dir.glob(f"*.{ArtifactType.MP4.value}")
-            if path.is_file()
-        ]
-        scene_count = len(video_plan.scenes)
-        if len(output_files) != scene_count:
+        output_files = [p for p in videos_dir.glob(f"*.{ArtifactType.MP4.value}") if p.is_file()]
+        if len(output_files) != len(video_plan.scenes):
             raise RuntimeError(
-                "Render output count mismatch: "
-                f"expected {scene_count} mp4 files, got {len(output_files)}."
+                f"Render output count mismatch: "
+                f"expected {len(video_plan.scenes)} mp4 files, got {len(output_files)}."
             )
-        
-        artifacts = []
-        for output_file in output_files:
-            file_bytes = output_file.read_bytes()
-            object_path = storage.save_artifact(job_request.job.job_id, output_file)
-            artifact = Artifact(
-                artifact_id=uuid4(),
-                job_id=job_request.job.job_id,
-                artifact_type=ArtifactType.from_path(output_file),
-                path=object_path,
-                size=len(file_bytes),
-                sha256=hashlib.sha256(file_bytes).hexdigest(),
-            )
-            artifacts.append(artifact)
-            
-        with get_worker_cursor() as cursor:
-            for artifact in artifacts:
-                ArtifactsRepository.create_artifact(cursor, artifact)
 
-        require_transition(JobStatus.RENDERING, JobStatus.RENDERED)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.RENDERED
-            )
-        logger.info("Render completed (%s)", log_context(str(job_request.job.job_id)))
+        for output_file in output_files:
+            save_artifact_to_storage(job_id, output_file, ArtifactType.from_path(output_file), storage)
+
+        transition_job(job_id, JobStatus.RENDERING, JobStatus.RENDERED)
+        logger.info("Render completed (%s)", log_context(str(job_id)))
+
     except Exception:
-        logger.exception("Render failed (%s)", log_context(str(job_request.job.job_id)))
-        require_transition(JobStatus.RENDERING, JobStatus.FAILED_RENDER)
-        with get_worker_cursor() as cursor:
-            JobsRepository.update_job_status(
-                cursor, job_request.job.job_id, JobStatus.FAILED_RENDER
-            )
+        logger.exception("Render failed (%s)", log_context(str(job_id)))
+        transition_job(job_id, JobStatus.RENDERING, JobStatus.FAILED_RENDER)
         raise
+
     finally:
         if input_dir.exists():
             shutil.rmtree(input_dir, ignore_errors=True)

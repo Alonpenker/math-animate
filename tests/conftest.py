@@ -203,13 +203,18 @@ def artifacts_routes_with_mocks(
 @pytest.fixture
 def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> None:
     from app.workers import worker as worker_module
+    from app.workers import worker_helpers
 
     @contextmanager
     def cursor_context():
         yield fake_cursor
 
+    # Patch in both modules: worker.py owns the inline PLANNED transition cursor;
+    # worker_helpers.py owns all helper-function cursors.
     monkeypatch.setattr(worker_module, "get_worker_cursor", cursor_context)
-    monkeypatch.setattr(worker_module, "current_task", None)
+    monkeypatch.setattr(worker_helpers, "get_worker_cursor", cursor_context)
+    # current_task is only imported in worker_helpers (log_context lives there)
+    monkeypatch.setattr(worker_helpers, "current_task", None)
 
 
 @pytest.fixture
@@ -228,12 +233,11 @@ def mock_worker_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
 @pytest.fixture
 def mock_worker_storage(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any]) -> None:
-    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
 
     class FakeStorageService:
-        def __init__(self, client: Any, bucket: str):
-            self._client = client
-            self._bucket = bucket
+        def __init__(self, client: Any = None, bucket: str = "") -> None:
+            pass
 
         def save_artifact(self, job_id, file_path: Path) -> str:
             path = Path(file_path)
@@ -246,8 +250,18 @@ def mock_worker_storage(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, A
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(test_store["objects"][object_name])
 
-    monkeypatch.setattr(worker_module, "FilesStorageService", FakeStorageService)
-    monkeypatch.setattr(worker_module, "get_storage_client", lambda: object())
+    # get_storage() and save_artifact_to_storage() live in worker_helpers,
+    # so patch the names there (not in worker.py which re-exports them).
+    monkeypatch.setattr(worker_helpers, "FilesStorageService", FakeStorageService)
+    monkeypatch.setattr(worker_helpers, "get_storage_client", lambda: object())
+
+
+@pytest.fixture
+def mock_worker_verify_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patches verify_code in worker to always pass (return no failures)."""
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(worker_module, "verify_code", lambda code: [])
 
 
 @pytest.fixture
@@ -281,7 +295,8 @@ def mock_worker_llm(monkeypatch: pytest.MonkeyPatch, sample_video_plan) -> None:
 
 @pytest.fixture
 def mock_worker_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.workers import worker as worker_module
+    # BudgetService is only imported in worker_helpers (via reserve_budget etc.)
+    from app.workers import worker_helpers
 
     def fake_reserve(cursor, call_id, job_id, stage, provider, model, prompt_text):
         return 1000
@@ -292,9 +307,9 @@ def mock_worker_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_release_on_error(cursor, call_id, reserved_tokens):
         pass
 
-    monkeypatch.setattr(worker_module.BudgetService, "reserve", staticmethod(fake_reserve))
-    monkeypatch.setattr(worker_module.BudgetService, "reconcile", staticmethod(fake_reconcile))
-    monkeypatch.setattr(worker_module.BudgetService, "release_on_error", staticmethod(fake_release_on_error))
+    monkeypatch.setattr(worker_helpers.BudgetService, "reserve", staticmethod(fake_reserve))
+    monkeypatch.setattr(worker_helpers.BudgetService, "reconcile", staticmethod(fake_reconcile))
+    monkeypatch.setattr(worker_helpers.BudgetService, "release_on_error", staticmethod(fake_release_on_error))
 
 
 @pytest.fixture
