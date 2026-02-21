@@ -46,7 +46,7 @@ Use the following examples of good Manim code as reference:
 {examples}
 
 Rules:
-- Import only from manim.
+- Import only from manim, numpy, math, colour, scipy, random and typing.
 - Do not use external files, images, or network calls.
 - Keep animations simple and clear.
 - Respond ONLY with the Python code, no markdown fences."""

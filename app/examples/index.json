@@ -1,0 +1,38 @@
+[
+  {
+    "document_id": "441bf342-defc-4992-b517-74c50cf90a36",
+    "title": "Plan: Visualizing a Sorting Algorithm",
+    "doc_type": "plan",
+    "file": "plans/sorting_algorithm.txt"
+  },
+  {
+    "document_id": "9b96e353-545a-4464-8e59-25181d16574a",
+    "title": "Plan: Explaining the Pythagorean Theorem",
+    "doc_type": "plan",
+    "file": "plans/pythagorean_theorem.txt"
+  },
+  {
+    "document_id": "03aa9fdc-a6e9-4533-9561-ca6b7661c8af",
+    "title": "Plan: Animating a Neural Network Forward Pass",
+    "doc_type": "plan",
+    "file": "plans/neural_network.txt"
+  },
+  {
+    "document_id": "6bad57f7-bc63-40c3-b588-4cfc442e5c48",
+    "title": "Sine Wave Transformation",
+    "doc_type": "code",
+    "file": "code/sine_wave.py"
+  },
+  {
+    "document_id": "d8df4b10-e062-4e61-a30e-b1e73ee42bcb",
+    "title": "Rotating 3D Surface Plot",
+    "doc_type": "code",
+    "file": "code/rotating_surface.py"
+  },
+  {
+    "document_id": "f56a766d-ccbc-4554-b354-af866f388e97",
+    "title": "Animated Bar Chart with Value Tracker",
+    "doc_type": "code",
+    "file": "code/bar_chart.py"
+  }
+]

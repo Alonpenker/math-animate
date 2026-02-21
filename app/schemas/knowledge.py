@@ -32,6 +32,11 @@ class KnowledgeDocumentsListResponse(BaseModel):
     documents: List[KnowledgeDocument]
 
 
+class SeedKnowledgeResponse(BaseModel):
+    inserted: int
+    skipped: int
+
+
 class KnowledgeDocumentSchema(Schema):
     DOCUMENT_ID = DBColumn(name="document_id", type="UUID", attributes=["PRIMARY KEY"])
     CONTENT = DBColumn(name="content", type="TEXT", attributes=["NOT NULL"])

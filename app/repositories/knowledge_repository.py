@@ -57,6 +57,11 @@ class KnowledgeRepository(Repository):
         return cursor.rowcount > 0
 
     @classmethod
+    def document_exists(cls, cursor, document_id: UUID) -> bool:
+        cursor.execute(cls.get(), (str(document_id),))
+        return cursor.fetchone() is not None
+
+    @classmethod
     def search_similar(cls, cursor, embedding: np.ndarray,
                        doc_type: str, limit: int = 3) -> List[KnowledgeDocument]:
         cursor.execute(

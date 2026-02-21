@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,6 +12,7 @@ from app.schemas.knowledge import (
     KnowledgeDocumentsListResponse,
     KnowledgeDocument,
     KnowledgeType,
+    SeedKnowledgeResponse,
 )
 from app.services.rag_service import RAGService
 
@@ -31,6 +34,27 @@ def create_document(body: KnowledgeDocumentCreate,
         title=body.title,
     )
     return KnowledgeDocumentResponse(document=document)
+
+
+@router.post("/seed", status_code=status.HTTP_200_OK)
+def seed_knowledge(cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
+    examples_dir = Path(__file__).resolve().parent.parent / "examples"
+    index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
+
+    inserted = 0
+    skipped = 0
+    for entry in index:
+        document_id = UUID(entry["document_id"])
+        if KnowledgeRepository.document_exists(cursor, document_id):
+            skipped += 1
+            continue
+        content = (examples_dir / entry["file"]).read_text(encoding="utf-8")
+        embedding = RAGService.embed_text(content)
+        KnowledgeRepository.create_document(
+            cursor, document_id, content, entry["doc_type"], entry["title"], embedding
+        )
+        inserted += 1
+    return SeedKnowledgeResponse(inserted=inserted, skipped=skipped)
 
 
 @router.get("/{document_id}")

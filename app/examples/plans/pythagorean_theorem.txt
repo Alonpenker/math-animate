@@ -1,0 +1,25 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Draw a right triangle and label its sides to set up the theorem.",
+      "visual_storyboard": "Draw a right triangle using Polygon with legs of length 3 and 4. Add MathTex labels 'a', 'b', and 'c' along the respective sides. Place a small Square at the right-angle vertex as the right-angle indicator. Animate the triangle appearing with Create, then Write each label in sequence.",
+      "voice_notes": "Consider a right triangle with legs a and b and hypotenuse c. The Pythagorean theorem tells us that the square of the hypotenuse equals the sum of the squares of the other two sides.",
+      "template_hints": "Use Polygon for the triangle. Position MathTex labels using next_to with the midpoint of each side."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Construct squares on each side and show their areas visually.",
+      "visual_storyboard": "Grow a blue Square from side 'a', a red Square from side 'b', and a purple Square from side 'c', each sized to match their corresponding side length. Use GrowFromEdge for each square. Inside the blue square write 'a²', inside the red write 'b²', and inside the purple write 'c²' using MathTex with Write.",
+      "voice_notes": "We construct squares on each side of the triangle. The area of the square on side a is a squared, on side b is b squared, and on the hypotenuse is c squared.",
+      "template_hints": "Compute Square side lengths from the triangle's Polygon vertices. Use rotate to align each square flush against its corresponding triangle side."
+    },
+    {
+      "scene_number": 3,
+      "learning_objective": "Demonstrate that the two smaller squares together equal the large square in area.",
+      "visual_storyboard": "Animate the blue and red squares simultaneously translating and fading into the purple square region, suggesting they fill it exactly. Then display the equation a² + b² = c² at the bottom of the screen using MathTex with Write. Hold for three seconds.",
+      "voice_notes": "The combined area of the two smaller squares exactly fills the square on the hypotenuse, proving that a squared plus b squared equals c squared.",
+      "template_hints": null
+    }
+  ]
+}

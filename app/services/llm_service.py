@@ -59,7 +59,7 @@ class LLMService:
         return "\n\n".join(parts)
 
     @staticmethod
-    def _extract_total_tokens(response) -> int:
+    def extract_total_tokens(response) -> int:
         usage = getattr(response, "usage_metadata", None) or {}
         return int(usage.get("total_tokens", 0))
 
@@ -99,7 +99,7 @@ class LLMService:
         chain = prompt | structured_model
         result = chain.invoke({"query": user_query})
         plan = result["parsed"]
-        total_tokens = LLMService._extract_total_tokens(result["raw"])
+        total_tokens = LLMService.extract_total_tokens(result["raw"])
         if isinstance(plan, VideoPlan):
             return plan, total_tokens
         raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
@@ -114,7 +114,7 @@ class LLMService:
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
         chain = prompt | model
         response = chain.invoke({"plan": user_query})
-        total_tokens = LLMService._extract_total_tokens(response)
+        total_tokens = LLMService.extract_total_tokens(response)
         content = response.content
         if isinstance(content, str):
             return content, total_tokens
