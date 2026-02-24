@@ -12,12 +12,11 @@ from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOU
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus, require_transition
-from app.exceptions.code_verification_error import CodeVerificationError
 from app.exceptions.quota import QuotaExceededException
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
-from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job
+from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
 from app.schemas.artifact import ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
@@ -29,8 +28,8 @@ from app.workers.worker_helpers import (
     release_budget_on_error,
     get_storage,
     save_artifact_to_storage,
-    verify_code,
     store_render_logs,
+    run_dry_run_docker,
 )
 from app.utils.logging import get_logger
 
@@ -97,8 +96,8 @@ def generate_plan(job_request_payload: dict) -> None:
         raise
 
 
-@app.task(bind=True, max_retries=1)
-def generate_code(self, job_request_payload: dict) -> None:
+@app.task()
+def generate_code(job_request_payload: dict) -> None:
     try:
         job_request = JobPlanRequest(**job_request_payload)
     except Exception:
@@ -123,33 +122,10 @@ def generate_code(self, job_request_payload: dict) -> None:
         code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
         reconcile_budget(call_id, total_tokens)
 
-        failures = verify_code(code)
-        if failures:
-            failure_msg = "; ".join(failures)
-            logger.warning("Code verification failed (%s): %s", log_context(str(job_id)), failure_msg)
-            raise self.retry(exc=CodeVerificationError(failure_msg), countdown=0)
-
-        storage = get_storage()
-        job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
-        job_dir.mkdir(parents=True, exist_ok=True)
-        file_path = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                suffix=f".{ArtifactType.PYTHON_FILE.value}",
-                dir=job_dir,
-                delete=False,
-            ) as tmp:
-                tmp.write(code.encode("utf-8"))
-                file_path = Path(tmp.name)
-            save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
-        finally:
-            if file_path is not None and file_path.exists():
-                file_path.unlink()
-
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
-        logger.info("Codegen completed; render enqueued (%s)", log_context(str(job_id)))
-        generate_render.delay(
-            JobRequest(job=Job(job_id=job_id, status=JobStatus.CODED)).model_dump(mode="json")
+        logger.info("Codegen completed; verification enqueued (%s)", log_context(str(job_id)))
+        verify_code_task.delay(
+            JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code, is_retry=False).model_dump(mode="json")
         )
 
     except QuotaExceededException:
@@ -161,6 +137,136 @@ def generate_code(self, job_request_payload: dict) -> None:
         release_budget_on_error(call_id, reserved, total_tokens)
         logger.exception("Codegen failed (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        raise
+
+
+@app.task()
+def verify_code_task(job_request_payload: dict) -> None:
+    try:
+        job_request = JobCodeRequest(**job_request_payload)
+    except Exception:
+        logger.exception("Invalid code request payload (%s)", log_context())
+        raise
+
+    job_id = job_request.job.job_id
+    code = job_request.code
+    is_retry = job_request.is_retry
+
+    try:
+        transition_job(job_id, job_request.job.status, JobStatus.VERIFYING)
+        logger.info("Verification started (is_retry=%s) (%s)", is_retry, log_context(str(job_id)))
+
+        from app.workers.worker_helpers import verify_code as static_verify
+        failures = static_verify(code)
+
+        if not failures:
+            render_root = Path(PathNames.TMP_RENDER_FOLDER)
+            input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
+            input_dir.mkdir(parents=True, exist_ok=True)
+
+            code_path = input_dir / PathNames.MANIM_CODE
+            code_path.write_text(code, encoding="utf-8")
+
+            try:
+                passed, error_output = run_dry_run_docker(input_dir, code_path)
+                if not passed:
+                    failures.append(f"Dry-run failed:\n{error_output}")
+            finally:
+                if code_path.exists():
+                    code_path.unlink()
+                dry_run_path = input_dir / "dry_run.py"
+                if dry_run_path.exists():
+                    dry_run_path.unlink()
+
+        if not failures:
+            storage = get_storage()
+            job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
+            job_dir.mkdir(parents=True, exist_ok=True)
+            file_path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    suffix=f".{ArtifactType.PYTHON_FILE.value}",
+                    dir=job_dir,
+                    delete=False,
+                ) as tmp:
+                    tmp.write(code.encode("utf-8"))
+                    file_path = Path(tmp.name)
+                save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
+            finally:
+                if file_path is not None and file_path.exists():
+                    file_path.unlink()
+
+            transition_job(job_id, JobStatus.VERIFYING, JobStatus.VERIFIED)
+            logger.info("Verification passed; render enqueued (%s)", log_context(str(job_id)))
+            generate_render.delay(
+                JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
+            )
+        else:
+            error_context = "; ".join(failures)
+            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), error_context)
+
+            if is_retry:
+                transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+                logger.error("Verification exhausted; job failed (%s)", log_context(str(job_id)))
+            else:
+                transition_job(job_id, JobStatus.VERIFYING, JobStatus.FIXING)
+                logger.info("Fix enqueued (%s)", log_context(str(job_id)))
+                fix_code_task.delay(
+                    JobFixRequest(
+                        job=Job(job_id=job_id, status=JobStatus.FIXING),
+                        code=code,
+                        error_context=error_context,
+                    ).model_dump(mode="json")
+                )
+
+    except Exception:
+        logger.exception("Verification task failed unexpectedly (%s)", log_context(str(job_id)))
+        transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+        raise
+
+
+@app.task()
+def fix_code_task(job_request_payload: dict) -> None:
+    try:
+        job_request = JobFixRequest(**job_request_payload)
+    except Exception:
+        logger.exception("Invalid fix request payload (%s)", log_context())
+        raise
+
+    job_id = job_request.job.job_id
+    call_id = uuid4()
+    reserved = 0
+    total_tokens = 0
+
+    try:
+        system_prompt, user_query = LLMService.render_fix_prompt(job_request.code, job_request.error_context)
+        reserved = reserve_budget(
+            call_id, job_id, JobStatus.FIXING.value, LLM_CODE_MODEL,
+            f"{system_prompt}\n{user_query}",
+        )
+
+        logger.info("Fix LLM call started (%s)", log_context(str(job_id)))
+        fixed_code, total_tokens = LLMService.fix_call(system_prompt, user_query)
+        reconcile_budget(call_id, total_tokens)
+
+        logger.info("Fix completed; re-verification enqueued (%s)", log_context(str(job_id)))
+        verify_code_task.delay(
+            JobCodeRequest(
+                job=Job(job_id=job_id, status=JobStatus.FIXING),
+                code=fixed_code,
+                is_retry=True,
+            ).model_dump(mode="json")
+        )
+
+    except QuotaExceededException:
+        logger.exception("Fix quota exceeded (%s)", log_context(str(job_id)))
+        release_budget_on_error(call_id, reserved, total_tokens)
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+
+    except Exception:
+        release_budget_on_error(call_id, reserved, total_tokens)
+        logger.exception("Fix task failed (%s)", log_context(str(job_id)))
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
         raise
 
 
@@ -186,7 +292,7 @@ def generate_render(job_request_payload: dict) -> None:
             plan = PlansRepository.get_plan(cursor, job_id)
         if plan is None:
             raise RuntimeError("No plan found for render.")
-        video_plan = VideoPlan.model_validate_json(plan.plan)
+        video_plan = plan.plan
         if not video_plan.scenes:
             raise RuntimeError("No plan scenes found for render.")
 

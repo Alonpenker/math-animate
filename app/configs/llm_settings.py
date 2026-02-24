@@ -11,14 +11,15 @@ LLM_PROVIDER = LLMProvider.OPENAI
 LLM_PLAN_MODEL = "gpt-5.2"
 LLM_CODE_MODEL = "gpt-5.1-codex"
 LLM_TEMPERATURE = 0.2
-LLM_MAX_TOKENS = 4096
+LLM_MAX_TOKENS = 12_288
+LLM_REASONING_EFFORT = "low"
 
 # --- Embedding defaults ---
 LLM_EMBEDDING_MODEL = "nomic-embed-text"
 LLM_EMBEDDING_DIMENSIONS = 768
 
 # --- RAG defaults ---
-RAG_SIMILARITY_TOP_K = 3
+RAG_SIMILARITY_TOP_K = 2
 
 # --- Token budget defaults ---
 DAILY_TOKEN_LIMIT = 250_000
@@ -50,3 +51,13 @@ Rules:
 - Do not use external files, images, or network calls.
 - Keep animations simple and clear.
 - Respond ONLY with the Python code, no markdown fences."""
+
+CODEGEN_FIX_SYSTEM_PROMPT = """You are an expert Manim v0.19.2 developer fixing a specific bug in existing code.
+You will receive broken Manim code and the exact error it produced.
+Fix only the specific issue. Do not rewrite scenes from scratch.
+Preserve all Scene class names (Scene1, Scene2, ...) and the overall structure.
+
+Rules:
+- Import only from manim, numpy, math, colour, scipy, random and typing.
+- Do not use external files, images, or network calls.
+- Respond ONLY with the corrected Python code, no markdown fences."""

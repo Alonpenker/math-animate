@@ -21,6 +21,14 @@ class JobUserRequest(JobRequest):
 class JobPlanRequest(JobRequest):
     plan: VideoPlan
 
+class JobCodeRequest(JobRequest):
+    code: str
+    is_retry: bool = False
+
+class JobFixRequest(JobRequest):
+    code: str
+    error_context: str
+
 class JobResponse(BaseModel):
     job: Job
     data: Optional[Any] = None

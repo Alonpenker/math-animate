@@ -72,15 +72,7 @@ def approve_plan(job_id: UUID, approved: bool, cursor=Depends(get_cursor)) -> Jo
     if approved:
         job = Job(job_id=job_id, status=JobStatus.APPROVED)
         JobsRepository.update_job_status(cursor, job_id, JobStatus.APPROVED)
-        try:
-            video_plan = VideoPlan.model_validate_json(plan.plan)
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Invalid stored plan JSON (job_id={job_id})",
-            )
-        job_request = JobPlanRequest(job=job,
-                                     plan=video_plan)
+        job_request = JobPlanRequest(job=job, plan=plan.plan)
         WorkerRunner.advance(job_request)
     else:
         job = Job(job_id=job_id, status=JobStatus.CANCELLED)

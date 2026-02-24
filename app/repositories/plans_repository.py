@@ -26,7 +26,7 @@ class PlansRepository(Repository):
             return None
         return Plan(
             job_id=row[PlanSchema.JOB_ID.name],
-            plan=row[PlanSchema.PLAN.name],
+            plan=VideoPlan.model_validate_json(row[PlanSchema.PLAN.name]),
             approved=row[PlanSchema.APPROVED.name],
         )
 

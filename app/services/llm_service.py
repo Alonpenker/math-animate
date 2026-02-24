@@ -1,11 +1,12 @@
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import (
     LLMProvider, LLM_PROVIDER, LLM_PLAN_MODEL, LLM_CODE_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
-    PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
+    LLM_REASONING_EFFORT,
+    PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, CODEGEN_FIX_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
 )
 from app.dependencies.db import get_worker_cursor
 from app.repositories.knowledge_repository import KnowledgeRepository
@@ -22,6 +23,7 @@ class LLMService:
             model=model_name,
             temperature=LLM_TEMPERATURE,
             max_completion_tokens=LLM_MAX_TOKENS,
+            reasoning_effort=LLM_REASONING_EFFORT,
             api_key=settings.api_key,
         ),
         LLMProvider.ANTHROPIC: lambda model_name: ChatAnthropic(
@@ -34,7 +36,7 @@ class LLMService:
         ),
     }
 
-    _chat_models = {}
+    _chat_models: dict[str, ChatOpenAI | ChatAnthropic] = {}
 
     @classmethod
     def get_chat_model(cls, model_name: str) -> ChatOpenAI | ChatAnthropic:
@@ -64,6 +66,25 @@ class LLMService:
         return int(usage.get("total_tokens", 0))
 
     @staticmethod
+    def extract_text_content(response) -> str:
+        """Extract plain text from a response whose content may be a str or a list of typed blocks."""
+        content = response.content
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = [
+                block["text"]
+                for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            if text_parts:
+                return "".join(text_parts)
+        raise ValueError(
+            f"LLM returned non-text response content. "
+            f"type={type(content).__name__!r}, value={content!r}"
+        )
+
+    @staticmethod
     def render_plan_prompt(user_request: UserRequest) -> tuple[str, str]:
         """Return (system_prompt, user_query) for the planning LLM call."""
         query = (
@@ -89,33 +110,47 @@ class LLMService:
 
     @staticmethod
     def plan_call(system_prompt: str, user_query: str) -> tuple[VideoPlan, int]:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{query}"),
-        ])
-
         model = LLMService.get_chat_model(LLM_PLAN_MODEL)
         structured_model = model.with_structured_output(VideoPlan, include_raw=True)
-        chain = prompt | structured_model
-        result = chain.invoke({"query": user_query})
-        plan = result["parsed"]
-        total_tokens = LLMService.extract_total_tokens(result["raw"])
+        result = structured_model.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_query),
+        ])
+        if not isinstance(result, dict):
+            raise ValueError("Unexpected structured output shape.")
+        plan = result.get("parsed")
+        total_tokens = LLMService.extract_total_tokens(result.get("raw"))
         if isinstance(plan, VideoPlan):
             return plan, total_tokens
         raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
 
     @staticmethod
     def codegen_call(system_prompt: str, user_query: str) -> tuple[str, int]:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{plan}"),
-        ])
-
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
-        chain = prompt | model
-        response = chain.invoke({"plan": user_query})
+        response = model.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_query),
+        ])
         total_tokens = LLMService.extract_total_tokens(response)
-        content = response.content
-        if isinstance(content, str):
-            return content, total_tokens
-        raise ValueError("LLM returned non-text response content for code generation.")
+        return LLMService.extract_text_content(response), total_tokens
+
+    @staticmethod
+    def render_fix_prompt(code: str, error_context: str) -> tuple[str, str]:
+        user_query = (
+            f"Fix this Manim code:\n\n"
+            f"<code>\n{code}\n</code>\n\n"
+            f"It failed with this error:\n"
+            f"<error>\n{error_context}\n</error>\n\n"
+            f"Return only the corrected Python code."
+        )
+        return CODEGEN_FIX_SYSTEM_PROMPT, user_query
+
+    @staticmethod
+    def fix_call(system_prompt: str, user_query: str) -> tuple[str, int]:
+        model = LLMService.get_chat_model(LLM_CODE_MODEL)
+        response = model.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_query),
+        ])
+        total_tokens = LLMService.extract_total_tokens(response)
+        return LLMService.extract_text_content(response), total_tokens

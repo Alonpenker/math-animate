@@ -3,10 +3,12 @@ from uuid import UUID
 
 from app.schemas.db_column import DBColumn
 from app.schemas.schema import Schema
+from app.schemas.video_plan import VideoPlan
+
 
 class Plan(BaseModel):
     job_id: UUID
-    plan: str
+    plan: VideoPlan
     approved: bool
 
 class PlanSchema(Schema):

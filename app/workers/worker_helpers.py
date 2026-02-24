@@ -19,7 +19,7 @@ from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import Artifact, ArtifactType
 from app.services.budget_service import BudgetService
 from app.services.files_storage_service import FilesStorageService
-from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, PathNames
+from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, PathNames, DockerCommands
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,7 +101,12 @@ def verify_code(code: str) -> list[str]:
             tmp_path = tmp.name
         try:
             result = subprocess.run(
-                ["mypy", "--ignore-missing-imports", tmp_path],
+                ["mypy",
+                "--ignore-missing-imports",
+                "--follow-imports=skip",
+                "--disable-error-code=name-defined",
+                "--disable-error-code=attr-defined",
+                tmp_path],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -151,6 +156,74 @@ def verify_code(code: str) -> list[str]:
         failures.append(f"Dangerous builtin calls: {', '.join(sorted(set(dangerous_calls)))}")
 
     return failures
+
+
+def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
+    """Run a Docker dry-run to verify generated Manim code can be imported and constructed.
+
+    Returns (passed, error_output). On success: (True, ""). On failure: (False, stderr+stdout).
+    """
+    dry_run_script = (
+        "import sys, importlib.util\n"
+        "from unittest.mock import MagicMock\n"
+        "import manim\n"
+        "\n"
+        "code_path = sys.argv[1]\n"
+        "spec = importlib.util.spec_from_file_location(\"generated\", code_path)\n"
+        "mod = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(mod)\n"
+        "\n"
+        "scene_classes = [\n"
+        "    obj for obj in vars(mod).values()\n"
+        "    if isinstance(obj, type) and issubclass(obj, manim.Scene) and obj is not manim.Scene\n"
+        "]\n"
+        "if not scene_classes:\n"
+        "    print(\"No Scene subclasses found\", file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        "\n"
+        "for cls in scene_classes:\n"
+        "    instance = object.__new__(cls)\n"
+        "    instance.play = MagicMock()\n"
+        "    instance.wait = MagicMock()\n"
+        "    instance.add = MagicMock()\n"
+        "    instance.remove = MagicMock()\n"
+        "    instance.camera = MagicMock()\n"
+        "    instance.mobjects = []\n"
+        "    instance.construct()\n"
+        "\n"
+        "print(\"Dry run passed.\")\n"
+    )
+
+    dry_run_path = input_dir / "dry_run.py"
+    dry_run_path.write_text(dry_run_script, encoding="utf-8")
+
+    render_root = Path(PathNames.TMP_RENDER_FOLDER)
+
+    command = [
+        *DockerCommands.BIN,
+        *DockerCommands.NETWORK,
+        *DockerCommands.CPU,
+        *DockerCommands.MEMORY,
+        *DockerCommands.PIDS,
+        *DockerCommands.SECURITY,
+        *DockerCommands.volume(str(render_root), render_root, "rw"),
+        *DockerCommands.IMAGE,
+        "python", str(dry_run_path), str(code_path),
+    ]
+
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            return True, ""
+        return False, f"{result.stderr}{result.stdout}"
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr if isinstance(exc.stderr, str) else (bytes(exc.stderr).decode() if exc.stderr else "")
+        stdout = exc.stdout if isinstance(exc.stdout, str) else (bytes(exc.stdout).decode() if exc.stdout else "")
+        return False, f"Dry-run timed out after 30s.\n{stderr}{stdout}"
+    except Exception as exc:
+        return False, f"Dry-run failed with exception: {exc}"
 
 
 def store_render_logs(

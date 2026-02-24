@@ -8,7 +8,7 @@ DANGEROUS_BUILTINS: frozenset[str] = frozenset({
     "exec", "eval", "open", "__import__", "compile",
 })
 
-RENDER_TIMEOUT_SECONDS: int = 900
+RENDER_TIMEOUT_SECONDS: int = 600
 
 class PathNames:
     ARTIFACTS_FOLDER = 'job_artifacts'

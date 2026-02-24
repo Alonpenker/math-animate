@@ -96,14 +96,14 @@ services:
   
   ollama:
     image: ollama/ollama:latest
-    entrypoint: /bin/sh
-    command: >-
-      -c "ollama serve &
-          until curl -sf http://localhost:11434/api/tags > /dev/null; do sleep 1; done &&
-          ollama pull nomic-embed-text &&
-          wait"
+    restart: unless-stopped
+    environment:
+      OLLAMA_DEBUG: 0
+      OLLAMA_LOG_LEVEL: ERROR
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama serve > /dev/null 2>&1 & sleep 5 && ollama pull nomic-embed-text && wait"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags | grep -q nomic-embed-text"]
+      test: ["CMD", "sh", "-c", "ollama list | grep -q nomic-embed-text"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -114,15 +114,24 @@ services:
   docker-daemon:
     image: docker:dind
     privileged: true
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        dockerd-entrypoint.sh &
+        daemon_pid=$$!
+        until docker info >/dev/null 2>&1; do sleep 1; done
+        docker pull "manimcommunity/manim:v0.19.2"
+        wait "$$daemon_pid"
     environment:
       DOCKER_TLS_CERTDIR: ""
     volumes:
       - render_data:/job
     healthcheck:
-      test: ["CMD", "docker", "info"]
+      test: ["CMD-SHELL", "docker info >/dev/null 2>&1 && docker image inspect \"manimcommunity/manim:v0.19.2\" >/dev/null 2>&1"]
       interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 20s
 
 
 volumes:
