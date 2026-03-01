@@ -104,9 +104,11 @@ class LLMService:
         plan_text = plan.model_dump_json(indent=2)
         with get_worker_cursor() as cursor:
             examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE)
-        system_prompt = CODEGEN_SYSTEM_PROMPT.format(examples=examples)
-        user_query = f"Generate Manim code for this plan:\n{plan_text}"
-        return system_prompt, user_query
+        user_query = (
+            f"Reference examples of good Manim code:\n{examples}\n\n"
+            f"Generate Manim code for this plan:\n{plan_text}"
+        )
+        return CODEGEN_SYSTEM_PROMPT, user_query
 
     @staticmethod
     def plan_call(system_prompt: str, user_query: str) -> tuple[VideoPlan, int]:

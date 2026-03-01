@@ -158,45 +158,21 @@ def verify_code(code: str) -> list[str]:
     return failures
 
 
-def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
-    """Run a Docker dry-run to verify generated Manim code can be imported and constructed.
+def extract_traceback(stderr: str) -> str:
+    """Extract the traceback portion from stderr output.
 
-    Returns (passed, error_output). On success: (True, ""). On failure: (False, stderr+stdout).
+    If a "Traceback (most recent call last)" marker is found, returns everything
+    from the first occurrence to the end. Otherwise returns the full stderr as-is.
     """
-    dry_run_script = (
-        "import sys, importlib.util\n"
-        "from unittest.mock import MagicMock\n"
-        "import manim\n"
-        "\n"
-        "code_path = sys.argv[1]\n"
-        "spec = importlib.util.spec_from_file_location(\"generated\", code_path)\n"
-        "mod = importlib.util.module_from_spec(spec)\n"
-        "spec.loader.exec_module(mod)\n"
-        "\n"
-        "scene_classes = [\n"
-        "    obj for obj in vars(mod).values()\n"
-        "    if isinstance(obj, type) and issubclass(obj, manim.Scene) and obj is not manim.Scene\n"
-        "]\n"
-        "if not scene_classes:\n"
-        "    print(\"No Scene subclasses found\", file=sys.stderr)\n"
-        "    sys.exit(1)\n"
-        "\n"
-        "for cls in scene_classes:\n"
-        "    instance = object.__new__(cls)\n"
-        "    instance.play = MagicMock()\n"
-        "    instance.wait = MagicMock()\n"
-        "    instance.add = MagicMock()\n"
-        "    instance.remove = MagicMock()\n"
-        "    instance.camera = MagicMock()\n"
-        "    instance.mobjects = []\n"
-        "    instance.construct()\n"
-        "\n"
-        "print(\"Dry run passed.\")\n"
-    )
+    marker = "Traceback (most recent call last)"
+    idx = stderr.find(marker)
+    if idx != -1:
+        return stderr[idx:]
+    return stderr
 
-    dry_run_path = input_dir / "dry_run.py"
-    dry_run_path.write_text(dry_run_script, encoding="utf-8")
 
+def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
+    """Run ``manim --dry_run`` inside Docker to verify generated code."""
     render_root = Path(PathNames.TMP_RENDER_FOLDER)
 
     command = [
@@ -208,20 +184,20 @@ def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
         *DockerCommands.SECURITY,
         *DockerCommands.volume(str(render_root), render_root, "rw"),
         *DockerCommands.IMAGE,
-        "python", str(dry_run_path), str(code_path),
+        *DockerCommands.manim_dry_run_command(code_path),
     ]
 
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=30,
+            command, capture_output=True, text=True, timeout=60,
         )
         if result.returncode == 0:
             return True, ""
-        return False, f"{result.stderr}{result.stdout}"
+        error_output = result.stderr or ""
+        return False, extract_traceback(error_output)
     except subprocess.TimeoutExpired as exc:
         stderr = exc.stderr if isinstance(exc.stderr, str) else (bytes(exc.stderr).decode() if exc.stderr else "")
-        stdout = exc.stdout if isinstance(exc.stdout, str) else (bytes(exc.stdout).decode() if exc.stdout else "")
-        return False, f"Dry-run timed out after 30s.\n{stderr}{stdout}"
+        return False, f"Dry-run timed out after 60s.\n{extract_traceback(stderr)}"
     except Exception as exc:
         return False, f"Dry-run failed with exception: {exc}"
 

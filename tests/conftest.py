@@ -102,7 +102,7 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
     def create_plan(cursor: object, job_id, plan) -> None:
         test_store["plans"][job_id] = Plan(
             job_id=job_id,
-            plan=plan.model_dump_json(),
+            plan=plan,
             approved=False,
         )
 

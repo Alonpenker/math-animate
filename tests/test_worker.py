@@ -7,7 +7,7 @@ import pytest
 
 from app.domain.job_state import JobStatus
 from app.schemas.artifact import Artifact, ArtifactType
-from app.schemas.jobs import Job, JobPlanRequest, JobRequest, JobUserRequest
+from app.schemas.jobs import Job, JobCodeRequest, JobFixRequest, JobPlanRequest, JobRequest, JobUserRequest
 from app.schemas.plan import Plan
 
 
@@ -125,6 +125,171 @@ def test_verify_code_accumulates_multiple_failures(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# _extract_traceback unit tests
+# ---------------------------------------------------------------------------
+
+def test_extract_traceback_returns_from_marker_to_end():
+    from app.workers.worker_helpers import extract_traceback
+
+    stderr = (
+        "INFO manim starting...\n"
+        "Rendering scene...\n"
+        "Traceback (most recent call last):\n"
+        "  File code.py, line 5, in construct\n"
+        "IndexError: list index out of range\n"
+    )
+    result = extract_traceback(stderr)
+    assert result.startswith("Traceback (most recent call last):")
+    assert "IndexError" in result
+    assert "INFO manim starting" not in result
+
+
+def test_extract_traceback_returns_full_string_when_no_marker():
+    from app.workers.worker_helpers import extract_traceback
+
+    stderr = "Error: some plain error without traceback"
+    assert extract_traceback(stderr) == stderr
+
+
+def test_extract_traceback_handles_empty_string():
+    from app.workers.worker_helpers import extract_traceback
+
+    assert extract_traceback("") == ""
+
+
+# ---------------------------------------------------------------------------
+# run_dry_run_docker tests
+# ---------------------------------------------------------------------------
+
+def _make_dry_run_env(monkeypatch, tmp_path):
+    """Set up a minimal filesystem environment for run_dry_run_docker tests."""
+    from app.workers import worker_helpers
+
+    render_root = tmp_path / "render_root"
+    render_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(worker_helpers.PathNames, "TMP_RENDER_FOLDER", str(render_root))
+
+    input_dir = render_root / "input"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    code_path = input_dir / "code.py"
+    code_path.write_text("from manim import *\n", encoding="utf-8")
+    return input_dir, code_path
+
+
+def test_run_dry_run_docker_passes_on_zero_exit_code(monkeypatch, tmp_path):
+    from app.workers import worker_helpers
+    from app.workers.worker_helpers import run_dry_run_docker
+
+    input_dir, code_path = _make_dry_run_env(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        worker_helpers.subprocess,
+        "run",
+        lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(cmd, 0, "", ""),
+    )
+
+    passed, error = run_dry_run_docker(input_dir, code_path)
+    assert passed is True
+    assert error == ""
+
+
+def test_run_dry_run_docker_uses_manim_dry_run_command(monkeypatch, tmp_path):
+    from app.workers import worker_helpers
+    from app.workers.worker_helpers import run_dry_run_docker
+
+    input_dir, code_path = _make_dry_run_env(monkeypatch, tmp_path)
+
+    captured_commands = []
+
+    def fake_run(cmd, *, capture_output, text, timeout):
+        captured_commands.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(worker_helpers.subprocess, "run", fake_run)
+
+    run_dry_run_docker(input_dir, code_path)
+
+    assert len(captured_commands) == 1
+    cmd = captured_commands[0]
+    assert "manim" in cmd
+    assert "--dry_run" in cmd
+    # No dry_run.py script should be written by the new implementation
+    assert not (input_dir / "dry_run.py").exists()
+
+
+def test_run_dry_run_docker_extracts_traceback_from_stderr_on_failure(monkeypatch, tmp_path):
+    from app.workers import worker_helpers
+    from app.workers.worker_helpers import run_dry_run_docker
+
+    input_dir, code_path = _make_dry_run_env(monkeypatch, tmp_path)
+
+    stderr_with_noise = (
+        "INFO manim starting\n"
+        "Traceback (most recent call last):\n"
+        "  File code.py, line 5\n"
+        "IndexError: list index out of range\n"
+    )
+    monkeypatch.setattr(
+        worker_helpers.subprocess,
+        "run",
+        lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(
+            cmd, 1, "some stdout", stderr_with_noise
+        ),
+    )
+
+    passed, error = run_dry_run_docker(input_dir, code_path)
+
+    assert passed is False
+    assert error.startswith("Traceback (most recent call last):")
+    assert "IndexError" in error
+    assert "INFO manim starting" not in error
+    assert "some stdout" not in error
+
+
+def test_run_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeypatch, tmp_path):
+    from app.workers import worker_helpers
+    from app.workers.worker_helpers import run_dry_run_docker
+
+    input_dir, code_path = _make_dry_run_env(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        worker_helpers.subprocess,
+        "run",
+        lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(
+            cmd, 1, "", "plain error message"
+        ),
+    )
+
+    passed, error = run_dry_run_docker(input_dir, code_path)
+    assert passed is False
+    assert error == "plain error message"
+
+
+def test_run_dry_run_docker_timeout_includes_stderr_only(monkeypatch, tmp_path):
+    from app.workers import worker_helpers
+    from app.workers.worker_helpers import run_dry_run_docker
+
+    input_dir, code_path = _make_dry_run_env(monkeypatch, tmp_path)
+
+    def timeout_run(cmd, *, capture_output, text, timeout):
+        raise subprocess.TimeoutExpired(
+            cmd=cmd,
+            timeout=timeout,
+            output=b"stdout-timeout",
+            stderr=b"stderr-timeout",
+        )
+
+    monkeypatch.setattr(worker_helpers.subprocess, "run", timeout_run)
+
+    passed, error = run_dry_run_docker(input_dir, code_path)
+
+    assert passed is False
+    assert "Dry-run timed out after 60s." in error
+    assert "stderr-timeout" in error
+    assert "stdout-timeout" not in error
+
+
+# ---------------------------------------------------------------------------
 # generate_plan tests
 # ---------------------------------------------------------------------------
 
@@ -186,19 +351,23 @@ def test_generate_plan_failure_sets_failed_planning(
 # generate_code tests
 # ---------------------------------------------------------------------------
 
-def test_generate_code_success_persists_python_artifact_and_enqueues_render(
+def test_generate_code_success_transitions_to_coded_and_enqueues_verify(
+    monkeypatch,
     mock_repositories,
     mock_worker_cursor,
-    mock_worker_paths,
-    mock_worker_storage,
     mock_worker_llm,
     mock_worker_budget,
-    mock_worker_verify_code,
-    capture_render_delay,
     sample_video_plan,
     test_store,
 ):
     from app.workers import worker as worker_module
+
+    enqueued_payloads = []
+    monkeypatch.setattr(
+        worker_module.verify_code_task,
+        "delay",
+        lambda payload: enqueued_payloads.append(payload),
+    )
 
     job = Job(status=JobStatus.APPROVED)
     test_store["jobs"][job.job_id] = job
@@ -211,27 +380,16 @@ def test_generate_code_success_persists_python_artifact_and_enqueues_render(
         (job.job_id, JobStatus.CODEGEN),
         (job.job_id, JobStatus.CODED),
     ]
-
-    job_artifacts = [a for a in test_store["artifacts"].values() if a.job_id == job.job_id]
-    assert len(job_artifacts) == 1
-    artifact = job_artifacts[0]
-    assert artifact.artifact_type == ArtifactType.PYTHON_FILE
-    assert artifact.path in test_store["objects"]
-    stored_bytes = test_store["objects"][artifact.path]
-    assert artifact.size == len(stored_bytes)
-    assert artifact.sha256 == hashlib.sha256(stored_bytes).hexdigest()
-
-    assert len(test_store["render_delay_payloads"]) == 1
-    assert test_store["render_delay_payloads"][0]["job"]["job_id"] == str(job.job_id)
-    assert test_store["render_delay_payloads"][0]["job"]["status"] == JobStatus.CODED.value
+    assert len(enqueued_payloads) == 1
+    assert enqueued_payloads[0]["job"]["job_id"] == str(job.job_id)
+    assert enqueued_payloads[0]["job"]["status"] == JobStatus.CODED.value
+    assert enqueued_payloads[0]["is_retry"] is False
 
 
 def test_generate_code_failure_sets_failed_codegen(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
-    mock_worker_paths,
-    mock_worker_storage,
     mock_worker_budget,
     sample_video_plan,
     test_store,
@@ -258,71 +416,299 @@ def test_generate_code_failure_sets_failed_codegen(
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_CODEGEN)
 
 
-def test_generate_code_verification_failure_transitions_to_failed_codegen(
+# ---------------------------------------------------------------------------
+# verify_code_task tests
+# ---------------------------------------------------------------------------
+
+def test_verify_code_task_success_saves_artifact_and_enqueues_render(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
     mock_worker_paths,
     mock_worker_storage,
-    mock_worker_llm,
-    mock_worker_budget,
+    capture_render_delay,
     sample_video_plan,
     test_store,
 ):
-    """When verify_code always fails, max retries are exhausted → FAILED_CODEGEN."""
     from app.workers import worker as worker_module
-    from celery.exceptions import MaxRetriesExceededError
+    from app.workers import worker_helpers
 
-    monkeypatch.setattr(worker_module, "verify_code", lambda code: ["Forbidden imports: os"])
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: [])
+    monkeypatch.setattr(worker_module, "run_dry_run_docker", lambda input_dir, code_path: (True, ""))
 
-    # Simulate Celery exhausting retries: self.retry raises MaxRetriesExceededError
-    def fake_retry(*args, exc=None, **kwargs):
-        raise MaxRetriesExceededError()
-
-    monkeypatch.setattr(worker_module.generate_code, "retry", fake_retry)
-
-    job = Job(status=JobStatus.APPROVED)
+    code = (
+        "from manim import *\n\n"
+        "class Scene1(Scene):\n"
+        "    def construct(self):\n"
+        "        self.wait()\n"
+    )
+    job = Job(status=JobStatus.CODED)
     test_store["jobs"][job.job_id] = job
-    payload = JobPlanRequest(job=job, plan=sample_video_plan).model_dump(mode="json")
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.CODED),
+        code=code,
+        is_retry=False,
+    ).model_dump(mode="json")
 
-    with pytest.raises(MaxRetriesExceededError):
-        worker_module.generate_code(payload)
+    worker_module.verify_code_task(payload)
 
-    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_CODEGEN
-    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_CODEGEN)
+    assert test_store["jobs"][job.job_id].status == JobStatus.VERIFIED
+    assert test_store["status_updates"][-2:] == [
+        (job.job_id, JobStatus.VERIFYING),
+        (job.job_id, JobStatus.VERIFIED),
+    ]
+    python_artifacts = [
+        a for a in test_store["artifacts"].values()
+        if a.job_id == job.job_id and a.artifact_type == ArtifactType.PYTHON_FILE
+    ]
+    assert len(python_artifacts) == 1
+    assert len(test_store["render_delay_payloads"]) == 1
+    assert test_store["render_delay_payloads"][0]["job"]["job_id"] == str(job.job_id)
 
 
-def test_generate_code_verification_failure_does_not_store_artifact(
+def test_verify_code_task_dry_run_failure_first_attempt_enqueues_fix(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
     mock_worker_paths,
-    mock_worker_storage,
-    mock_worker_llm,
-    mock_worker_budget,
-    sample_video_plan,
     test_store,
 ):
-    """Unverified code must never be persisted as an artifact."""
     from app.workers import worker as worker_module
-    from celery.exceptions import MaxRetriesExceededError
+    from app.workers import worker_helpers
 
-    monkeypatch.setattr(worker_module, "verify_code", lambda code: ["mypy errors: bad type"])
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: [])
+    monkeypatch.setattr(
+        worker_module,
+        "run_dry_run_docker",
+        lambda input_dir, code_path: (False, "Traceback (most recent call last):\nIndexError"),
+    )
 
-    def fake_retry(*args, exc=None, **kwargs):
-        raise MaxRetriesExceededError()
+    enqueued_fix_payloads = []
+    monkeypatch.setattr(
+        worker_module.fix_code_task,
+        "delay",
+        lambda payload: enqueued_fix_payloads.append(payload),
+    )
 
-    monkeypatch.setattr(worker_module.generate_code, "retry", fake_retry)
-
-    job = Job(status=JobStatus.APPROVED)
+    code = "from manim import *\n"
+    job = Job(status=JobStatus.CODED)
     test_store["jobs"][job.job_id] = job
-    payload = JobPlanRequest(job=job, plan=sample_video_plan).model_dump(mode="json")
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.CODED),
+        code=code,
+        is_retry=False,
+    ).model_dump(mode="json")
 
-    with pytest.raises(MaxRetriesExceededError):
-        worker_module.generate_code(payload)
+    worker_module.verify_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
+    assert len(enqueued_fix_payloads) == 1
+    assert "IndexError" in enqueued_fix_payloads[0]["error_context"]
+
+
+def test_verify_code_task_dry_run_failure_second_attempt_sets_failed_verification(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_paths,
+    test_store,
+):
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
+
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: [])
+    monkeypatch.setattr(
+        worker_module,
+        "run_dry_run_docker",
+        lambda input_dir, code_path: (False, "Traceback: IndexError"),
+    )
+
+    code = "from manim import *\n"
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code=code,
+        is_retry=True,
+    ).model_dump(mode="json")
+
+    worker_module.verify_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
+
+
+def test_verify_code_task_static_failure_first_attempt_enqueues_fix(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    test_store,
+):
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
+
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: ["Forbidden imports: os"])
+
+    enqueued_fix_payloads = []
+    monkeypatch.setattr(
+        worker_module.fix_code_task,
+        "delay",
+        lambda payload: enqueued_fix_payloads.append(payload),
+    )
+
+    code = "import os\nfrom manim import *\n"
+    job = Job(status=JobStatus.CODED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.CODED),
+        code=code,
+        is_retry=False,
+    ).model_dump(mode="json")
+
+    worker_module.verify_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
+    assert len(enqueued_fix_payloads) == 1
+    assert "Forbidden imports" in enqueued_fix_payloads[0]["error_context"]
+
+
+def test_verify_code_task_static_failure_second_attempt_sets_failed_verification(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    test_store,
+):
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
+
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: ["mypy errors: bad type"])
+
+    code = "from manim import *\n"
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code=code,
+        is_retry=True,
+    ).model_dump(mode="json")
+
+    worker_module.verify_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
+
+
+def test_verify_code_task_unverified_code_is_not_persisted(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    test_store,
+):
+    """Code that fails verification must never be persisted as an artifact."""
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
+
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code: ["mypy errors: bad type"])
+    monkeypatch.setattr(worker_module.fix_code_task, "delay", lambda payload: None)
+
+    code = "from manim import *\n"
+    job = Job(status=JobStatus.CODED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.CODED),
+        code=code,
+        is_retry=False,
+    ).model_dump(mode="json")
+
+    worker_module.verify_code_task(payload)
 
     job_artifacts = [a for a in test_store["artifacts"].values() if a.job_id == job.job_id]
     assert len(job_artifacts) == 0, "No artifact should be stored when verification fails"
+
+
+# ---------------------------------------------------------------------------
+# fix_code_task tests
+# ---------------------------------------------------------------------------
+
+def test_fix_code_task_success_enqueues_re_verify_with_retry_flag(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_budget,
+    test_store,
+):
+    from app.workers import worker as worker_module
+
+    fixed_code = (
+        "from manim import *\n\n"
+        "class Scene1(Scene):\n"
+        "    def construct(self):\n"
+        "        self.wait()\n"
+    )
+
+    monkeypatch.setattr(
+        worker_module.LLMService,
+        "render_fix_prompt",
+        staticmethod(lambda code, error_context: ("fix-system-prompt", "fix-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.LLMService,
+        "fix_call",
+        staticmethod(lambda system_prompt, user_query: (fixed_code, 150)),
+    )
+
+    enqueued_verify_payloads = []
+    monkeypatch.setattr(
+        worker_module.verify_code_task,
+        "delay",
+        lambda payload: enqueued_verify_payloads.append(payload),
+    )
+
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobFixRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code="from manim import *\n",
+        error_context="IndexError: list index out of range",
+    ).model_dump(mode="json")
+
+    worker_module.fix_code_task(payload)
+
+    assert len(enqueued_verify_payloads) == 1
+    assert enqueued_verify_payloads[0]["is_retry"] is True
+    assert enqueued_verify_payloads[0]["job"]["status"] == JobStatus.FIXING.value
+    assert enqueued_verify_payloads[0]["code"] == fixed_code
+
+
+def test_fix_code_task_llm_failure_sets_failed_verification(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_budget,
+    test_store,
+):
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService,
+        "render_fix_prompt",
+        staticmethod(lambda code, error_context: ("fix-system-prompt", "fix-user-query")),
+    )
+    def failing_fix_call(system_prompt, user_query):
+        raise RuntimeError("LLM fix failed")
+
+    monkeypatch.setattr(worker_module.LLMService, "fix_call", staticmethod(failing_fix_call))
+
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobFixRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code="from manim import *\n",
+        error_context="some error",
+    ).model_dump(mode="json")
+
+    with pytest.raises(RuntimeError, match="LLM fix failed"):
+        worker_module.fix_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +718,7 @@ def test_generate_code_verification_failure_does_not_store_artifact(
 def _make_render_payload(job, sample_video_plan, test_store):
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id,
-        plan=sample_video_plan.model_dump_json(),
+        plan=sample_video_plan,
         approved=True,
     )
     code_bytes = (
@@ -366,7 +752,7 @@ def test_generate_render_success_invokes_renderer_and_persists_mp4_artifacts(
 ):
     from app.workers import worker as worker_module
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 
@@ -429,7 +815,7 @@ def test_generate_render_failure_sets_failed_render_and_stores_logs(
 ):
     from app.workers import worker as worker_module
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 
@@ -464,7 +850,7 @@ def test_generate_render_timeout_sets_failed_render(
 ):
     from app.workers import worker as worker_module
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 
@@ -491,7 +877,7 @@ def test_generate_render_no_plan_sets_failed_render(
 ):
     from app.workers import worker as worker_module
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     # Do NOT add a plan to test_store
     payload = JobRequest(job=job).model_dump(mode="json")
@@ -513,11 +899,11 @@ def test_generate_render_no_python_artifact_sets_failed_render(
 ):
     from app.workers import worker as worker_module
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id,
-        plan=sample_video_plan.model_dump_json(),
+        plan=sample_video_plan,
         approved=True,
     )
     # Do NOT add any artifacts
@@ -542,7 +928,7 @@ def test_generate_render_log_storage_failure_does_not_block_render_success(
     from app.workers import worker as worker_module
     from app.workers import worker_helpers
 
-    job = Job(status=JobStatus.CODED)
+    job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 

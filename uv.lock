@@ -625,14 +625,10 @@ dependencies = [
     { name = "psycopg2" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pytest" },
     { name = "redis" },
     { name = "tiktoken" },
     { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -651,12 +647,11 @@ requires-dist = [
     { name = "psycopg2", specifier = ">=2.9.11" },
     { name = "pydantic", specifier = ">=2.5" },
     { name = "pydantic-settings", specifier = ">=2.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4" },
+    { name = "pytest", specifier = ">=7.4" },
     { name = "redis", specifier = ">=7.1.0" },
     { name = "tiktoken", specifier = ">=0.7" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "minio"

@@ -22,10 +22,6 @@ dependencies = [
     "langchain-ollama>=1.0.1",
     "tiktoken>=0.7",
     "mypy>=1.13",
-]
-
-[project.optional-dependencies]
-dev = [
     "pytest>=7.4",
 ]
 

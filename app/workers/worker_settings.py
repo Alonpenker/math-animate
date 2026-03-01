@@ -34,19 +34,29 @@ class DockerCommands:
     )
     
     @staticmethod
-    def volume(src: str, dst: Path, mode: str):
+    def volume(src: str, dst: str | Path, mode: str):
         return ("-v", f"{src}:{dst}:{mode}")
     
     IMAGE = ("manimcommunity/manim:v0.19.2",)
     
     @staticmethod
-    def manim_command(code_path: Path, media_dir: Path):
+    def manim_command(code_path: str | Path, media_dir: str | Path):
         return (
             "manim",
             "-qh",
             "-a",
             "--media_dir",
             f"{media_dir}",
+            f"{code_path}"
+        )
+
+    @staticmethod
+    def manim_dry_run_command(code_path: str | Path):
+        return (
+            "manim",
+            "-ql",
+            "-a",
+            "--dry_run",
             f"{code_path}"
         )
         

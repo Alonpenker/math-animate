@@ -62,7 +62,7 @@ def test_get_plan_returns_existing_plan(
     test_store["jobs"][job.job_id] = job
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id,
-        plan=sample_video_plan.model_dump_json(),
+        plan=sample_video_plan,
         approved=False,
     )
 
@@ -98,7 +98,7 @@ def test_approve_plan_true_updates_status_and_calls_worker_runner(
     test_store["jobs"][job.job_id] = job
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id,
-        plan=sample_video_plan.model_dump_json(),
+        plan=sample_video_plan,
         approved=False,
     )
 
@@ -127,7 +127,7 @@ def test_approve_plan_false_cancels_without_worker_runner(
     test_store["jobs"][job.job_id] = job
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id,
-        plan=sample_video_plan.model_dump_json(),
+        plan=sample_video_plan,
         approved=False,
     )
 

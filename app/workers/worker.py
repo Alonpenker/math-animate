@@ -174,9 +174,6 @@ def verify_code_task(job_request_payload: dict) -> None:
             finally:
                 if code_path.exists():
                     code_path.unlink()
-                dry_run_path = input_dir / "dry_run.py"
-                if dry_run_path.exists():
-                    dry_run_path.unlink()
 
         if not failures:
             storage = get_storage()
