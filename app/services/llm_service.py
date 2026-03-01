@@ -1,3 +1,5 @@
+import time
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
@@ -14,6 +16,9 @@ from app.schemas.knowledge import KnowledgeType
 from app.schemas.user_request import UserRequest
 from app.schemas.video_plan import VideoPlan
 from app.services.rag_service import RAGService
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class LLMService:
@@ -54,16 +59,23 @@ class LLMService:
             cursor, embedding, doc_type.value, limit=RAG_SIMILARITY_TOP_K
         )
         if not docs:
+            logger.info("RAG retrieval: doc_type=%s count=0", doc_type.value)
             return "(No examples available.)"
+        titles = [doc.title for doc in docs]
+        logger.info("RAG retrieval: doc_type=%s count=%d titles=%s", doc_type.value, len(titles), titles)
         parts = []
         for i, doc in enumerate(docs, 1):
             parts.append(f"--- Example {i} ---\n{doc.content}")
         return "\n\n".join(parts)
 
     @staticmethod
-    def extract_total_tokens(response) -> int:
+    def _extract_token_usage(response) -> tuple[int, int, int]:
+        """Return (input_tokens, output_tokens, total_tokens) from a LangChain response."""
         usage = getattr(response, "usage_metadata", None) or {}
-        return int(usage.get("total_tokens", 0))
+        input_tokens = int(usage.get("input_tokens", 0))
+        output_tokens = int(usage.get("output_tokens", 0))
+        total_tokens = int(usage.get("total_tokens", 0))
+        return input_tokens, output_tokens, total_tokens
 
     @staticmethod
     def extract_text_content(response) -> str:
@@ -114,27 +126,39 @@ class LLMService:
     def plan_call(system_prompt: str, user_query: str) -> tuple[VideoPlan, int]:
         model = LLMService.get_chat_model(LLM_PLAN_MODEL)
         structured_model = model.with_structured_output(VideoPlan, include_raw=True)
+        t0 = time.perf_counter()
         result = structured_model.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_query),
         ])
+        duration_ms = int((time.perf_counter() - t0) * 1000)
         if not isinstance(result, dict):
             raise ValueError("Unexpected structured output shape.")
         plan = result.get("parsed")
-        total_tokens = LLMService.extract_total_tokens(result.get("raw"))
+        input_tok, output_tok, total_tok = LLMService._extract_token_usage(result.get("raw"))
+        logger.info(
+            "LLM call: call=plan model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            LLM_PLAN_MODEL, input_tok, output_tok, total_tok, duration_ms,
+        )
         if isinstance(plan, VideoPlan):
-            return plan, total_tokens
+            return plan, total_tok
         raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
 
     @staticmethod
     def codegen_call(system_prompt: str, user_query: str) -> tuple[str, int]:
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
+        t0 = time.perf_counter()
         response = model.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_query),
         ])
-        total_tokens = LLMService.extract_total_tokens(response)
-        return LLMService.extract_text_content(response), total_tokens
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        logger.info(
+            "LLM call: call=codegen model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
+        )
+        return LLMService.extract_text_content(response), total_tok
 
     @staticmethod
     def render_fix_prompt(code: str, error_context: str) -> tuple[str, str]:
@@ -150,9 +174,15 @@ class LLMService:
     @staticmethod
     def fix_call(system_prompt: str, user_query: str) -> tuple[str, int]:
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
+        t0 = time.perf_counter()
         response = model.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_query),
         ])
-        total_tokens = LLMService.extract_total_tokens(response)
-        return LLMService.extract_text_content(response), total_tokens
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        logger.info(
+            "LLM call: call=fix model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
+        )
+        return LLMService.extract_text_content(response), total_tok
