@@ -1,0 +1,11 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Factor a simple quadratic x² + bx + c by finding two numbers whose product equals c and whose sum equals b.",
+      "visual_storyboard": "Display the title 'Factor x^2 + bx + c'. Write x² + 5x + 6 in large font near the top. Fade in a condition panel (RoundedRectangle) on the lower left labeled 'Need two numbers', with two rows: 'Product = ?' in teal and 'Sum = ?' in orange. Animate the constant 6 pulsing (Indicate), then copy it flying into the Product slot to replace '?'. Animate the coefficient 5 pulsing, then copy it flying into the Sum slot. On the lower right, fade in a factor-pair table with two rows: (1, 6) with product 1·6=6 and sum 1+6=7, and (2, 3) with product 2·3=6 and sum 2+3=5. Draw a gray SurroundingRectangle around row (1,6) and add a red note 'Sum is 7, not 5'. Replace it with a green SurroundingRectangle around row (2,3) and color that pair green. Fade out both panels and use TransformMatchingTex to animate the winning pair (2,3) expanding into the factored form (x+2)(x+3) centered on screen.",
+      "voice_notes": "To factor x squared plus 5x plus 6, we need two numbers with a product of 6 and a sum of 5. The constant term gives us the product and the middle coefficient gives us the sum. Testing factor pairs of 6: 1 and 6 have a product of 6 but a sum of 7, so that's wrong. 2 and 3 have a product of 6 and a sum of 5, which is exactly what we need. So the factored form is x plus 2 times x plus 3.",
+      "template_hints": "Use make_condition_panel to build the left panel with product and sum value slots as separate MathTex objects that can be individually Transformed. Use make_pair_row and make_factor_table to build the right-side table. Animate Indicate on each coefficient/constant before flying a copy of it into the panel slot. Use ReplacementTransform to move the SurroundingRectangle from the wrong row to the correct row."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Find the derivative of a cubic function and set it equal to zero to obtain the equation whose solutions are the critical x-values.",
+      "visual_storyboard": "Display the title 'Find Critical x-Values' and a rule banner 'Critical points: f′(x) = 0 or f′(x) is undefined'. Write f(x) = x³ − 6x² + 9x in the upper portion of the screen. Use TransformFromCopy to animate the derivative appearing below: f′(x) = 3x² − 12x + 9. Copy the derivative terms to a new line setting them equal to zero: 3x² − 12x + 9 = 0. Fade in the note 'Divide every term by 3' in orange, then use TransformMatchingTex to simplify to x² − 4x + 3 = 0, removing the note at the same time.",
+      "voice_notes": "Critical points occur where the derivative equals zero or is undefined. For f of x equals x cubed minus 6x squared plus 9x, we apply the power rule to each term: 3x squared minus 12x plus 9. Setting f prime equal to zero gives 3x squared minus 12x plus 9 equals zero. Dividing every term by 3 simplifies to x squared minus 4x plus 3 equals zero.",
+      "template_hints": "Use TransformFromCopy from the function MathTex to the derivative MathTex to visually connect them. Copy only the non-constant derivative terms into the set_zero expression and FadeIn the equals-zero part. Use FadeIn for the divide_note and FadeOut it simultaneously with the TransformMatchingTex into the simplified equation."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Factor the simplified derivative equation and solve for the critical x-values, then plot them on a number line.",
+      "visual_storyboard": "Show the title 'Solve for the Critical x-Values'. Write x² − 4x + 3 = 0 near the top. Use TransformMatchingTex to factor it into (x−1)(x−3) = 0. Fade in the two solutions x = 1 and x = 3 in green, arranged side by side below the factored form. Draw a NumberLine from 0 to 4 in the lower portion. Animate tick markers at x = 1 and x = 3 growing from the solutions: TransformFromCopy of each solution value to create the vertical marker line, then FadeIn the dot and the label 'x = 1' / 'x = 3' above each tick.",
+      "voice_notes": "x squared minus 4x plus 3 factors as (x minus 1) times (x minus 3). Setting each factor to zero gives x equals 1 and x equals 3. These are our two critical x-values, shown here on the number line.",
+      "template_hints": "Use TransformMatchingTex to go from the expanded equation to the factored form. Arrange the two solution MathTex objects with .arrange(RIGHT) in a VGroup. Build the NumberLine with include_numbers=True. Use TransformFromCopy from each solution's number term to create the vertical marker line at the correct position, then separately FadeIn the dot and label."
+    },
+    {
+      "scene_number": 3,
+      "learning_objective": "Evaluate the original function at each critical x-value and plot the resulting critical points on the curve.",
+      "visual_storyboard": "Show the title 'Turn Critical x-Values into Points'. On the left half of the screen, display f(x) = x³ − 6x² + 9x and the two critical values x = 1 and x = 3 in green. Below, show two rounded evaluation boxes: the first animates f(1) = 1 − 6 + 9 = 4, copying the critical value x=1 to build the f(1) intro before expanding. The second box shows f(3) = 27 − 54 + 27 = 0 the same way. Highlight the final results 4 and 0 in green. On the right half, draw a NumberPlane with x in [0,4.5] and y in [−1,5]. Plot the cubic curve f(x) = x³ − 6x² + 9x in blue. Place green Dots at (1,4) and (3,0). Use TransformFromCopy from each evaluation result to create the coordinate labels (1,4) and (3,0) next to the dots.",
+      "voice_notes": "Now we substitute each critical x-value back into the original function to get the y-coordinates. f of 1 equals 1 minus 6 plus 9, which equals 4. f of 3 equals 27 minus 54 plus 27, which equals 0. The critical points are (1, 4) and (3, 0). Plotting them on the curve, we can see that (1, 4) is a local maximum and (3, 0) is a local minimum.",
+      "template_hints": "Use RoundedRectangle boxes to contain each evaluation calculation. Build each evaluation as a MathTex showing all the arithmetic steps and use TransformMatchingTex from a short intro (just f(1) =) to the full expanded version. Position the NumberPlane on the right half using .move_to(RIGHT * 3.1). Use plane.c2p to convert mathematical coordinates to screen positions for the Dot placements."
+    }
+  ]
+}

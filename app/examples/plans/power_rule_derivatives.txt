@@ -1,0 +1,18 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Apply the power rule to each term of a polynomial to find its derivative.",
+      "visual_storyboard": "Display a bold title 'Differentiate with the Power Rule' at the top of the screen, followed by a rounded-rectangle banner showing the rule d/dx(x^n) = n*x^(n-1) in blue. Write the function f(x) = 3x^4 - 2x^2 + 5 in the center of the screen. Show a placeholder f'(x) = ? below it. Place a derivative workspace (d/dx symbol with parentheses and an equals sign) in the middle row. For each term, highlight it with a yellow SurroundingRectangle, copy it into the workspace slot in yellow/orange colors, then animate the coefficient moving right, the exponent dropping down to become the new coefficient, and the exponent decrementing by one. Collapse the intermediate steps into the result (e.g. 12x^3, then -4x, then 0 for the constant). After each term, update the running answer at the bottom. Finally fade out the workspace and leave f'(x) = 12x^3 - 4x.",
+      "voice_notes": "The power rule says: bring the exponent down as a multiplier, then reduce the exponent by one. We apply it to every term. 3x to the fourth: multiply 3 by 4 to get 12, reduce the exponent to 3, giving 12x cubed. Negative 2x squared: multiply negative 2 by 2 to get negative 4, reduce the exponent to 1, giving negative 4x. The constant 5 has no x, so its derivative is zero. Our final answer is f prime of x equals 12x cubed minus 4x.",
+      "template_hints": "Use a derivative workspace VGroup (d/dx, left paren, right paren, equals sign) positioned in the middle row. Build each power term as a VGroup of coefficient, x, and superscript exponent mobjects so they can be individually animated. Use TransformMatchingTex to update the running answer incrementally. Use SurroundingRectangle to highlight each term being processed."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Identify and correct two common mistakes students make when applying the power rule.",
+      "visual_storyboard": "Display a bold title 'Common Derivative Errors' with the same rule banner. Show the first error: 3x^4 → 2x^3 in red, draw an X mark over the wrong answer, add a note 'Wrong: do not subtract 1 from the coefficient.' Then replace it with 3x^4 → 12x^3 in green with the note 'Multiply 3 by 4, then lower the exponent to 3.' Fade out and show the second error: g(x) = -5x^3 + 4x, with a wrong derivative g'(x) = 15x^2 + 4 in red (missing the negative sign). Draw an X mark over the wrong result, add a note 'Wrong: the negative sign stays with the term.' Animate the negative sign moving from the original term to the corrected derivative, then display g'(x) = -15x^2 + 4 in green with the note 'Correct: -5 times 3 is -15, and 4x becomes 4.'",
+      "voice_notes": "Two mistakes come up constantly. First: some students subtract 1 from the coefficient instead of the exponent. For 3x to the fourth, the coefficient stays 3, you multiply it by the exponent 4 to get 12. Second: the negative sign is part of the coefficient and must be carried through. Negative 5 times 3 is negative 15, not positive 15.",
+      "template_hints": "Use make_x_mark helper (two diagonal Line mobjects inside a SurroundingRectangle) to mark wrong answers. Use TransformMatchingTex to swap between the wrong and correct expressions. Animate the negative sign as a copied Mobject moving from the original function to the corrected derivative to make the carry-through visual."
+    }
+  ]
+}

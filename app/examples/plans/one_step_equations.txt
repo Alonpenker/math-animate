@@ -1,0 +1,11 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Solve one-step equations by performing the same inverse operation on both sides, using a balance scale as a visual metaphor.",
+      "visual_storyboard": "Display the title 'One-Step Equations' at the top. Draw a balance scale (beam, post, support triangle, two arc-shaped pans) at the bottom of the screen to reinforce the idea that both sides must remain equal. Write the first equation x + 7 = 12 in the center. Animate the '+7' group shifting toward the equals sign in orange, then spawn '-7' labels below both sides simultaneously. Indicate the scale with a green glow to show balance is preserved. Use TransformMatchingTex to collapse x + 7 = 12 into x = 5. Then transition to the second equation 3x = 15: highlight the '3' coefficient in teal, spawn '÷3' labels below both sides, indicate the scale again, and collapse to x = 5 in green.",
+      "voice_notes": "An equation is like a balance scale — whatever you do to one side, you must do to the other. Our first equation is x plus 7 equals 12. To isolate x, we subtract 7 from both sides, leaving x equals 5. Our second equation is 3x equals 15. To get x alone we divide both sides by 3, again giving x equals 5.",
+      "template_hints": "Build the balance scale as a VGroup of Line, Polygon, and ArcBetweenPoints mobjects. Use position_equation to keep the equals sign centered and both sides flanking it. Use Indicate on the scale after each operation to reinforce the balance rule. Spawn operation labels with FadeIn and remove them with FadeOut before showing the simplified equation."
+    }
+  ]
+}

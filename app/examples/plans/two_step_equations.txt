@@ -1,0 +1,18 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Solve two-step equations by undoing operations in reverse order: remove the constant first, then remove the coefficient.",
+      "visual_storyboard": "Show the title 'Two-Step Equations' and a subtitle 'Undo last operation first' in yellow. Below it list step labels: '1. Remove the constant' in orange and '2. Remove the coefficient' in teal. Write the first equation 2x + 5 = 15, coloring '+5' in orange. Fade in '-5' labels below both sides in orange, then use TransformMatchingTex to reduce to 2x = 10. Re-color the '2' coefficient in teal, fade in '÷2' labels below both sides in teal, then collapse to x = 5 in green. Without clearing the screen, transition directly to the second equation 3x − 4 = 11 (coloring '−4' orange). Add '+4' labels on both sides, reduce to 3x = 15, add '÷3' labels, and collapse to x = 5 in green.",
+      "voice_notes": "Two-step equations need two operations to solve. The rule is: undo the last operation first. In 2x plus 5 equals 15, the last operation added 5, so we subtract 5 from both sides. That leaves 2x equals 10. Then divide both sides by 2 to get x equals 5. For 3x minus 4 equals 11, we add 4 first, then divide by 3.",
+      "template_hints": "Use position_equation to keep the equals sign centered throughout. Color the constant sub-expression orange before showing the subtraction or addition operation labels. Color the coefficient teal before showing the division labels. Use TransformMatchingTex to collapse each step so the remaining terms slide into place naturally."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Contrast applying an operation to only one side (wrong) versus both sides (right), including a negative-right-hand-side example.",
+      "visual_storyboard": "Show the title 'Both Sides Matter' with a vertical gray divider splitting the screen. Label the left column 'Wrong' in red with an X icon and the right column 'Right' in green with a checkmark. Write 2x + 5 = 15 in both columns. In the wrong column, fade in '-5' only below the right side in red; in the right column, fade in '-5' below both sides in green. Animate TransformMatchingTex: the wrong result leaves 2x + 5 on the left (unchanged, shown in red) while the right result correctly yields 2x on the left. Add notes: 'Only one side changed' in red and 'Same move on both sides' in green. Fade everything out. Then show a negative example: x − 7 = −2 centered, add '+7' below both sides in yellow, and collapse to x = 5 in green.",
+      "voice_notes": "The most common mistake is only subtracting from one side. If you subtract 5 from the right only, the left side still has the plus 5 and the equation is no longer balanced. You must apply the same operation to both sides every time. Even when the right-hand side is negative, like x minus 7 equals negative 2, adding 7 to both sides gives x equals 5.",
+      "template_hints": "Use a vertical Line mobject as the divider. Lay out two independent equation triplets (left_equal, left_left, left_right) and (right_equal, right_left, right_right) side by side. Show wrong_subtract only next to the right column's right-side term. Use Text mobjects in red and green for the notes. For the negative example, bring in the equation with standard Write and FadeIn operations."
+    }
+  ]
+}

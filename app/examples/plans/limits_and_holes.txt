@@ -1,0 +1,18 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Understand that a limit describes the value a function approaches near a point, even if the function is undefined at that exact point.",
+      "visual_storyboard": "Show the title 'What the Limit Approaches'. Create a NumberPlane with x in [-1,5] and y in [0,6]. Plot the line y = x + 2 as two separate segments (x < 2 and x > 2) in blue to leave a visible gap. Place an open circle (unfilled Circle) at (2, 4) in yellow to mark the hole, with a coordinate label '(2,4)' nearby. Show the limit statement lim x→2 f(x) = 4 in yellow at the top left, with a CurvedArrow pointing to the hole. Add two white Dot trackers on the graph — one starting left of the hole, one right — and animate both simultaneously sliding toward the hole to show approach from both sides. After the trackers stop near (2,4), fade them out and display the closing note 'As x gets close to 2, the graph approaches 4' at the bottom.",
+      "voice_notes": "A limit asks: what value does a function approach as x gets close to a specific number? Here, f of x equals x plus 2 everywhere except at x equals 2, where there is a hole. Even though f(2) is undefined, as x approaches 2 from either side, the graph gets closer and closer to 4. We write: the limit as x approaches 2 of f(x) equals 4.",
+      "template_hints": "Plot the function as two separate plane.plot calls split at the hole x-value to leave a natural gap. Use a Circle with fill_opacity=0 and a colored stroke for the open hole. Use CurvedArrow from the limit label to the hole. Animate two Dot objects with simultaneous .animate.move_to calls to show approach from both sides."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Evaluate limits that produce 0/0 by factoring the numerator, canceling the common factor with the denominator, then substituting.",
+      "visual_storyboard": "Show the title 'Simplify a Hole Before Substituting'. Work through two examples sequentially. Example 1: display lim x→2 (x²−4)/(x−2). Show direct substitution yielding (4−4)/(2−2) = 0/0 in orange with a warning 'Direct substitution gives an indeterminate form.' Fade out the warning. Replace the original fraction with the factored form lim x→2 (x−2)(x+2)/(x−2) — color the (x−2) factors orange. Draw diagonal cancel lines through both (x−2) factors. Use ReplacementTransform to reduce to lim x→2 (x+2) in blue. Show (2+2) = 4 below. Example 2: repeat the same sequence for lim x→1 (x²−1)/(x−1), factoring to (x−1)(x+1)/(x−1), canceling, reducing to lim x→1 (x+1), substituting to get (1+1) = 2.",
+      "voice_notes": "When direct substitution gives zero over zero, that's an indeterminate form — we can't evaluate it that way. Instead, we factor the numerator. For x squared minus 4 over x minus 2: x squared minus 4 factors as (x−2)(x+2). The (x−2) in the numerator cancels with the denominator, leaving just (x+2). Now substituting x equals 2 gives 4. The same process applies to x squared minus 1 over x minus 1.",
+      "template_hints": "Use build_fraction_layout and build_limit_with_value helpers to compose the limit expressions. Use make_cancel_mark (two diagonal Line strokes) to draw through both the numerator and denominator common factors. Use ReplacementTransform from the factored form to the simplified form after the cancel marks are shown and then faded out."
+    }
+  ]
+}

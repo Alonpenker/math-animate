@@ -1,0 +1,18 @@
+{
+  "scenes": [
+    {
+      "scene_number": 1,
+      "learning_objective": "Set up the substitution by replacing the isolated variable in one equation with its expression from the other.",
+      "visual_storyboard": "Show the title 'Solve by Substitution' with the helper note 'Replace y with 2x + 1 in the other equation' in yellow. Write the two-equation system: y = 2x + 1 and x + y = 7, arranged vertically. Surround the first equation with a blue SurroundingRectangle and color it blue to signal it is the substitution source. Highlight the y slot in the second equation with a smaller blue box. Animate a copy of '2x + 1' flying up toward the y slot, then use TransformMatchingTex to replace y with (2x + 1) in the second equation, yielding x + (2x + 1) = 7. Fade the first equation back to white and replace the helper note with 'Combine like terms'. Highlight the two x terms in teal and use TransformMatchingTex to simplify to 3x + 1 = 7.",
+      "voice_notes": "We have two equations and two unknowns. The first equation already isolates y: y equals 2x plus 1. We substitute this expression for y in the second equation wherever y appears, giving x plus the quantity 2x plus 1 equals 7. Combining the x terms, x plus 2x is 3x, so we get 3x plus 1 equals 7.",
+      "template_hints": "Build the system with build_system, which arranges both MathTex equations in a VGroup. Use TransformFromCopy to animate the '2x + 1' expression moving toward the y position in the second equation before the full substitution transform. Use a SurroundingRectangle on the y subexpression to show where the replacement occurs."
+    },
+    {
+      "scene_number": 2,
+      "learning_objective": "Finish solving for x, substitute back to find y, and state the solution as an ordered pair.",
+      "visual_storyboard": "Show the title 'Finish and Check' with the helper note 'Solve for x, then substitute back for y'. Write 3x + 1 = 7. Fade in '-1' below both sides in orange, simplify to 3x = 6. Fade in '÷3' below both sides in teal, animate TransformMatchingTex to show x = 2 in green. Shrink and move x = 2 to the upper right. Bring in y = 2x + 1 on the left. Change the helper note to 'Substitute x = 2' in blue. Highlight the x in the reference equation with a blue SurroundingRectangle. Animate the '2' from the solved equation floating above the x, then use TransformMatchingTex to substitute and show y = 2(2) + 1 → y = 5 in green. Add a centered 'Solution: (2, 5)' Text in green at the bottom.",
+      "voice_notes": "Continuing from 3x plus 1 equals 7: subtract 1 from both sides to get 3x equals 6, then divide by 3 to find x equals 2. Now substitute x equals 2 back into y equals 2x plus 1: y equals 2 times 2 plus 1, which equals 5. Our solution is the ordered pair (2, 5).",
+      "template_hints": "After finding x = 2, use animate to scale it down and move it to a corner reference position. Use SurroundingRectangle on the x term in the reference equation before animating the flying '2' copy. Use TransformMatchingTex for each algebraic simplification step."
+    }
+  ]
+}

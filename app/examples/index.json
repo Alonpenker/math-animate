@@ -1,38 +1,110 @@
 [
   {
-    "document_id": "441bf342-defc-4992-b517-74c50cf90a36",
-    "title": "Plan: Visualizing a Sorting Algorithm",
+    "document_id": "b20f2da6-d1ca-481f-8d0f-c54f1e1603e4",
+    "title": "Plan: One-Step Equations (Balance Scale)",
     "doc_type": "plan",
-    "file": "plans/sorting_algorithm.txt"
+    "file": "plans/one_step_equations.txt"
   },
   {
-    "document_id": "9b96e353-545a-4464-8e59-25181d16574a",
-    "title": "Plan: Explaining the Pythagorean Theorem",
+    "document_id": "8f83fd5a-1585-4b3b-b182-ad9ea4e6e8ec",
+    "title": "One-Step Equations (Balance Scale)",
+    "doc_type": "code",
+    "file": "code/001_one_step_equations.py"
+  },
+  {
+    "document_id": "a7368139-076a-4c2b-b1ba-5220ad5ed23b",
+    "title": "Plan: Order of Operations",
     "doc_type": "plan",
-    "file": "plans/pythagorean_theorem.txt"
+    "file": "plans/order_of_operations.txt"
   },
   {
-    "document_id": "03aa9fdc-a6e9-4533-9561-ca6b7661c8af",
-    "title": "Plan: Animating a Neural Network Forward Pass",
+    "document_id": "34233c4d-b504-480b-94aa-01ffafc67bfc",
+    "title": "Order of Operations",
+    "doc_type": "code",
+    "file": "code/002_order_of_operations.py"
+  },
+  {
+    "document_id": "65cbd126-d837-4169-8912-1d3065c18fd9",
+    "title": "Plan: Two-Step Equations",
     "doc_type": "plan",
-    "file": "plans/neural_network.txt"
+    "file": "plans/two_step_equations.txt"
   },
   {
-    "document_id": "6bad57f7-bc63-40c3-b588-4cfc442e5c48",
-    "title": "Sine Wave Transformation",
+    "document_id": "bb1e1718-c1a2-460a-8f64-bacca78d52a5",
+    "title": "Two-Step Equations",
     "doc_type": "code",
-    "file": "code/sine_wave.py"
+    "file": "code/003_two_step_equations.py"
   },
   {
-    "document_id": "d8df4b10-e062-4e61-a30e-b1e73ee42bcb",
-    "title": "Rotating 3D Surface Plot",
-    "doc_type": "code",
-    "file": "code/rotating_surface.py"
+    "document_id": "ef8d070b-ee67-422a-8cf4-a9cd0150737a",
+    "title": "Plan: Solving Systems by Substitution",
+    "doc_type": "plan",
+    "file": "plans/substitution_systems.txt"
   },
   {
-    "document_id": "f56a766d-ccbc-4554-b354-af866f388e97",
-    "title": "Animated Bar Chart with Value Tracker",
+    "document_id": "72ecfec0-a1b5-40ad-86e0-eab0095c510c",
+    "title": "Solving Systems by Substitution",
     "doc_type": "code",
-    "file": "code/bar_chart.py"
+    "file": "code/004_substitution_systems.py"
+  },
+  {
+    "document_id": "398845af-3c22-44f8-af13-55b1ac8bef50",
+    "title": "Plan: Factoring Quadratics",
+    "doc_type": "plan",
+    "file": "plans/factoring_quadratics.txt"
+  },
+  {
+    "document_id": "36ae3113-6630-434b-bf34-4723cc3f99ac",
+    "title": "Factoring Quadratics",
+    "doc_type": "code",
+    "file": "code/005_factoring_quadratics.py"
+  },
+  {
+    "document_id": "e6213418-5f27-4193-909f-11e2444915ab",
+    "title": "Plan: Quadratic Formula",
+    "doc_type": "plan",
+    "file": "plans/quadratic_formula.txt"
+  },
+  {
+    "document_id": "7c35cede-dadf-4019-837b-210eaa9c5055",
+    "title": "Quadratic Formula",
+    "doc_type": "code",
+    "file": "code/006_quadratic_formula.py"
+  },
+  {
+    "document_id": "7c373336-f139-4edf-b4f2-e6afb2bcd3de",
+    "title": "Plan: Limits and Holes in Graphs",
+    "doc_type": "plan",
+    "file": "plans/limits_and_holes.txt"
+  },
+  {
+    "document_id": "95ba50ce-64e7-42d1-aa0b-da355efc0d5a",
+    "title": "Limits and Holes in Graphs",
+    "doc_type": "code",
+    "file": "code/007_limits_and_holes.py"
+  },
+  {
+    "document_id": "57d63a7e-f798-4e11-8776-5ad24b2607e8",
+    "title": "Plan: Power Rule for Derivatives",
+    "doc_type": "plan",
+    "file": "plans/power_rule_derivatives.txt"
+  },
+  {
+    "document_id": "9c046627-b128-4790-a1f1-beb012ae7129",
+    "title": "Power Rule for Derivatives",
+    "doc_type": "code",
+    "file": "code/008_power_rule_derivatives.py"
+  },
+  {
+    "document_id": "682ffeb0-c0ce-4708-a1aa-0f63e15fa6fd",
+    "title": "Plan: Critical Points of a Cubic Function",
+    "doc_type": "plan",
+    "file": "plans/critical_points_cubic.txt"
+  },
+  {
+    "document_id": "f5f78fec-4c67-4de0-9456-65beebe1f8ed",
+    "title": "Critical Points of a Cubic Function",
+    "doc_type": "code",
+    "file": "code/009_critical_points_cubic.py"
   }
 ]
