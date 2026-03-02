@@ -6,7 +6,7 @@ from app.configs.llm_settings import (
     DAILY_TOKEN_LIMIT,
     PLANNING_OUTPUT_BUFFER,
 )
-from app.exceptions.quota import QuotaExceededException
+from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.services.budget_service import BudgetService
 
 
@@ -101,7 +101,7 @@ def test_reserve_blocks_when_limit_exceeded(
         staticmethod(fake_reserve),
     )
 
-    with pytest.raises(QuotaExceededException):
+    with pytest.raises(QuotaExceededError):
         BudgetService.reserve(
             cursor=object(),
             call_id=uuid4(),

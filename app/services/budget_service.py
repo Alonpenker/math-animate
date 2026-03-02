@@ -8,7 +8,7 @@ from app.configs.llm_settings import (
     PLANNING_OUTPUT_BUFFER,
     CODEGEN_OUTPUT_BUFFER,
 )
-from app.exceptions.quota import QuotaExceededException
+from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.token_repository import TokenLedgerRepository
 
 
@@ -46,7 +46,7 @@ class BudgetService:
         current_total = TokenLedgerRepository.get_current_total(cursor)
 
         if current_total + reserved_tokens > DAILY_TOKEN_LIMIT:
-            raise QuotaExceededException(
+            raise QuotaExceededError(
                 limit=DAILY_TOKEN_LIMIT,
                 consumed=current_total,
                 reserved=0,

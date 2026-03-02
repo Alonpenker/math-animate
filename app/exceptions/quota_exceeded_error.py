@@ -1,4 +1,4 @@
-class QuotaExceededException(Exception):
+class QuotaExceededError(Exception):
     def __init__(self, limit: int, consumed: int, reserved: int, requested: int):
         self.limit = limit
         self.consumed = consumed

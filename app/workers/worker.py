@@ -12,7 +12,7 @@ from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOU
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus, require_transition
-from app.exceptions.quota import QuotaExceededException
+from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
@@ -84,7 +84,7 @@ def generate_plan(job_request_payload: dict) -> None:
             JobsRepository.update_job_status(cursor, job_id, JobStatus.PLANNED)
         logger.info("Planning completed (%s)", log_context(str(job_id)))
 
-    except QuotaExceededException:
+    except QuotaExceededError:
         logger.exception("Planning quota exceeded (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         raise
@@ -128,7 +128,7 @@ def generate_code(job_request_payload: dict) -> None:
             JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code, is_retry=False).model_dump(mode="json")
         )
 
-    except QuotaExceededException:
+    except QuotaExceededError:
         logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         raise
@@ -255,7 +255,7 @@ def fix_code_task(job_request_payload: dict) -> None:
             ).model_dump(mode="json")
         )
 
-    except QuotaExceededException:
+    except QuotaExceededError:
         logger.exception("Fix quota exceeded (%s)", log_context(str(job_id)))
         release_budget_on_error(call_id, reserved, total_tokens)
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
