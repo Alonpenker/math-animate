@@ -10,6 +10,7 @@ from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
 from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOUT_SECONDS
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
+from app.dependencies.redis_client import init_redis_pool, close_redis_pool
 from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus, require_transition
 from app.exceptions.quota_exceeded_error import QuotaExceededError
@@ -35,7 +36,7 @@ from app.utils.logging import get_logger
 
 app = Celery('manim-generator-worker',
              broker=settings.broker_url,
-             backend=settings.backend_url)
+             backend=settings.redis_url)
 
 logger = get_logger(__name__)
 
@@ -44,11 +45,13 @@ logger = get_logger(__name__)
 def init_worker(**kwargs) -> None:
     init_storage()
     init_db_pool()
+    init_redis_pool()
 
 
 @worker_process_shutdown.connect
 def shutdown_worker(**kwargs) -> None:
     close_db_pool()
+    close_redis_pool()
 
 
 @app.task()
@@ -78,10 +81,9 @@ def generate_plan(job_request_payload: dict) -> None:
         plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
         reconcile_budget(call_id, total_tokens)
 
-        require_transition(JobStatus.PLANNING, JobStatus.PLANNED)
         with get_worker_cursor() as cursor:
             PlansRepository.create_plan(cursor, job_id, plan)
-            JobsRepository.update_job_status(cursor, job_id, JobStatus.PLANNED)
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
         logger.info("Planning completed (%s)", log_context(str(job_id)))
 
     except QuotaExceededError:

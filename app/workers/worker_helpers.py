@@ -12,6 +12,7 @@ from celery import current_task
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PROVIDER
 from app.dependencies.db import get_worker_cursor
+from app.dependencies.redis_client import get_worker_redis
 from app.dependencies.storage import get_storage_client
 from app.domain.job_state import JobStatus, require_transition
 from app.repositories.jobs_repository import JobsRepository
@@ -38,8 +39,8 @@ def log_context(job_id: Optional[str] = None) -> str:
 
 def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None:
     require_transition(from_status, to_status)
-    with get_worker_cursor() as cursor:
-        JobsRepository.update_job_status(cursor, job_id, to_status)
+    with get_worker_redis() as redis_client:
+        JobsRepository.update_job_status(redis_client, job_id, to_status)
 
 
 def reserve_budget(call_id, job_id, stage: str, model: str, prompt_text: str) -> int:

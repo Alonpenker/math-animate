@@ -1,31 +1,44 @@
 from typing import Optional
 from uuid import UUID
 
-from app.schemas.jobs import Job, JobSchema
+import redis
+
+from app.schemas.jobs import Job
 from app.domain.job_state import JobStatus
-from app.repositories.repository import Repository
+from app.dependencies.redis_client import TERMINAL_JOB_TTL_SECONDS
 
-class JobsRepository(Repository):
+TERMINAL_STATUSES: frozenset[JobStatus] = frozenset({
+    JobStatus.RENDERED,
+    JobStatus.FAILED_PLANNING,
+    JobStatus.FAILED_CODEGEN,
+    JobStatus.FAILED_VERIFICATION,
+    JobStatus.FAILED_RENDER,
+    JobStatus.CANCELLED,
+})
 
-    TABLE_NAME = 'jobs'
-    SCHEMA = JobSchema
-    PRIMARY_KEY = 'job_id'
+
+class JobsRepository:
+
+    KEY_PREFIX = "job"
+
+    @staticmethod
+    def _key(job_id: UUID) -> str:
+        return f"{JobsRepository.KEY_PREFIX}:{job_id}"
 
     @classmethod
-    def create_job(cls, cursor, job: Job) -> None:
-        cursor.execute(cls.insert(), (str(job.job_id), job.status.value))
+    def create_job(cls, r: redis.Redis, job: Job) -> None:
+        r.set(cls._key(job.job_id), job.status.value)
 
     @classmethod
-    def get_job(cls, cursor, job_id: UUID) -> Optional[Job]:
-        cursor.execute(cls.get(), (str(job_id),))
-        row = cursor.fetchone()
-        if row is None:
+    def get_job(cls, r: redis.Redis, job_id: UUID) -> Optional[Job]:
+        value = r.get(cls._key(job_id))
+        if value is None:
             return None
-        return Job(
-            job_id=row[JobSchema.JOB_ID.name],
-            status=JobStatus(row[JobSchema.STATUS.name]),
-        )
+        return Job(job_id=job_id, status=JobStatus(value.decode()))
 
     @classmethod
-    def update_job_status(cls, cursor, job_id: UUID, status: JobStatus) -> None:
-        cursor.execute(cls.modify(cls.SCHEMA.STATUS.name), (status.value, str(job_id)))
+    def update_job_status(cls, r: redis.Redis, job_id: UUID, status: JobStatus) -> None:
+        if status in TERMINAL_STATUSES:
+            r.set(cls._key(job_id), status.value, ex=TERMINAL_JOB_TTL_SECONDS)
+        else:
+            r.set(cls._key(job_id), status.value)

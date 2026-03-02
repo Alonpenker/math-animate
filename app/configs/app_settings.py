@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     database_url: str
     
     broker_url: str
-    backend_url: str
+    redis_url: str
 
     ollama_base_url: str
 
