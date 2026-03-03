@@ -8,8 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
-
-
 .env
+
+# Claude
+.claude
 TODOS
 PLAN.md

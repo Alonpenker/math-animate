@@ -16,6 +16,7 @@ from app.schemas.knowledge import KnowledgeType
 from app.schemas.user_request import UserRequest
 from app.schemas.video_plan import VideoPlan
 from app.services.rag_service import RAGService
+from app.utils.llm_stubs import IS_E2E_MODE, STUB_PLAN, STUB_BROKEN_CODE, STUB_FIXED_CODE
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -124,6 +125,15 @@ class LLMService:
 
     @staticmethod
     def plan_call(system_prompt: str, user_query: str) -> tuple[VideoPlan, int]:
+        if IS_E2E_MODE:
+            t0 = time.perf_counter()
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            logger.info(
+                "LLM call: call=plan [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+                LLM_PLAN_MODEL, 0, 0, 0, duration_ms,
+            )
+            return STUB_PLAN, 0
+
         model = LLMService.get_chat_model(LLM_PLAN_MODEL)
         structured_model = model.with_structured_output(VideoPlan, include_raw=True)
         t0 = time.perf_counter()
@@ -146,6 +156,15 @@ class LLMService:
 
     @staticmethod
     def codegen_call(system_prompt: str, user_query: str) -> tuple[str, int]:
+        if IS_E2E_MODE:
+            t0 = time.perf_counter()
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            logger.info(
+                "LLM call: call=codegen [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+                LLM_CODE_MODEL, 0, 0, 0, duration_ms,
+            )
+            return STUB_BROKEN_CODE, 0
+
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
         t0 = time.perf_counter()
         response = model.invoke([
@@ -173,6 +192,15 @@ class LLMService:
 
     @staticmethod
     def fix_call(system_prompt: str, user_query: str) -> tuple[str, int]:
+        if IS_E2E_MODE:
+            t0 = time.perf_counter()
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            logger.info(
+                "LLM call: call=fix [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+                LLM_CODE_MODEL, 0, 0, 0, duration_ms,
+            )
+            return STUB_FIXED_CODE, 0
+
         model = LLMService.get_chat_model(LLM_CODE_MODEL)
         t0 = time.perf_counter()
         response = model.invoke([

@@ -32,6 +32,7 @@ from app.workers.worker_helpers import (
     store_render_logs,
     run_dry_run_docker,
 )
+from app.utils.llm_stubs import IS_E2E_MODE
 from app.utils.logging import get_logger
 
 app = Celery('manim-generator-worker',
@@ -39,6 +40,9 @@ app = Celery('manim-generator-worker',
              backend=settings.redis_url)
 
 logger = get_logger(__name__)
+
+if IS_E2E_MODE:
+    logger.warning("E2E mode enabled — LLM calls will be stubbed. No real API calls will be made.")
 
 
 @worker_process_init.connect
@@ -154,30 +158,28 @@ def verify_code_task(job_request_payload: dict) -> None:
     code = job_request.code
     is_retry = job_request.is_retry
 
+    render_root = Path(PathNames.TMP_RENDER_FOLDER)
+    input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
+    input_dir.mkdir(parents=True, exist_ok=True)
+    code_path = input_dir / PathNames.MANIM_CODE
+    code_path.write_text(code, encoding="utf-8")
+
     try:
         transition_job(job_id, job_request.job.status, JobStatus.VERIFYING)
         logger.info("Verification started (is_retry=%s) (%s)", is_retry, log_context(str(job_id)))
 
         from app.workers.worker_helpers import verify_code as static_verify
-        failures = static_verify(code)
+        failure: str | None = static_verify(code, code_path)
 
-        if not failures:
-            render_root = Path(PathNames.TMP_RENDER_FOLDER)
-            input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
-            input_dir.mkdir(parents=True, exist_ok=True)
+        if failure is None:
+            media_dir = input_dir / PathNames.MEDIA_FOLDER
+            media_dir.mkdir(parents=True, exist_ok=True)
+            media_dir.chmod(0o777)
+            passed, error_output = run_dry_run_docker(code_path, media_dir)
+            if not passed:
+                failure = f"Dry-run failed:\n{error_output}"
 
-            code_path = input_dir / PathNames.MANIM_CODE
-            code_path.write_text(code, encoding="utf-8")
-
-            try:
-                passed, error_output = run_dry_run_docker(input_dir, code_path)
-                if not passed:
-                    failures.append(f"Dry-run failed:\n{error_output}")
-            finally:
-                if code_path.exists():
-                    code_path.unlink()
-
-        if not failures:
+        if failure is None:
             storage = get_storage()
             job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
             job_dir.mkdir(parents=True, exist_ok=True)
@@ -192,8 +194,8 @@ def verify_code_task(job_request_payload: dict) -> None:
                     file_path = Path(tmp.name)
                 save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
             finally:
-                if file_path is not None and file_path.exists():
-                    file_path.unlink()
+                if job_dir.exists():
+                    shutil.rmtree(job_dir, ignore_errors=True)
 
             transition_job(job_id, JobStatus.VERIFYING, JobStatus.VERIFIED)
             logger.info("Verification passed; render enqueued (%s)", log_context(str(job_id)))
@@ -201,8 +203,7 @@ def verify_code_task(job_request_payload: dict) -> None:
                 JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
             )
         else:
-            error_context = "; ".join(failures)
-            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), error_context)
+            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), failure)
 
             if is_retry:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
@@ -214,7 +215,7 @@ def verify_code_task(job_request_payload: dict) -> None:
                     JobFixRequest(
                         job=Job(job_id=job_id, status=JobStatus.FIXING),
                         code=code,
-                        error_context=error_context,
+                        error_context=failure,
                     ).model_dump(mode="json")
                 )
 
@@ -222,6 +223,9 @@ def verify_code_task(job_request_payload: dict) -> None:
         logger.exception("Verification task failed unexpectedly (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
         raise
+
+    finally:
+        shutil.rmtree(input_dir, ignore_errors=True)
 
 
 @app.task()

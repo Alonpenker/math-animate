@@ -23,11 +23,15 @@ uv run pytest
 # Run a single test file
 uv run pytest tests/test_jobs.py
 
-# Run type checking
-uv run mypy .
+# Build both api and worker on code change
+docker compose build api worker
 
 # Start the full stack (preferred for development)
 docker-compose up
+
+# Start the full stack with stubbed LLM calls
+$env:E2E="true"; docker-compose up
+Remove-Item Env:E2E
 ```
 
 ## Architecture

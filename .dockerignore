@@ -22,6 +22,7 @@ dist/
 
 AGENTS.md
 CLAUDE.md
+PLAN.md
 TODOS
 docker-compose.yml
 .python-version

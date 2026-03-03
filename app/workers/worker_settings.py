@@ -24,6 +24,7 @@ class PathNames:
     
 class DockerCommands:
     BIN = ("docker", "run", "--rm")
+    INTERACTIVE = ("-i",)
     NETWORK = ("--network","none")
     CPU = ("--cpus","1")
     MEMORY = ("--memory","2g")
@@ -51,12 +52,14 @@ class DockerCommands:
         )
 
     @staticmethod
-    def manim_dry_run_command(code_path: str | Path):
+    def manim_dry_run_command(code_path: str | Path, media_dir: str | Path):
         return (
             "manim",
             "-ql",
             "-a",
             "--dry_run",
+            "--media_dir",
+            f"{media_dir}",
             f"{code_path}"
         )
         

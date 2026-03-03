@@ -18,6 +18,8 @@ services:
         condition: service_started
       ollama:
         condition: service_healthy
+      worker:
+        condition: service_started
     env_file:
       - .env
 
@@ -40,6 +42,7 @@ services:
         condition: service_healthy
     environment:
       DOCKER_HOST: tcp://docker-daemon:2375
+      E2E: ${E2E:-}
     env_file:
       - .env
     volumes:
@@ -67,7 +70,7 @@ services:
       retries: 3
       start_period: 30s
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+      - rabbitmq_data:/var/lib/rabbitmq
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -104,10 +107,10 @@ services:
     command: ["ollama serve > /dev/null 2>&1 & sleep 5 && ollama pull nomic-embed-text && wait"]
     healthcheck:
       test: ["CMD", "sh", "-c", "ollama list | grep -q nomic-embed-text"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 5
-      start_period: 120s
+      retries: 15
+      start_period: 60s
     volumes:
       - ollama_data:/root/.ollama
 
@@ -128,10 +131,10 @@ services:
       - render_data:/job
     healthcheck:
       test: ["CMD-SHELL", "docker info >/dev/null 2>&1 && docker image inspect \"manimcommunity/manim:v0.19.2\" >/dev/null 2>&1"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 18
+      start_period: 60s
 
 
 volumes:

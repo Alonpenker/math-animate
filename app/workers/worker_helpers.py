@@ -2,9 +2,9 @@ from typing import Optional
 from pathlib import Path
 from uuid import uuid4
 import hashlib
-import tempfile
 import ast
 import subprocess
+import shutil
 import os
 
 from celery import current_task
@@ -85,46 +85,35 @@ def save_artifact_to_storage(
         ArtifactsRepository.create_artifact(cursor, artifact)
 
 
-def verify_code(code: str) -> list[str]:
+def verify_code(code: str, code_path: Path) -> str | None:
     """Run mypy type-check and AST safety analysis on generated code.
 
-    Returns a list of failure reason strings. An empty list means the code
-    passed verification.
+    Returns a failure reason string, or None if all checks pass.
     """
-    failures: list[str] = []
 
     # --- Part A: mypy check ---
     try:
-        with tempfile.NamedTemporaryFile(
-            suffix=".py", mode="w", delete=False, encoding="utf-8",
-        ) as tmp:
-            tmp.write(code)
-            tmp_path = tmp.name
-        try:
-            result = subprocess.run(
-                ["mypy",
-                "--ignore-missing-imports",
-                "--follow-imports=skip",
-                "--disable-error-code=name-defined",
-                "--disable-error-code=attr-defined",
-                tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if result.returncode != 0:
-                failures.append(f"mypy errors:\n{result.stdout}{result.stderr}")
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
+        result = subprocess.run(
+            ["mypy",
+            "--ignore-missing-imports",
+            "--follow-imports=skip",
+            "--disable-error-code=name-defined",
+            "--disable-error-code=attr-defined",
+            str(code_path)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return f"mypy errors:\n{result.stdout}{result.stderr}"
     except Exception as exc:
-        failures.append(f"mypy check failed with exception: {exc}")
+        return f"mypy check failed with exception: {exc}"
 
     # --- Part B: AST import & dangerous-builtin analysis ---
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
-        failures.append(f"AST parse syntax error: {exc}")
-        return failures
+        return f"AST parse syntax error: {exc}"
 
     forbidden_imports: list[str] = []
     dangerous_calls: list[str] = []
@@ -152,11 +141,11 @@ def verify_code(code: str) -> list[str]:
                 dangerous_calls.append(name)
 
     if forbidden_imports:
-        failures.append(f"Forbidden imports: {', '.join(sorted(set(forbidden_imports)))}")
+        return f"Forbidden imports: {', '.join(sorted(set(forbidden_imports)))}"
     if dangerous_calls:
-        failures.append(f"Dangerous builtin calls: {', '.join(sorted(set(dangerous_calls)))}")
+        return f"Dangerous builtin calls: {', '.join(sorted(set(dangerous_calls)))}"
 
-    return failures
+    return None
 
 
 def extract_traceback(stderr: str) -> str:
@@ -172,12 +161,13 @@ def extract_traceback(stderr: str) -> str:
     return stderr
 
 
-def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
+def run_dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str]:
     """Run ``manim --dry_run`` inside Docker to verify generated code."""
     render_root = Path(PathNames.TMP_RENDER_FOLDER)
 
     command = [
         *DockerCommands.BIN,
+        *DockerCommands.INTERACTIVE,
         *DockerCommands.NETWORK,
         *DockerCommands.CPU,
         *DockerCommands.MEMORY,
@@ -185,16 +175,16 @@ def run_dry_run_docker(input_dir: Path, code_path: Path) -> tuple[bool, str]:
         *DockerCommands.SECURITY,
         *DockerCommands.volume(str(render_root), render_root, "rw"),
         *DockerCommands.IMAGE,
-        *DockerCommands.manim_dry_run_command(code_path),
+        *DockerCommands.manim_dry_run_command(code_path, media_dir),
     ]
 
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=60,
+            command, capture_output=True, text=True, timeout=60, input="*\n",
         )
         if result.returncode == 0:
             return True, ""
-        error_output = result.stderr or ""
+        error_output = (result.stdout or "") + (result.stderr or "")
         return False, extract_traceback(error_output)
     except subprocess.TimeoutExpired as exc:
         stderr = exc.stderr if isinstance(exc.stderr, str) else (bytes(exc.stderr).decode() if exc.stderr else "")
@@ -229,3 +219,4 @@ def store_render_logs(
             )
         finally:
             file_path.unlink(missing_ok=True)
+    shutil.rmtree(job_dir, ignore_errors=True)
