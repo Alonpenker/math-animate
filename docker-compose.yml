@@ -62,7 +62,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit log_levels [{connection,warning}]"
     healthcheck:
       test: ["CMD-SHELL","rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -92,8 +91,8 @@ services:
     image: minio/minio:latest
     command: ["server", "/data", "--console-address", ":9001","--quiet"]
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
     volumes:
       - minio_data:/data
   
