@@ -3,7 +3,9 @@
 .vscode
 .idea
 .DS_Store
+docker-compose.yml
 
+# Python-generated files
 .venv
 __pycache__/
 *.py[cod]
@@ -16,13 +18,14 @@ build/
 dist/
 *.egg-info/
 
+# Virtual environments
 .env
 .env.*
 *.log
+.python-version
 
+# Claude
 AGENTS.md
 CLAUDE.md
 PLAN.md
 TODOS
-docker-compose.yml
-.python-version
