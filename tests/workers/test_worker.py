@@ -2,7 +2,7 @@
 Worker pipeline tests.
 
 Covers three groups:
-  1. Utility functions (verify_code, extract_traceback, run_dry_run_docker) —
+  1. Utility functions (verify_code, extract_traceback, dry_run_docker) —
      pure unit tests, no DB/storage/Celery mocks needed.
   2. Celery task functions (generate_plan, generate_code, verify_code_task,
      fix_code_task, generate_render) — use the mock_worker_* fixture family.
@@ -21,7 +21,7 @@ from app.schemas.plan import Plan
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helpers shared across verify_code / run_dry_run_docker tests
+# Helpers shared across verify_code / dry_run_docker tests
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _patch_mypy_pass(monkeypatch):
@@ -38,7 +38,7 @@ def _patch_mypy_pass(monkeypatch):
 def _setup_dry_run_env(monkeypatch, tmp_path):
     """
     Create minimal filesystem state and return (code_path, media_dir) for
-    run_dry_run_docker tests.
+    dry_run_docker tests.
     """
     from app.workers import worker_helpers
 
@@ -250,13 +250,13 @@ def test_extract_traceback_handles_empty_string():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# run_dry_run_docker — runs Manim --dry_run in a subprocess
+# dry_run_docker — runs Manim --dry_run in a subprocess
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_run_dry_run_docker_passes_when_subprocess_exits_zero(monkeypatch, tmp_path):
+def test_dry_run_docker_passes_when_subprocess_exits_zero(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
-    from app.workers.worker_helpers import run_dry_run_docker
+    from app.workers.worker_helpers import dry_run_docker
     code_path, media_dir = _setup_dry_run_env(monkeypatch, tmp_path)
     monkeypatch.setattr(
         worker_helpers.subprocess, "run",
@@ -264,17 +264,18 @@ def test_run_dry_run_docker_passes_when_subprocess_exits_zero(monkeypatch, tmp_p
     )
 
     # When
-    passed, error = run_dry_run_docker(code_path, media_dir)
+    passed, error, is_fixable = dry_run_docker(code_path, media_dir)
 
     # Then
     assert passed is True
     assert error == ""
+    assert is_fixable is True
 
 
-def test_run_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp_path):
+def test_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
-    from app.workers.worker_helpers import run_dry_run_docker
+    from app.workers.worker_helpers import dry_run_docker
     code_path, media_dir = _setup_dry_run_env(monkeypatch, tmp_path)
     captured_commands = []
 
@@ -285,7 +286,7 @@ def test_run_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp
     monkeypatch.setattr(worker_helpers.subprocess, "run", fake_run)
 
     # When
-    run_dry_run_docker(code_path, media_dir)
+    dry_run_docker(code_path, media_dir)
 
     # Then
     assert len(captured_commands) == 1
@@ -294,10 +295,10 @@ def test_run_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp
     assert "--dry_run" in cmd
 
 
-def test_run_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monkeypatch, tmp_path):
+def test_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
-    from app.workers.worker_helpers import run_dry_run_docker
+    from app.workers.worker_helpers import dry_run_docker
     code_path, media_dir = _setup_dry_run_env(monkeypatch, tmp_path)
     stderr_with_noise = (
         "INFO manim starting\n"
@@ -313,7 +314,7 @@ def test_run_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monke
     )
 
     # When
-    passed, error = run_dry_run_docker(code_path, media_dir)
+    passed, error, is_fixable = dry_run_docker(code_path, media_dir)
 
     # Then
     assert passed is False
@@ -321,12 +322,13 @@ def test_run_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monke
     assert "IndexError" in error
     assert "INFO manim starting" not in error
     assert "some stdout" not in error
+    assert is_fixable is True
 
 
-def test_run_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeypatch, tmp_path):
+def test_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
-    from app.workers.worker_helpers import run_dry_run_docker
+    from app.workers.worker_helpers import dry_run_docker
     code_path, media_dir = _setup_dry_run_env(monkeypatch, tmp_path)
     monkeypatch.setattr(
         worker_helpers.subprocess, "run",
@@ -336,17 +338,18 @@ def test_run_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeyp
     )
 
     # When
-    passed, error = run_dry_run_docker(code_path, media_dir)
+    passed, error, is_fixable = dry_run_docker(code_path, media_dir)
 
     # Then
     assert passed is False
     assert error == "plain error message"
+    assert is_fixable is True
 
 
-def test_run_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path):
+def test_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
-    from app.workers.worker_helpers import run_dry_run_docker
+    from app.workers.worker_helpers import dry_run_docker
     code_path, media_dir = _setup_dry_run_env(monkeypatch, tmp_path)
 
     def timeout_run(cmd, *, capture_output, text, timeout, input=None):
@@ -357,13 +360,12 @@ def test_run_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_
     monkeypatch.setattr(worker_helpers.subprocess, "run", timeout_run)
 
     # When
-    passed, error = run_dry_run_docker(code_path, media_dir)
+    passed, error, is_fixable = dry_run_docker(code_path, media_dir)
 
     # Then
     assert passed is False
     assert "Dry-run timed out after 60s." in error
-    assert "stderr-timeout" in error
-    assert "stdout-timeout" not in error
+    assert is_fixable is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -518,7 +520,9 @@ def test_verify_code_task_saves_artifact_and_enqueues_render_on_success(
     from app.workers import worker_helpers
 
     monkeypatch.setattr(worker_helpers, "verify_code", lambda code, code_path: None)
-    monkeypatch.setattr(worker_module, "run_dry_run_docker", lambda code_path, media_dir: (True, ""))
+    monkeypatch.setattr(
+        worker_module, "dry_run_docker", lambda code_path, media_dir: (True, "", True)
+    )
 
     code = (
         "from manim import *\n\n"
@@ -565,8 +569,12 @@ def test_verify_code_task_enqueues_fix_on_first_dry_run_failure(
 
     monkeypatch.setattr(worker_helpers, "verify_code", lambda code, code_path: None)
     monkeypatch.setattr(
-        worker_module, "run_dry_run_docker",
-        lambda code_path, media_dir: (False, "Traceback (most recent call last):\nIndexError"),
+        worker_module, "dry_run_docker",
+        lambda code_path, media_dir: (
+            False,
+            "Traceback (most recent call last):\nIndexError",
+            True,
+        ),
     )
 
     enqueued_fix = []
@@ -604,8 +612,8 @@ def test_verify_code_task_sets_failed_verification_on_second_dry_run_failure(
 
     monkeypatch.setattr(worker_helpers, "verify_code", lambda code, code_path: None)
     monkeypatch.setattr(
-        worker_module, "run_dry_run_docker",
-        lambda code_path, media_dir: (False, "Traceback: IndexError"),
+        worker_module, "dry_run_docker",
+        lambda code_path, media_dir: (False, "Traceback: IndexError", True),
     )
 
     job = Job(status=JobStatus.FIXING)

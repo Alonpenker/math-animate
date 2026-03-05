@@ -1,12 +1,12 @@
 import time
+from enum import StrEnum
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import (
-    LLMProvider, LLM_PROVIDER, LLM_PLAN_MODEL, LLM_CODE_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
+    LLM_PLAN_MODEL, LLM_CODE_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS,
     LLM_REASONING_EFFORT,
     PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, CODEGEN_FIX_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
 )
@@ -21,36 +21,25 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+class CallType(StrEnum):
+    PLAN = "plan"
+    CODEGEN = "codegen"
+    FIX = "fix"
 
 class LLMService:
 
-    PROVIDERS = {
-        LLMProvider.OPENAI: lambda model_name: ChatOpenAI(
-            model=model_name,
-            temperature=LLM_TEMPERATURE,
-            max_completion_tokens=LLM_MAX_TOKENS,
-            reasoning_effort=LLM_REASONING_EFFORT,
-            api_key=settings.api_key,
-        ),
-        LLMProvider.ANTHROPIC: lambda model_name: ChatAnthropic(
-            model_name=model_name,
-            temperature=LLM_TEMPERATURE,
-            max_tokens_to_sample=LLM_MAX_TOKENS,
-            api_key=settings.api_key,
-            timeout=None,
-            stop=None
-        ),
-    }
-
-    _chat_models: dict[str, ChatOpenAI | ChatAnthropic] = {}
+    _chat_models: dict[str, ChatOpenAI] = {}
 
     @classmethod
-    def get_chat_model(cls, model_name: str) -> ChatOpenAI | ChatAnthropic:
+    def get_chat_model(cls, model_name: str) -> ChatOpenAI:
         if model_name not in cls._chat_models:
-            builder = cls.PROVIDERS.get(LLM_PROVIDER)
-            if builder is None:
-                raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
-            cls._chat_models[model_name] = builder(model_name)
+            cls._chat_models[model_name] = ChatOpenAI(
+                model=model_name,
+                temperature=LLM_TEMPERATURE,
+                max_completion_tokens=LLM_MAX_TOKENS,
+                reasoning_effort=LLM_REASONING_EFFORT,
+                api_key=settings.api_key,
+            )
         return cls._chat_models[model_name]
 
     @classmethod
@@ -61,6 +50,12 @@ class LLMService:
         )
         if not docs:
             logger.info("RAG retrieval: doc_type=%s count=0", doc_type.value)
+            logger.warning(
+                "No knowledge examples were retrieved for doc_type=%s. "
+                "This is unexpected in a seeded environment. "
+                "Load the bundled examples by calling POST /api/v1/knowledge/seed.",
+                doc_type.value,
+            )
             return "(No examples available.)"
         titles = [doc.title for doc in docs]
         logger.info("RAG retrieval: doc_type=%s count=%d titles=%s", doc_type.value, len(titles), titles)
@@ -77,6 +72,19 @@ class LLMService:
         output_tokens = int(usage.get("output_tokens", 0))
         total_tokens = int(usage.get("total_tokens", 0))
         return input_tokens, output_tokens, total_tokens
+
+    @staticmethod
+    def _check_max_tokens(call_name: CallType, output_tokens: int) -> None:
+        """Warn and raise if output tokens hit the configured max, indicating truncated output."""
+        if output_tokens >= LLM_MAX_TOKENS:
+            logger.warning(
+                "LLM call: call=%s output_tokens=%d reached LLM_MAX_TOKENS=%d — output is likely truncated.",
+                call_name, output_tokens, LLM_MAX_TOKENS,
+            )
+            raise ValueError(
+                f"LLM call '{call_name}' hit the max token limit ({LLM_MAX_TOKENS}). "
+                "Output is likely truncated and unusable."
+            )
 
     @staticmethod
     def extract_text_content(response) -> str:
@@ -129,8 +137,8 @@ class LLMService:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(
-                "LLM call: call=plan [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                LLM_PLAN_MODEL, 0, 0, 0, duration_ms,
+                "LLM call: call=%s [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.PLAN, LLM_PLAN_MODEL, 0, 0, 0, duration_ms,
             )
             return STUB_PLAN, 0
 
@@ -146,9 +154,10 @@ class LLMService:
             raise ValueError("Unexpected structured output shape.")
         plan = result.get("parsed")
         input_tok, output_tok, total_tok = LLMService._extract_token_usage(result.get("raw"))
+        LLMService._check_max_tokens(CallType.PLAN, output_tok)
         logger.info(
-            "LLM call: call=plan model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            LLM_PLAN_MODEL, input_tok, output_tok, total_tok, duration_ms,
+            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.PLAN, LLM_PLAN_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         if isinstance(plan, VideoPlan):
             return plan, total_tok
@@ -160,8 +169,8 @@ class LLMService:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(
-                "LLM call: call=codegen [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                LLM_CODE_MODEL, 0, 0, 0, duration_ms,
+                "LLM call: call=%s [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.CODEGEN, LLM_CODE_MODEL, 0, 0, 0, duration_ms,
             )
             return STUB_BROKEN_CODE, 0
 
@@ -173,9 +182,10 @@ class LLMService:
         ])
         duration_ms = int((time.perf_counter() - t0) * 1000)
         input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        LLMService._check_max_tokens(CallType.CODEGEN, output_tok)
         logger.info(
-            "LLM call: call=codegen model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
+            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.CODEGEN, LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         return LLMService.extract_text_content(response), total_tok
 
@@ -196,8 +206,8 @@ class LLMService:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(
-                "LLM call: call=fix [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                LLM_CODE_MODEL, 0, 0, 0, duration_ms,
+                "LLM call: call=%s [E2E MODE] model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.FIX, LLM_CODE_MODEL, 0, 0, 0, duration_ms,
             )
             return STUB_FIXED_CODE, 0
 
@@ -209,8 +219,9 @@ class LLMService:
         ])
         duration_ms = int((time.perf_counter() - t0) * 1000)
         input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        LLMService._check_max_tokens(CallType.FIX, output_tok)
         logger.info(
-            "LLM call: call=fix model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
+            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            CallType.FIX, LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         return LLMService.extract_text_content(response), total_tok

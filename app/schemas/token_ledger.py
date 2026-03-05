@@ -1,6 +1,12 @@
+from enum import StrEnum
+
 from app.schemas.db_column import DBColumn
 from app.schemas.schema import Schema
 
+class State(StrEnum):
+    ACTIVE = "ACTIVE"
+    RELEASED = "RELEASED"
+    EXPIRED = "EXPIRED"
 
 class TokenLedgerSchema(Schema):
     CALL_ID = DBColumn(name="call_id", type="UUID", attributes=["PRIMARY KEY"])
@@ -11,6 +17,6 @@ class TokenLedgerSchema(Schema):
     MODEL = DBColumn(name="model", type="TEXT", attributes=["NOT NULL"])
     RESERVED_TOKENS = DBColumn(name="reserved_tokens", type="INTEGER", attributes=["NOT NULL"])
     CONSUMED_TOKENS = DBColumn(name="consumed_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
-    STATE = DBColumn(name="state", type="TEXT", attributes=["NOT NULL", "DEFAULT 'ACTIVE'"])
+    STATE = DBColumn(name="state", type="TEXT", attributes=["NOT NULL", f"DEFAULT '{State.ACTIVE}'"])
     CREATED_AT = DBColumn(name="created_at", type="TIMESTAMPTZ", attributes=["NOT NULL", "DEFAULT NOW()"])
     UPDATED_AT = DBColumn(name="updated_at", type="TIMESTAMPTZ", attributes=["NOT NULL", "DEFAULT NOW()"])

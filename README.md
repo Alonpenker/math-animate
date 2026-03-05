@@ -13,7 +13,7 @@ Teachers submit a lesson topic → an LLM drafts a structured scene plan → the
 - **Auto-fix pipeline** — generated code that fails verification is automatically patched by the LLM and re-verified before failing permanently
 - **Sandboxed rendering** — every render runs in a fresh, network-isolated Docker container with strict CPU, memory, and PID limits
 - **Token budget enforcement** — a 250K daily token cap with pessimistic reservation and per-job ledger tracking prevents runaway LLM spend
-- **Multi-provider LLM** — swap between OpenAI and Anthropic by changing a single config value
+- **OpenAI-backed LLM pipeline** — planning and code generation run on OpenAI chat models configured in one place
 - **OpenAPI docs** — full Swagger UI available at `/docs` out of the box
 
 ---
@@ -123,7 +123,7 @@ All non-terminal states + RENDERED ──► CANCELLED
 | Database | PostgreSQL 16 + pgvector |
 | Artifact storage | MinIO (S3-compatible) |
 | Embeddings | Ollama (`nomic-embed-text`, 768 dims) |
-| LLM | LangChain (OpenAI / Anthropic) |
+| LLM | LangChain (OpenAI) |
 | Renderer | `manimcommunity/manim:v0.19.2` (Docker-in-Docker) |
 | Package manager | `uv` |
 | Language | Python 3.13 |
@@ -135,7 +135,7 @@ All non-terminal states + RENDERED ──► CANCELLED
 ### Prerequisites
 
 - [Docker](https://www.docker.com/) with Compose v2
-- An **OpenAI** or **Anthropic** API key
+- An **OpenAI** API key
 
 ### 1. Configure environment
 
@@ -147,7 +147,7 @@ cp .env.example .env
 
 | Variable | Description |
 |---|---|
-| `API_KEY` | OpenAI or Anthropic API key |
+| `API_KEY` | OpenAI API key |
 | `STORAGE_ACCESS_KEY` | MinIO root user |
 | `STORAGE_SECRET_KEY` | MinIO root password |
 | `STORAGE_BUCKET` | Bucket name for artifacts |
@@ -278,12 +278,12 @@ tests/                # Unit and integration tests
 
 ## Configuration
 
-### Switching LLM provider
+### LLM model configuration
 
 Edit [app/configs/llm_settings.py](app/configs/llm_settings.py):
 
 ```python
-LLM_PROVIDER  = LLMProvider.OPENAI      # or LLMProvider.ANTHROPIC
+LLM_PROVIDER = "openai"
 LLM_PLAN_MODEL = "gpt-5.2"
 LLM_CODE_MODEL = "gpt-5.1-codex"
 ```
@@ -299,7 +299,6 @@ API_KEY=sk-...
 ```python
 DAILY_TOKEN_LIMIT            = 250_000   # hard cap
 SOFT_THRESHOLD_RATIO         = 0.8       # warning threshold
-STALE_RESERVATION_TTL_MINUTES = 30       # auto-release orphaned reservations
 ```
 
 ---

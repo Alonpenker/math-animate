@@ -10,7 +10,6 @@ dependencies = [
     "gunicorn>=24.1.1",
     "langchain-core>=0.3",
     "langchain-openai>=0.3",
-    "langchain-anthropic>=0.3",
     "minio>=7.2.10",
     "numpy>=1.26",
     "pgvector>=0.4",

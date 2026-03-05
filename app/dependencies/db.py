@@ -50,7 +50,7 @@ def get_cursor():
 
 @contextmanager
 def get_worker_cursor():
-    return get_cursor()
+    yield from get_cursor()
 
 def init_db_tables() -> None:
     if db_pool is None:

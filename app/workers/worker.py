@@ -30,7 +30,7 @@ from app.workers.worker_helpers import (
     get_storage,
     save_artifact_to_storage,
     store_render_logs,
-    run_dry_run_docker,
+    dry_run_docker,
 )
 from app.utils.llm_stubs import IS_E2E_MODE
 from app.utils.logging import get_logger
@@ -175,8 +175,15 @@ def verify_code_task(job_request_payload: dict) -> None:
             media_dir = input_dir / PathNames.MEDIA_FOLDER
             media_dir.mkdir(parents=True, exist_ok=True)
             media_dir.chmod(0o777)
-            passed, error_output = run_dry_run_docker(code_path, media_dir)
+            passed, error_output, is_fixable = dry_run_docker(code_path, media_dir)
             if not passed:
+                if not is_fixable:
+                    logger.error(
+                        "Dry-run aborted due to infrastructure error (is_retry=%s) (%s): %s",
+                        is_retry, log_context(str(job_id)), error_output,
+                    )
+                    transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+                    return
                 failure = f"Dry-run failed:\n{error_output}"
 
         if failure is None:
@@ -203,7 +210,8 @@ def verify_code_task(job_request_payload: dict) -> None:
                 JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
             )
         else:
-            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), failure)
+            failure_summary = failure.strip().splitlines()[-1] if failure.strip() else failure
+            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), failure_summary)
 
             if is_retry:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)

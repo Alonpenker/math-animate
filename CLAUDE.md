@@ -82,7 +82,7 @@ app/
 
 ### Key Services
 
-- **`LLMService`** (`app/services/llm_service.py`): Wraps LangChain (OpenAI/Anthropic), fetches RAG examples before each LLM call, handles planning and codegen prompts.
+- **`LLMService`** (`app/services/llm_service.py`): Wraps LangChain OpenAI, fetches RAG examples before each LLM call, handles planning and codegen prompts.
 - **`RAGService`**: Vector similarity search via pgvector + Ollama `nomic-embed-text` embeddings (768 dimensions).
 - **`BudgetService`**: Enforces a 250K daily token limit (soft threshold at 80%). Reserves tokens before LLM calls and settles after.
 - **`FilesStorageService`**: MinIO artifact storage. All artifact access uses artifact IDs, never raw paths.

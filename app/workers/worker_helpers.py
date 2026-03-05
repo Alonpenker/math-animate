@@ -46,7 +46,7 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
 def reserve_budget(call_id, job_id, stage: str, model: str, prompt_text: str) -> int:
     with get_worker_cursor() as cursor:
         return BudgetService.reserve(
-            cursor, call_id, job_id, stage, LLM_PROVIDER.value, model, prompt_text
+            cursor, call_id, job_id, stage, LLM_PROVIDER, model, prompt_text
         )
 
 
@@ -161,8 +161,14 @@ def extract_traceback(stderr: str) -> str:
     return stderr
 
 
-def run_dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str]:
-    """Run ``manim --dry_run`` inside Docker to verify generated code."""
+def dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str, bool]:
+    """Run ``manim --dry_run`` inside Docker to verify generated code.
+
+    Returns (passed, error_message, is_fixable).
+    is_fixable=True means the error came from the generated Manim code itself
+    and is worth sending to the fix step. is_fixable=False means it's an
+    infrastructure problem (timeout, Docker failure) unrelated to the code.
+    """
     render_root = Path(PathNames.TMP_RENDER_FOLDER)
 
     command = [
@@ -183,14 +189,13 @@ def run_dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str]:
             command, capture_output=True, text=True, timeout=60, input="*\n",
         )
         if result.returncode == 0:
-            return True, ""
+            return True, "", True
         error_output = (result.stdout or "") + (result.stderr or "")
-        return False, extract_traceback(error_output)
-    except subprocess.TimeoutExpired as exc:
-        stderr = exc.stderr if isinstance(exc.stderr, str) else (bytes(exc.stderr).decode() if exc.stderr else "")
-        return False, f"Dry-run timed out after 60s.\n{extract_traceback(stderr)}"
+        return False, extract_traceback(error_output), True
+    except subprocess.TimeoutExpired:
+        return False, "Dry-run timed out after 60s.", False
     except Exception as exc:
-        return False, f"Dry-run failed with exception: {exc}"
+        return False, str(exc), False
 
 
 def store_render_logs(

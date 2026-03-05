@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
 from app.repositories.repository import Repository
-from app.schemas.token_ledger import TokenLedgerSchema
+from app.schemas.token_ledger import TokenLedgerSchema, State
 from app.schemas.token_usage import BreakdownEntry, DailySummary
 
 
@@ -36,7 +36,7 @@ class TokenLedgerRepository(Repository):
         cursor.execute(
             cls.insert(),
             (str(call_id), day, str(job_id), stage, provider, model,
-             reserved_tokens, 0, "ACTIVE"),
+             reserved_tokens, 0, State.ACTIVE),
         )
 
     @classmethod
@@ -45,7 +45,7 @@ class TokenLedgerRepository(Repository):
             f"UPDATE {cls.TABLE_NAME} "
             f"SET {cls.SCHEMA.CONSUMED_TOKENS.name} = %s, "
             f"{cls.SCHEMA.RESERVED_TOKENS.name} = 0, "
-            f"{cls.SCHEMA.STATE.name} = 'RELEASED', "
+            f"{cls.SCHEMA.STATE.name} = '{State.RELEASED}', "
             f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
             f"WHERE {cls.SCHEMA.CALL_ID.name} = %s",
             (consumed_tokens, str(call_id)),
@@ -56,10 +56,10 @@ class TokenLedgerRepository(Repository):
         cursor.execute(
             f"SELECT "
             f"{cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, {cls.SCHEMA.STAGE.name}, "
-            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = 'RELEASED' "
-            f"THEN {cls.SCHEMA.CONSUMED_TOKENS.name} ELSE 0 END), 0) AS consumed, "
-            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = 'ACTIVE' "
-            f"THEN {cls.SCHEMA.RESERVED_TOKENS.name} ELSE 0 END), 0) AS reserved "
+            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = '{State.RELEASED}' "
+            f"THEN {cls.SCHEMA.CONSUMED_TOKENS.name} ELSE 0 END), 0) AS {cls.SCHEMA.CONSUMED_TOKENS.name}, "
+            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = '{State.ACTIVE}' "
+            f"THEN {cls.SCHEMA.RESERVED_TOKENS.name} ELSE 0 END), 0) AS {cls.SCHEMA.RESERVED_TOKENS.name} "
             f"FROM {cls.TABLE_NAME} "
             f"WHERE {cls.SCHEMA.DAY.name} = %s "
             f"GROUP BY {cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, {cls.SCHEMA.STAGE.name}",
@@ -110,7 +110,7 @@ class TokenLedgerRepository(Repository):
             f"+ COALESCE(SUM({cls.SCHEMA.RESERVED_TOKENS.name}), 0) "
             f"FROM {cls.TABLE_NAME} "
             f"WHERE {cls.SCHEMA.DAY.name} = current_date "
-            f"AND {cls.SCHEMA.STATE.name} IN ('RELEASED', 'ACTIVE')",
+            f"AND {cls.SCHEMA.STATE.name} IN ('{State.RELEASED}', '{State.ACTIVE}')",
         )
         row = cursor.fetchone()
         return list(row.values())[0] if row else 0
@@ -126,9 +126,9 @@ class TokenLedgerRepository(Repository):
     def expire_stale(cls, cursor, before_timestamp: datetime) -> None:
         cursor.execute(
             f"UPDATE {cls.TABLE_NAME} "
-            f"SET {cls.SCHEMA.STATE.name} = 'EXPIRED', "
+            f"SET {cls.SCHEMA.STATE.name} = '{State.EXPIRED}', "
             f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
-            f"WHERE {cls.SCHEMA.STATE.name} = 'ACTIVE' "
+            f"WHERE {cls.SCHEMA.STATE.name} = '{State.ACTIVE}' "
             f"AND {cls.SCHEMA.CREATED_AT.name} < %s",
             (before_timestamp,),
         )
