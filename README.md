@@ -312,14 +312,15 @@ uv run pytest
 # Run a single test file
 uv run pytest tests/test_jobs.py
 
-# Run the API server locally (requires external services)
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-# Run the Celery worker locally
-uv run celery -A app.workers.worker worker
-
 # Rebuild API and worker images after code changes
 docker compose build api worker
+
+# Start the full stack (preferred for development)
+docker-compose up --attach worker --attach api 
+
+# Start the full stack with stubbed LLM calls
+$env:E2E="true"; docker-compose up --attach worker --attach api 
+Remove-Item Env:E2E # to remove 
 ```
 
 ---

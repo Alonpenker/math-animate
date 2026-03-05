@@ -41,11 +41,12 @@ services:
       ollama:
         condition: service_healthy
     environment:
-      DOCKER_HOST: tcp://docker-daemon:2375
+      DOCKER_HOST: unix:///var/run/docker.sock
       E2E: ${E2E:-}
     env_file:
       - .env
     volumes:
+      - docker_sock:/var/run
       - render_data:/job
 
   redis:
@@ -119,14 +120,18 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
-        dockerd-entrypoint.sh &
+        dockerd-entrypoint.sh \
+          --host unix:///var/run/docker.sock \
+          --log-level=warn &
         daemon_pid=$$!
         until docker info >/dev/null 2>&1; do sleep 1; done
         docker pull "manimcommunity/manim:v0.19.2"
         wait "$$daemon_pid"
     environment:
       DOCKER_TLS_CERTDIR: ""
+      DOCKER_HOST: unix:///var/run/docker.sock
     volumes:
+      - docker_sock:/var/run
       - render_data:/job
     healthcheck:
       test: ["CMD-SHELL", "docker info >/dev/null 2>&1 && docker image inspect \"manimcommunity/manim:v0.19.2\" >/dev/null 2>&1"]
@@ -142,3 +147,4 @@ volumes:
   minio_data:
   render_data:
   ollama_data:
+  docker_sock:

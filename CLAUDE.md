@@ -27,10 +27,10 @@ uv run pytest tests/test_jobs.py
 docker compose build api worker
 
 # Start the full stack (preferred for development)
-docker-compose up
+docker-compose up --attach worker --attach api 
 
 # Start the full stack with stubbed LLM calls
-$env:E2E="true"; docker-compose up
+$env:E2E="true"; docker-compose up --attach worker --attach api 
 Remove-Item Env:E2E
 ```
 
