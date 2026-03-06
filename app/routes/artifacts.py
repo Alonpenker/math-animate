@@ -6,16 +6,19 @@ import tempfile
 from typing import List, Optional
 from uuid import UUID
 
+from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
+from app.dependencies.limiter import limiter
 from app.dependencies.storage import get_storage_service
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import ArtifactType, ArtifactResponse
 from app.services.files_storage_service import FilesStorageService
 
-router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 
 
 @router.get("", response_model=List[ArtifactResponse])
+@limiter.limit(LimitConfig.NORMAL)
 def list_artifacts(
     artifact_type: Optional[ArtifactType] = None,
     job_id: Optional[UUID] = None,
@@ -41,6 +44,7 @@ def list_artifacts(
 
 
 @router.get("/{artifact_id}", response_model=ArtifactResponse)
+@limiter.limit(LimitConfig.NORMAL)
 def get_artifact(
     artifact_id: UUID,
     cursor=Depends(get_cursor),
@@ -63,6 +67,7 @@ def get_artifact(
 
 
 @router.get("/{artifact_id}/download")
+@limiter.limit(LimitConfig.STRICT)
 def download_artifact(
     artifact_id: UUID,
     cursor=Depends(get_cursor),
@@ -89,6 +94,7 @@ def download_artifact(
 
 
 @router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(LimitConfig.STRICT)
 def delete_artifact(
     artifact_id: UUID,
     cursor=Depends(get_cursor),

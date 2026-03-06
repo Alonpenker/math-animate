@@ -1,19 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 
+from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
 from app.dependencies.redis_client import get_redis_client
+from app.dependencies.limiter import limiter
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.plans_repository import PlansRepository
 from app.schemas.jobs import *
-from app.schemas.video_plan import VideoPlan
 from app.schemas.user_request import UserRequest
 from app.domain.job_state import JobStatus
 from app.workers.runner import WorkerRunner
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 @router.post("",status_code=status.HTTP_201_CREATED)
+@limiter.limit(LimitConfig.STRICT)
 def create_job(user_request: UserRequest, redis_client=Depends(get_redis_client)) -> JobResponse:
     job = Job(status=JobStatus.CREATED)
     job_request = JobUserRequest(job=job, user_request=user_request)
@@ -23,6 +25,7 @@ def create_job(user_request: UserRequest, redis_client=Depends(get_redis_client)
 
 
 @router.get("/{job_id}/status")
+@limiter.limit(LimitConfig.LIGHT)
 def get_job_status(job_id: UUID, redis_client=Depends(get_redis_client)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:
@@ -34,6 +37,7 @@ def get_job_status(job_id: UUID, redis_client=Depends(get_redis_client)) -> JobR
 
 
 @router.get("/{job_id}/plan")
+@limiter.limit(LimitConfig.NORMAL)
 def get_plan(job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:
@@ -52,6 +56,7 @@ def get_plan(job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depend
 
 
 @router.patch("/{job_id}/approve")
+@limiter.limit(LimitConfig.STRICT)
 def approve_plan(job_id: UUID, approved: bool, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:

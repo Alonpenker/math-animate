@@ -4,7 +4,9 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
+from app.dependencies.limiter import limiter
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.schemas.knowledge import (
     KnowledgeDocumentCreate,
@@ -16,10 +18,11 @@ from app.schemas.knowledge import (
 )
 from app.services.rag_service import RAGService
 
-router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
 
 @router.post("",
              status_code=status.HTTP_201_CREATED)
+@limiter.limit(LimitConfig.STRICT)
 def create_document(body: KnowledgeDocumentCreate,
                     cursor=Depends(get_cursor)) -> KnowledgeDocumentResponse:
     document_id = uuid4()
@@ -37,6 +40,7 @@ def create_document(body: KnowledgeDocumentCreate,
 
 
 @router.post("/seed", status_code=status.HTTP_200_OK)
+@limiter.limit(LimitConfig.STRICT)
 def seed_knowledge(cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
     examples_dir = Path(__file__).resolve().parent.parent / "examples"
     index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
@@ -58,6 +62,7 @@ def seed_knowledge(cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
 
 
 @router.get("/{document_id}")
+@limiter.limit(LimitConfig.NORMAL)
 def get_document(document_id: UUID,
                  cursor=Depends(get_cursor)) -> KnowledgeDocumentResponse:
     doc = KnowledgeRepository.get_document(cursor, document_id)
@@ -69,6 +74,7 @@ def get_document(document_id: UUID,
     return KnowledgeDocumentResponse(document=doc)
 
 @router.get("")
+@limiter.limit(LimitConfig.NORMAL)
 def get_documents(
     doc_type: KnowledgeType,
     cursor=Depends(get_cursor),
@@ -78,6 +84,7 @@ def get_documents(
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(LimitConfig.STRICT)
 def delete_document(document_id: UUID,
                     cursor=Depends(get_cursor)) -> None:
     deleted = KnowledgeRepository.delete_document(cursor, document_id)
