@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.schemas.artifact import Artifact, ArtifactType, ArtifactResponse
 
@@ -334,6 +334,92 @@ def test_delete_artifact_succeeds_even_when_minio_object_already_missing(
     # Then
     assert result is None
     assert a.artifact_id not in test_store["artifacts"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stream_artifact
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_stream_artifact_returns_200_with_full_content_headers_when_no_range(
+    artifacts_routes_with_mocks,
+    fake_cursor,
+    test_store,
+    mock_storage_service,
+):
+    # Given
+    job_id = uuid4()
+    a = _make_artifact(job_id, ArtifactType.MP4, path=f"{job_id}/scene.mp4")
+    payload = b"\x00\x00\x00\x1cftypisom"
+    test_store["artifacts"][a.artifact_id] = a
+    test_store["objects"][a.path] = payload
+
+    # When
+    result = artifacts_routes_with_mocks.stream_artifact(
+        a.artifact_id,
+        range_header=None,
+        cursor=fake_cursor,
+        storage=mock_storage_service,
+    )
+
+    # Then
+    assert isinstance(result, StreamingResponse)
+    assert result.status_code == 200
+    assert result.media_type == "video/mp4"
+    assert result.headers["accept-ranges"] == "bytes"
+    assert result.headers["content-length"] == str(len(payload))
+
+
+def test_stream_artifact_returns_206_with_partial_content_headers_when_range_provided(
+    artifacts_routes_with_mocks,
+    fake_cursor,
+    test_store,
+    mock_storage_service,
+):
+    # Given
+    job_id = uuid4()
+    a = _make_artifact(job_id, ArtifactType.MP4, path=f"{job_id}/scene.mp4")
+    payload = b"0123456789"
+    test_store["artifacts"][a.artifact_id] = a
+    test_store["objects"][a.path] = payload
+
+    # When
+    result = artifacts_routes_with_mocks.stream_artifact(
+        a.artifact_id,
+        range_header="bytes=2-5",
+        cursor=fake_cursor,
+        storage=mock_storage_service,
+    )
+
+    # Then
+    assert isinstance(result, StreamingResponse)
+    assert result.status_code == 206
+    assert result.media_type == "video/mp4"
+    assert result.headers["content-range"] == "bytes 2-5/10"
+    assert result.headers["content-length"] == "4"
+
+
+def test_stream_artifact_raises_416_when_range_header_format_is_invalid(
+    artifacts_routes_with_mocks,
+    fake_cursor,
+    test_store,
+    mock_storage_service,
+):
+    # Given
+    job_id = uuid4()
+    a = _make_artifact(job_id, ArtifactType.MP4, path=f"{job_id}/scene.mp4")
+    test_store["artifacts"][a.artifact_id] = a
+    test_store["objects"][a.path] = b"0123456789"
+
+    # When / Then
+    with pytest.raises(HTTPException) as exc_info:
+        artifacts_routes_with_mocks.stream_artifact(
+            a.artifact_id,
+            range_header="2-5",
+            cursor=fake_cursor,
+            storage=mock_storage_service,
+        )
+
+    assert exc_info.value.status_code == 416
 
 
 # ─────────────────────────────────────────────────────────────────────────────

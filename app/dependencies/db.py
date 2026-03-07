@@ -8,6 +8,7 @@ from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.token_repository import TokenLedgerRepository
+from app.repositories.job_requests_repository import JobRequestsRepository
 
 db_pool = None
 
@@ -63,7 +64,8 @@ def init_db_tables() -> None:
         cursor.execute(ArtifactsRepository._create())
         cursor.execute(KnowledgeRepository._create())
         cursor.execute(TokenLedgerRepository._create())
-        cursor.execute(TokenLedgerRepository._create_index())
+        TokenLedgerRepository.create_day_index(cursor)
+        cursor.execute(JobRequestsRepository._create())
         conn.commit()
     except Exception:
         conn.rollback()

@@ -55,6 +55,7 @@ class ArtifactResponse(BaseModel):
     artifact_id: UUID
     job_id: UUID
     artifact_type: ArtifactType
+    name: str
     size: int
     sha256: str
     created_at: Optional[datetime] = None

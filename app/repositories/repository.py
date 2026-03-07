@@ -60,6 +60,17 @@ class Repository(ABC):
     def _create(cls):
         return f"CREATE TABLE IF NOT EXISTS {cls.TABLE_NAME} (" + \
                 ', '.join(f"{col.name} {col.sql_type}" for col in cls.SCHEMA.columns()) + ")"
+
+    @classmethod
+    def _create_index(cls, field: str):
+        schema_fields = cls.SCHEMA.column_names()
+        if field not in schema_fields:
+            raise ValueError(f"Field {field} not found in table {cls.TABLE_NAME}")
+
+        return (
+            f"CREATE INDEX IF NOT EXISTS idx_{cls.TABLE_NAME}_{field} "
+            f"ON {cls.TABLE_NAME} ({field})"
+        )
     
     @classmethod
     def _truncate(cls):

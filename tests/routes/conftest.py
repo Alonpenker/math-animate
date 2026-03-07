@@ -44,7 +44,12 @@ def mock_storage_service(test_store: dict[str, Any]):
     In-memory MinIO replacement.
     Reads/writes objects to test_store["objects"] keyed by object_name.
     """
+    from io import BytesIO
     from pathlib import Path
+
+    class FakeObjectStream(BytesIO):
+        def release_conn(self) -> None:
+            pass
 
     class FakeFilesStorageService:
         def download_artifact(self, object_name: str, file_path: str) -> None:
@@ -55,6 +60,22 @@ def mock_storage_service(test_store: dict[str, Any]):
 
         def delete_artifact(self, object_name: str) -> None:
             test_store["objects"].pop(object_name, None)
+
+        def get_artifact_size(self, object_name: str) -> int:
+            data = test_store["objects"].get(object_name, b"fake-content")
+            return len(data)
+
+        def open_artifact_stream(
+            self,
+            object_name: str,
+            offset: int = 0,
+            length: int = 0,
+        ) -> FakeObjectStream:
+            data = test_store["objects"].get(object_name, b"fake-content")
+            sliced = data[offset:]
+            if length > 0:
+                sliced = sliced[:length]
+            return FakeObjectStream(sliced)
 
     return FakeFilesStorageService()
 

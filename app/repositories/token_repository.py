@@ -15,11 +15,8 @@ class TokenLedgerRepository(Repository):
     PRIMARY_KEY = "call_id"
 
     @classmethod
-    def _create_index(cls):
-        return (
-            f"CREATE INDEX IF NOT EXISTS idx_{cls.TABLE_NAME}_{cls.SCHEMA.DAY.name} "
-            f"ON {cls.TABLE_NAME} ({cls.SCHEMA.DAY.name})"
-        )
+    def create_day_index(cls, cursor) -> None:
+        cursor.execute(cls._create_index(cls.SCHEMA.DAY.name))
 
     @classmethod
     def reserve(

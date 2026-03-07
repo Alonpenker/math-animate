@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from fastapi.responses import FileResponse
 from pathlib import Path
 from starlette.background import BackgroundTask
@@ -13,6 +13,7 @@ from app.dependencies.storage import get_storage_service
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import ArtifactType, ArtifactResponse
 from app.services.files_storage_service import FilesStorageService
+from app.utils.video_streaming import build_video_stream_response
 
 router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 
@@ -34,6 +35,7 @@ def list_artifacts(
             artifact_id=a.artifact_id,
             job_id=a.job_id,
             artifact_type=a.artifact_type,
+            name=Path(a.path).name,
             size=a.size,
             sha256=a.sha256,
             created_at=a.created_at,
@@ -59,6 +61,7 @@ def get_artifact(
         artifact_id=artifact.artifact_id,
         job_id=artifact.job_id,
         artifact_type=artifact.artifact_type,
+        name=Path(artifact.path).name,
         size=artifact.size,
         sha256=artifact.sha256,
         created_at=artifact.created_at,
@@ -113,3 +116,30 @@ def delete_artifact(
         pass
 
     ArtifactsRepository.delete_artifact(cursor, artifact_id)
+
+
+@router.get("/{artifact_id}/stream")
+@limiter.limit(LimitConfig.NORMAL)
+def stream_artifact(
+    artifact_id: UUID,
+    range_header: Optional[str] = Header(default=None, alias="Range"),
+    cursor=Depends(get_cursor),
+    storage: FilesStorageService = Depends(get_storage_service),
+):
+    artifact = ArtifactsRepository.get_artifact_by_id(cursor, artifact_id)
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact not found. (artifact_id={artifact_id})",
+        )
+    if artifact.artifact_type != ArtifactType.MP4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only video artifacts can be streamed.",
+        )
+
+    return build_video_stream_response(
+        storage=storage,
+        artifact_path=artifact.path,
+        range_header=range_header,
+    )

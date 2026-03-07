@@ -18,5 +18,3 @@ class TokenLedgerSchema(Schema):
     RESERVED_TOKENS = DBColumn(name="reserved_tokens", type="INTEGER", attributes=["NOT NULL"])
     CONSUMED_TOKENS = DBColumn(name="consumed_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
     STATE = DBColumn(name="state", type="TEXT", attributes=["NOT NULL", f"DEFAULT '{State.ACTIVE}'"])
-    CREATED_AT = DBColumn(name="created_at", type="TIMESTAMPTZ", attributes=["NOT NULL", "DEFAULT NOW()"])
-    UPDATED_AT = DBColumn(name="updated_at", type="TIMESTAMPTZ", attributes=["NOT NULL", "DEFAULT NOW()"])

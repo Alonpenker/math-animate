@@ -6,6 +6,7 @@ from app.configs.llm_settings import LLM_EMBEDDING_DIMENSIONS
 ColumnType = Literal[
     "UUID",
     "TEXT",
+    "TEXT[]",
     "JSONB",
     "BOOLEAN",
     "INTEGER",
