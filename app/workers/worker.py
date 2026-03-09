@@ -92,7 +92,7 @@ def generate_plan(job_request_payload: dict) -> None:
 
     except QuotaExceededError:
         logger.exception("Planning quota exceeded (%s)", log_context(str(job_id)))
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
     except Exception:
@@ -136,7 +136,7 @@ def generate_code(job_request_payload: dict) -> None:
 
     except QuotaExceededError:
         logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id)))
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
     except Exception:
@@ -272,7 +272,7 @@ def fix_code_task(job_request_payload: dict) -> None:
     except QuotaExceededError:
         logger.exception("Fix quota exceeded (%s)", log_context(str(job_id)))
         release_budget_on_error(call_id, reserved, total_tokens)
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_QUOTA_EXCEEDED)
 
     except Exception:
         release_budget_on_error(call_id, reserved, total_tokens)

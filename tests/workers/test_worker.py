@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 
 from app.domain.job_state import JobStatus
+from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.jobs import Job, JobCodeRequest, JobFixRequest, JobPlanRequest, JobRequest, JobUserRequest
 from app.schemas.plan import Plan
@@ -431,6 +432,37 @@ def test_generate_plan_sets_failed_planning_and_reraises_on_llm_error(
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_PLANNING)
 
 
+def test_generate_plan_sets_failed_quota_exceeded_and_reraises_on_quota_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    sample_user_request,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_plan_prompt",
+        staticmethod(lambda user_request: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module, "reserve_budget",
+        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+    )
+
+    job = Job(status=JobStatus.CREATED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobUserRequest(job=job, user_request=sample_user_request).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(QuotaExceededError):
+        worker_module.generate_plan(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # generate_code
 # ─────────────────────────────────────────────────────────────────────────────
@@ -499,6 +531,37 @@ def test_generate_code_sets_failed_codegen_and_reraises_on_llm_error(
         worker_module.generate_code(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_CODEGEN
+
+
+def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    sample_video_plan,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_codegen_prompt",
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module, "reserve_budget",
+        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+    )
+
+    job = Job(status=JobStatus.APPROVED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobPlanRequest(job=job, plan=sample_video_plan).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(QuotaExceededError):
+        worker_module.generate_code(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -814,6 +877,40 @@ def test_fix_code_task_sets_failed_verification_and_reraises_on_llm_error(
         worker_module.fix_code_task(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
+
+
+def test_fix_code_task_sets_failed_quota_exceeded_on_quota_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_fix_prompt",
+        staticmethod(lambda code, error_context: ("fix-system-prompt", "fix-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module, "reserve_budget",
+        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+    )
+
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobFixRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code="from manim import *\n",
+        error_context="some error",
+    ).model_dump(mode="json")
+
+    # When
+    worker_module.fix_code_task(payload)
+
+    # Then
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

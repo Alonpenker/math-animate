@@ -8,6 +8,13 @@ from typing import Any
 
 import pytest
 
+# Disable slowapi rate-limiting before any route module is imported.
+# Route functions lack `request: Request` (they're called directly in tests,
+# not through FastAPI's routing layer), so slowapi's signature check would
+# raise at decoration time. This no-op makes `@limiter.limit(...)` transparent.
+from app.dependencies.limiter import limiter as _limiter
+_limiter.limit = lambda *args, **kwargs: (lambda f: f)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOBS ROUTES

@@ -11,6 +11,7 @@ TERMINAL_STATUSES: frozenset[JobStatus] = frozenset({
     JobStatus.RENDERED,
     JobStatus.FAILED_PLANNING,
     JobStatus.FAILED_CODEGEN,
+    JobStatus.FAILED_QUOTA_EXCEEDED,
     JobStatus.FAILED_VERIFICATION,
     JobStatus.FAILED_RENDER,
     JobStatus.CANCELLED,

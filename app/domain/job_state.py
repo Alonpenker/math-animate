@@ -16,6 +16,7 @@ class JobStatus(str, Enum):
     FAILED_PLANNING = "FAILED_PLANNING"
     FAILED_CODEGEN = "FAILED_CODEGEN"
     FAILED_RENDER = "FAILED_RENDER"
+    FAILED_QUOTA_EXCEEDED = "FAILED_QUOTA_EXCEEDED"
     VERIFYING = "VERIFYING"
     VERIFIED = "VERIFIED"
     FIXING = "FIXING"
@@ -24,19 +25,32 @@ class JobStatus(str, Enum):
 
 ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
     JobStatus.CREATED: frozenset({JobStatus.PLANNING, JobStatus.CANCELLED}),
-    JobStatus.PLANNING: frozenset({JobStatus.PLANNED, JobStatus.FAILED_PLANNING}),
+    JobStatus.PLANNING: frozenset({
+        JobStatus.PLANNED,
+        JobStatus.FAILED_PLANNING,
+        JobStatus.FAILED_QUOTA_EXCEEDED,
+    }),
     JobStatus.PLANNED: frozenset({JobStatus.APPROVED, JobStatus.CANCELLED}),
     JobStatus.APPROVED: frozenset({JobStatus.CODEGEN, JobStatus.CANCELLED}),
-    JobStatus.CODEGEN: frozenset({JobStatus.CODED, JobStatus.FAILED_CODEGEN}),
+    JobStatus.CODEGEN: frozenset({
+        JobStatus.CODED,
+        JobStatus.FAILED_CODEGEN,
+        JobStatus.FAILED_QUOTA_EXCEEDED,
+    }),
     JobStatus.CODED: frozenset({JobStatus.VERIFYING, JobStatus.CANCELLED}),
     JobStatus.VERIFYING: frozenset({JobStatus.VERIFIED, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION}),
     JobStatus.VERIFIED: frozenset({JobStatus.RENDERING, JobStatus.CANCELLED}),
-    JobStatus.FIXING: frozenset({JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION}),
+    JobStatus.FIXING: frozenset({
+        JobStatus.VERIFYING,
+        JobStatus.FAILED_VERIFICATION,
+        JobStatus.FAILED_QUOTA_EXCEEDED,
+    }),
     JobStatus.RENDERING: frozenset({JobStatus.RENDERED, JobStatus.FAILED_RENDER}),
     JobStatus.RENDERED: frozenset({JobStatus.CANCELLED}),
     JobStatus.FAILED_PLANNING: frozenset({JobStatus.CANCELLED}),
     JobStatus.FAILED_CODEGEN: frozenset({JobStatus.CANCELLED}),
     JobStatus.FAILED_RENDER: frozenset({JobStatus.CANCELLED}),
+    JobStatus.FAILED_QUOTA_EXCEEDED: frozenset({JobStatus.CANCELLED}),
     JobStatus.FAILED_VERIFICATION: frozenset({JobStatus.CANCELLED}),
     JobStatus.CANCELLED: frozenset()
 }

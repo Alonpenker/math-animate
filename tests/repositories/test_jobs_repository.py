@@ -102,3 +102,7 @@ def test_update_job_status_applies_ttl_for_every_terminal_status():
         assert r.get_ttl(f"job:{job_id}") == TERMINAL_JOB_TTL_SECONDS, (
             f"Expected TTL for terminal status {status}"
         )
+
+
+def test_terminal_statuses_include_failed_quota_exceeded():
+    assert JobStatus.FAILED_QUOTA_EXCEEDED in TERMINAL_STATUSES

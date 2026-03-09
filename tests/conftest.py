@@ -175,9 +175,21 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
     def delete_artifact(_cursor, artifact_id):
         return test_store["artifacts"].pop(artifact_id, None) is not None
 
+    from app.repositories.job_requests_repository import JobRequestsRepository
+
+    # ── JobRequests (cursor-backed SQL table, mirrors Redis job state) ────────
+
+    def create_job_request(_cursor, job_id, user_request, job_status) -> None:
+        pass  # job state is tracked via JobsRepository; no separate store needed
+
+    def update_job_request_status(_cursor, job_id, status) -> None:
+        pass  # status already recorded by update_job_status above
+
     monkeypatch.setattr(JobsRepository, "create_job", staticmethod(create_job))
     monkeypatch.setattr(JobsRepository, "get_job", staticmethod(get_job))
     monkeypatch.setattr(JobsRepository, "update_job_status", staticmethod(update_job_status))
+    monkeypatch.setattr(JobRequestsRepository, "create", staticmethod(create_job_request))
+    monkeypatch.setattr(JobRequestsRepository, "update_status", staticmethod(update_job_request_status))
     monkeypatch.setattr(PlansRepository, "create_plan", staticmethod(create_plan))
     monkeypatch.setattr(PlansRepository, "get_plan", staticmethod(get_plan))
     monkeypatch.setattr(PlansRepository, "approve_plan", staticmethod(approve_plan))
