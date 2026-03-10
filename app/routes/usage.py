@@ -1,6 +1,6 @@
 from datetime import timezone, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
 from app.configs.limiter_config import LimitConfig
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/usage", tags=["Usage"])
 
 @router.get("")
 @limiter.limit(LimitConfig.LIGHT)
-def get_usage(cursor=Depends(get_cursor)) -> TokenUsageResponse:
+def get_usage(request: Request, cursor=Depends(get_cursor)) -> TokenUsageResponse:
     today = datetime.now(timezone.utc).date()
     summary = TokenLedgerRepository.get_daily_summary(cursor, today)
 

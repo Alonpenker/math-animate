@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from fastapi.responses import FileResponse
 from pathlib import Path
 from starlette.background import BackgroundTask
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 @router.get("", response_model=List[ArtifactResponse])
 @limiter.limit(LimitConfig.NORMAL)
 def list_artifacts(
+    request: Request,
     artifact_type: Optional[ArtifactType] = None,
     job_id: Optional[UUID] = None,
     cursor=Depends(get_cursor),
@@ -48,6 +49,7 @@ def list_artifacts(
 @router.get("/{artifact_id}", response_model=ArtifactResponse)
 @limiter.limit(LimitConfig.NORMAL)
 def get_artifact(
+    request: Request,
     artifact_id: UUID,
     cursor=Depends(get_cursor),
 ) -> ArtifactResponse:
@@ -72,6 +74,7 @@ def get_artifact(
 @router.get("/{artifact_id}/download")
 @limiter.limit(LimitConfig.STRICT)
 def download_artifact(
+    request: Request,
     artifact_id: UUID,
     cursor=Depends(get_cursor),
     storage: FilesStorageService = Depends(get_storage_service),
@@ -99,6 +102,7 @@ def download_artifact(
 @router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(LimitConfig.STRICT)
 def delete_artifact(
+    request: Request,
     artifact_id: UUID,
     cursor=Depends(get_cursor),
     storage: FilesStorageService = Depends(get_storage_service),
@@ -121,6 +125,7 @@ def delete_artifact(
 @router.get("/{artifact_id}/stream")
 @limiter.limit(LimitConfig.NORMAL)
 def stream_artifact(
+    request: Request,
     artifact_id: UUID,
     range_header: Optional[str] = Header(default=None, alias="Range"),
     cursor=Depends(get_cursor),

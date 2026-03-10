@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
 @router.post("",
              status_code=status.HTTP_201_CREATED)
 @limiter.limit(LimitConfig.STRICT)
-def create_document(body: KnowledgeDocumentCreate,
+def create_document(request: Request,
+                    body: KnowledgeDocumentCreate,
                     cursor=Depends(get_cursor)) -> KnowledgeDocumentResponse:
     document_id = uuid4()
     embedding = RAGService.embed_text(body.content)
@@ -41,7 +42,7 @@ def create_document(body: KnowledgeDocumentCreate,
 
 @router.post("/seed", status_code=status.HTTP_200_OK)
 @limiter.limit(LimitConfig.STRICT)
-def seed_knowledge(cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
+def seed_knowledge(request: Request, cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
     examples_dir = Path(__file__).resolve().parent.parent / "examples"
     index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
 
@@ -63,7 +64,8 @@ def seed_knowledge(cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
 
 @router.get("/{document_id}")
 @limiter.limit(LimitConfig.NORMAL)
-def get_document(document_id: UUID,
+def get_document(request: Request,
+                 document_id: UUID,
                  cursor=Depends(get_cursor)) -> KnowledgeDocumentResponse:
     doc = KnowledgeRepository.get_document(cursor, document_id)
     if doc is None:
@@ -76,6 +78,7 @@ def get_document(document_id: UUID,
 @router.get("")
 @limiter.limit(LimitConfig.NORMAL)
 def get_documents(
+    request: Request,
     doc_type: KnowledgeType,
     cursor=Depends(get_cursor),
 ) -> KnowledgeDocumentsListResponse:
@@ -85,7 +88,8 @@ def get_documents(
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(LimitConfig.STRICT)
-def delete_document(document_id: UUID,
+def delete_document(request: Request,
+                    document_id: UUID,
                     cursor=Depends(get_cursor)) -> None:
     deleted = KnowledgeRepository.delete_document(cursor, document_id)
     if not deleted:

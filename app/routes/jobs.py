@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from typing import Optional
 from uuid import UUID
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/jobs", tags=["Jobs"])
 @router.post("",status_code=status.HTTP_201_CREATED)
 @limiter.limit(LimitConfig.STRICT)
 def create_job(
+    request: Request,
     user_request: UserRequest,
     redis_client=Depends(get_redis_client),
     cursor=Depends(get_cursor),
@@ -35,6 +36,7 @@ def create_job(
 @router.get("")
 @limiter.limit(LimitConfig.NORMAL)
 def get_jobs(
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     topic: Optional[str] = None,
@@ -60,7 +62,7 @@ def get_jobs(
 
 @router.get("/{job_id}/status")
 @limiter.limit(LimitConfig.LIGHT)
-def get_job_status(job_id: UUID, redis_client=Depends(get_redis_client)) -> JobResponse:
+def get_job_status(request: Request, job_id: UUID, redis_client=Depends(get_redis_client)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:
         raise HTTPException(
@@ -72,7 +74,7 @@ def get_job_status(job_id: UUID, redis_client=Depends(get_redis_client)) -> JobR
 
 @router.get("/{job_id}/plan")
 @limiter.limit(LimitConfig.NORMAL)
-def get_plan(job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
+def get_plan(request: Request, job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:
         raise HTTPException(
@@ -91,7 +93,7 @@ def get_plan(job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depend
 
 @router.patch("/{job_id}/approve")
 @limiter.limit(LimitConfig.STRICT)
-def approve_plan(job_id: UUID, approved: bool, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
+def approve_plan(request: Request, job_id: UUID, approved: bool, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
     job = JobsRepository.get_job(redis_client, job_id)
     if job is None:
         raise HTTPException(

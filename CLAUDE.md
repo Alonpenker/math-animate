@@ -32,6 +32,10 @@ docker-compose up --attach worker --attach api
 # Start the full stack with stubbed LLM calls
 $env:E2E="true"; docker-compose up --attach worker --attach api 
 Remove-Item Env:E2E
+
+# Clear the backend database
+docker-compose down
+docker volume rm manim-generator-backend_postgres_data
 ```
 
 ## Architecture

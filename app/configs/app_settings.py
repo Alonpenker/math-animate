@@ -7,7 +7,7 @@ The system turns a lesson idea into a reviewed scene plan, generates visual anim
 renders the video in an isolated environment, and stores the final artifacts for download. 
 Built for reliability, reproducibility, and human-in-the-loop control—so teachers stay in charge 
 while the system handles the heavy lifting."""
-APP_VERSION = "0.0.1"
+APP_VERSION = "0.0.2"
 
 ROUTER_PREFIX = "/api/v1"
 
@@ -25,5 +25,7 @@ class Settings(BaseSettings):
     redis_url: str
 
     ollama_base_url: str
+    
+    frontend_url: str = 'http://localhost:5174'
 
 settings = Settings()
