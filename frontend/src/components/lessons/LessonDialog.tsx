@@ -8,8 +8,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScenePlayer } from '@/components/lessons/ScenePlayer';
-import { listArtifacts, getJobPlan } from '@/services/api';
-import type { ArtifactResponse, VideoPlan, ScenePlan } from '@/services/api';
+import { listArtifacts, getJobPlan, extractVideoPlan } from '@/services/api';
+import type { ArtifactResponse, ScenePlan } from '@/services/api';
 
 interface LessonDialogProps {
   open: boolean;
@@ -52,7 +52,7 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
     ])
       .then(([artifacts, planRes]) => {
         if (cancelled) return;
-        const plan = planRes?.data as VideoPlan | null;
+        const plan = planRes ? extractVideoPlan(planRes.data) : null;
 
         const entries: SceneEntry[] = artifacts.map((artifact) => {
           const sceneNum = parseSceneNumber(artifact.name);
@@ -88,7 +88,7 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
       getJobPlan(jobId).catch(() => null),
     ])
       .then(([artifacts, planRes]) => {
-        const plan = planRes?.data as VideoPlan | null;
+        const plan = planRes ? extractVideoPlan(planRes.data) : null;
         const entries: SceneEntry[] = artifacts.map((artifact) => {
           const sceneNum = parseSceneNumber(artifact.name);
           const scenePlan = plan?.scenes.find((s) => s.scene_number === sceneNum);

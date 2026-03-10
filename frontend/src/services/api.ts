@@ -29,6 +29,12 @@ export interface VideoPlan {
   scenes: ScenePlan[];
 }
 
+export interface PlanData {
+  job_id: string;
+  plan: VideoPlan;
+  approved: boolean;
+}
+
 export interface UserRequest {
   topic: string;
   misconceptions: string[];
@@ -95,6 +101,34 @@ type ApiError = Error & { status: number };
 
 function isApiError(err: unknown): err is ApiError {
   return err instanceof Error && 'status' in err && err.name === 'ApiError';
+}
+
+function isVideoPlan(data: unknown): data is VideoPlan {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'scenes' in data &&
+    Array.isArray((data as { scenes?: unknown }).scenes)
+  );
+}
+
+function isPlanData(data: unknown): data is PlanData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'plan' in data &&
+    isVideoPlan((data as { plan?: unknown }).plan)
+  );
+}
+
+export function extractVideoPlan(data: unknown): VideoPlan | null {
+  if (isVideoPlan(data)) {
+    return data;
+  }
+  if (isPlanData(data)) {
+    return data.plan;
+  }
+  return null;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

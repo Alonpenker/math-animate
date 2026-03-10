@@ -22,6 +22,7 @@ interface PlanReviewProps {
 
 export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps) {
   const [loading, setLoading] = useState(false);
+  const scenes = Array.isArray(plan.scenes) ? plan.scenes : [];
 
   const handleApprove = async () => {
     setLoading(true);
@@ -51,7 +52,12 @@ export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps
       </p>
 
       <div className="mt-8 space-y-6">
-        {plan.scenes.map((scene) => (
+        {scenes.length === 0 && (
+          <div className="rounded-lg border border-brand-border p-6 text-sm text-brand-muted">
+            Plan data is unavailable. Please refresh and try again.
+          </div>
+        )}
+        {scenes.map((scene) => (
           <div
             key={scene.scene_number}
             className="rounded-lg border border-brand-border p-6"

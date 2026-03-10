@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  createJob, getJobStatus, getJobPlan, approveJob, isApiError,
+  createJob, getJobStatus, getJobPlan, approveJob, isApiError, extractVideoPlan,
 } from '@/services/api';
 import type { JobStatus, VideoPlan, UserRequest } from '@/services/api';
 import { useJobPolling } from '@/hooks/useJobPolling';
@@ -106,10 +106,14 @@ export function useCreateFlow(): UseCreateFlowReturn {
         if (res.job.status === 'PLANNED') {
           try {
             const planRes = await getJobPlan(jobIdParam);
+            const plan = extractVideoPlan(planRes.data);
+            if (!plan) {
+              throw new Error('Invalid plan payload');
+            }
             if (cancelled) return;
             setState((prev) => ({
               ...prev,
-              plan: planRes.data as VideoPlan,
+              plan,
             }));
           } catch {
             if (cancelled) return;
@@ -157,10 +161,14 @@ export function useCreateFlow(): UseCreateFlowReturn {
         void (async () => {
           try {
             const planRes = await getJobPlan(state.jobId!);
+            const plan = extractVideoPlan(planRes.data);
+            if (!plan) {
+              throw new Error('Invalid plan payload');
+            }
             setState((prev) => ({
               ...prev,
               phase: 'plan_review',
-              plan: planRes.data as VideoPlan,
+              plan,
             }));
           } catch {
             setState((prev) => ({
