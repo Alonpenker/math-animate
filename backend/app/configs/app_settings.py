@@ -26,6 +26,6 @@ class Settings(BaseSettings):
 
     ollama_base_url: str
     
-    frontend_url: str = 'http://localhost:5174'
+    frontend_url: str
 
 settings = Settings()
