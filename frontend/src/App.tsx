@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Navbar } from '@/components/layout/Navbar';
+import { GlassNavbar } from '@/components/layout/GlassNavbar';
 import { Footer } from '@/components/layout/Footer';
 import { HomePage } from '@/pages/HomePage';
 import { CreatePage } from '@/pages/CreatePage';
@@ -13,8 +13,8 @@ export default function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <div className="flex min-h-screen flex-col">
-          <Navbar />
-          <main className="flex-1 pt-14">
+          <GlassNavbar />
+          <main className="flex-1 pt-20">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/create" element={<CreatePage />} />

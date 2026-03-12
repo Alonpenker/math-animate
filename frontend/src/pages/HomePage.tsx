@@ -1,11 +1,11 @@
 import { HeroSection } from '@/components/home/HeroSection';
-import { FeatureBlocks } from '@/components/home/FeatureBlock';
+import { HowItWorksSection } from '@/components/home/HowItWorksSection';
 
 export function HomePage() {
   return (
-    <div>
+    <>
       <HeroSection />
-      <FeatureBlocks />
-    </div>
+      <HowItWorksSection />
+    </>
   );
 }

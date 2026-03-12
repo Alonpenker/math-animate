@@ -89,7 +89,6 @@ export interface TokenUsageResponse {
   breakdown: BreakdownEntry[];
 }
 
-// Using a factory function instead of class to satisfy erasableSyntaxOnly
 function createApiError(status: number, message: string): Error & { status: number } {
   const error = new Error(message) as Error & { status: number };
   error.name = 'ApiError';

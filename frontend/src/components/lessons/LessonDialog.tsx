@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Play, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChalkButton } from '@/components/chalk/ChalkButton';
 import {
   Dialog,
   DialogContent,
@@ -37,15 +37,10 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
   const [selectedScene, setSelectedScene] = useState<SceneEntry | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setSelectedScene(null);
-      return;
-    }
-
+    if (!open) { setSelectedScene(null); return; }
     let cancelled = false;
     setLoading(true);
     setError(null);
-
     Promise.all([
       listArtifacts({ job_id: jobId, artifact_type: 'mp4' }),
       getJobPlan(jobId).catch(() => null),
@@ -53,30 +48,16 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
       .then(([artifacts, planRes]) => {
         if (cancelled) return;
         const plan = planRes ? extractVideoPlan(planRes.data) : null;
-
         const entries: SceneEntry[] = artifacts.map((artifact) => {
           const sceneNum = parseSceneNumber(artifact.name);
           const scenePlan = plan?.scenes.find((s) => s.scene_number === sceneNum);
-          return {
-            artifact,
-            sceneNumber: sceneNum ?? 0,
-            displayName: sceneNum !== null ? `Scene ${sceneNum}` : artifact.name,
-            plan: scenePlan,
-          };
+          return { artifact, sceneNumber: sceneNum ?? 0, displayName: sceneNum !== null ? `Scene ${sceneNum}` : artifact.name, plan: scenePlan };
         });
-
         entries.sort((a, b) => a.sceneNumber - b.sceneNumber);
         setScenes(entries);
       })
-      .catch(() => {
-        if (!cancelled) {
-          setError('Could not load videos. Please try again.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
+      .catch(() => { if (!cancelled) setError('Could not load videos. Please try again.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [open, jobId]);
 
@@ -92,12 +73,7 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
         const entries: SceneEntry[] = artifacts.map((artifact) => {
           const sceneNum = parseSceneNumber(artifact.name);
           const scenePlan = plan?.scenes.find((s) => s.scene_number === sceneNum);
-          return {
-            artifact,
-            sceneNumber: sceneNum ?? 0,
-            displayName: sceneNum !== null ? `Scene ${sceneNum}` : artifact.name,
-            plan: scenePlan,
-          };
+          return { artifact, sceneNumber: sceneNum ?? 0, displayName: sceneNum !== null ? `Scene ${sceneNum}` : artifact.name, plan: scenePlan };
         });
         entries.sort((a, b) => a.sceneNumber - b.sceneNumber);
         setScenes(entries);
@@ -108,55 +84,67 @@ export function LessonDialog({ open, onOpenChange, jobId, topic }: LessonDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-6xl max-h-[90vh] overflow-y-auto w-[90vw]"
+        style={{ background: '#1e2b2e', border: '2px solid rgba(245,240,232,0.2)', borderRadius: '12px' }}
+      >
         <DialogHeader>
-          <DialogTitle className="text-xl text-brand-text">{topic}</DialogTitle>
+          <DialogTitle
+            className="text-xl text-chalk-white"
+            style={{ fontFamily: 'Patrick Hand, cursive' }}
+          >
+            {topic}
+          </DialogTitle>
         </DialogHeader>
 
         {loading && (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-light" />
+            <Loader2 className="h-8 w-8 animate-spin text-chalk-cyan" />
           </div>
         )}
 
         {error && (
           <div className="flex flex-col items-center py-8 text-center">
-            <p className="text-brand-muted">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={handleRetry}>
-              Retry
-            </Button>
+            <p className="text-chalk-white/50">{error}</p>
+            <ChalkButton variant="default" className="mt-4" onClick={handleRetry}>Retry</ChalkButton>
           </div>
         )}
 
         {!loading && !error && scenes.length === 0 && (
-          <p className="py-8 text-center text-brand-muted">No videos found for this job.</p>
+          <p className="py-8 text-center text-chalk-white/50">No videos found for this job.</p>
         )}
 
         {!loading && !error && scenes.length > 0 && !selectedScene && (
           <div>
-            <p className="mb-4 text-sm text-brand-muted">Select a scene to watch:</p>
+            <p className="mb-4 text-sm text-chalk-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Select a scene to watch:
+            </p>
             <div
               className="grid gap-4"
-              style={{
-                gridTemplateColumns: `repeat(${Math.min(scenes.length, 3)}, 1fr)`,
-              }}
+              style={{ gridTemplateColumns: `repeat(${Math.min(scenes.length, 3)}, 1fr)` }}
             >
               {scenes.map((scene) => (
                 <div
                   key={scene.artifact.artifact_id}
-                  className="flex flex-col items-center rounded-lg border border-brand-border p-6 transition-shadow hover:shadow-md"
+                  className="flex flex-col items-center rounded-[10px] p-6 transition-all hover:bg-white/5"
+                  style={{ border: '2px solid rgba(245,240,232,0.25)' }}
                 >
-                  <p className="mb-4 text-sm font-semibold text-brand-text">
+                  <p
+                    className="mb-4 text-sm text-chalk-white"
+                    style={{ fontFamily: 'Patrick Hand, cursive' }}
+                  >
                     {scene.displayName}
                   </p>
-                  <Button
+                  <button
                     onClick={() => setSelectedScene(scene)}
-                    className="rounded-full bg-brand-accent p-4 text-white hover:bg-brand-accent/90"
-                    size="icon"
+                    className="flex items-center justify-center rounded-full p-4 transition-all cursor-pointer"
+                    style={{ border: '2px solid #E8924A', color: '#E8924A', background: 'transparent' }}
                     aria-label={`Play ${scene.displayName}`}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(232,146,74,0.15)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
                     <Play className="h-6 w-6" />
-                  </Button>
+                  </button>
                 </div>
               ))}
             </div>
