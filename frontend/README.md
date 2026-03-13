@@ -1,73 +1,53 @@
-# React + TypeScript + Vite
+# MathAnimate — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite frontend for the MathAnimate application.
 
-Currently, two official plugins are available:
+## Development modes
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Option 1 — Vite dev server (fastest iteration)
 
-## React Compiler
+Requires the backend stack to already be running (`docker-compose up` in the repo root).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+App available at **http://localhost:5174**. Vite's HMR gives instant feedback on component changes.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+> The dev server does **not** proxy API calls automatically. The frontend is expected to talk to the backend at `http://localhost:8000` directly, or you can add a proxy to `vite.config.ts` if needed.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Option 2 — Full stack via Docker Compose
+
+Builds the React app and serves it with NGINX (proxies `/api/` to the backend container). Run from the repo root:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up
+```
+
+App available at **http://localhost:80**. Use this to test the full request path (NGINX → API → worker).
+
+After a frontend code change:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.frontend.yml build frontend
+```
+
+## Tech stack
+
+| | |
+|---|---|
+| Framework | React 18 + TypeScript |
+| Build tool | Vite |
+| Styling | Tailwind CSS |
+| Served by (Docker) | NGINX (SPA fallback + `/api/` proxy) |
+
+## Project structure
+
+```
+src/
+├── components/   # Shared UI components
+├── pages/        # Route-level page components
+├── hooks/        # Custom React hooks
+└── main.tsx      # App entry point
 ```

@@ -1,26 +1,29 @@
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
+import json
 import tempfile
 import shutil
 import subprocess
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
-from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOUT_SECONDS
+from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOUT_SECONDS, SQS_VISIBILITY_TIMEOUT, SQS_POLLING_INTERVAL
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.redis_client import init_redis_pool, close_redis_pool
 from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus, require_transition
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.jobs_repository import JobsRepository
+from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
 from app.schemas.artifact import ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
+from app.services.rag_service import RAGService
 from app.workers.worker_helpers import (
     log_context,
     transition_job,
@@ -35,9 +38,24 @@ from app.workers.worker_helpers import (
 from app.utils.llm_stubs import IS_E2E_MODE
 from app.utils.logging import get_logger
 
-app = Celery('manim-generator-worker',
+app = Celery('mathanimate-worker',
              broker=settings.broker_url,
              backend=settings.redis_url)
+
+if settings.environment == "prod":
+    app.conf.update(
+        broker_transport_options={
+            'region': settings.aws_region,
+            'visibility_timeout': SQS_VISIBILITY_TIMEOUT,
+            'polling_interval': SQS_POLLING_INTERVAL,
+            'predefined_queues': {
+                'celery': {
+                    'url': settings.sqs_queue_url,
+                }
+            }
+        },
+        task_default_queue='celery',
+    )
 
 logger = get_logger(__name__)
 
@@ -383,3 +401,36 @@ def generate_render(job_request_payload: dict) -> None:
     finally:
         if input_dir.exists():
             shutil.rmtree(input_dir, ignore_errors=True)
+
+
+@app.task()
+def seed_knowledge_task() -> None:
+    examples_dir = Path(__file__).resolve().parent.parent / "examples"
+    index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
+    inserted = skipped = 0
+    for entry in index:
+        document_id = UUID(entry["document_id"])
+        with get_worker_cursor() as cursor:
+            if KnowledgeRepository.document_exists(cursor, document_id):
+                skipped += 1
+                continue
+        content = (examples_dir / entry["file"]).read_text(encoding="utf-8")
+        embedding = RAGService.embed_text(content)
+        with get_worker_cursor() as cursor:
+            KnowledgeRepository.create_document(
+                cursor, document_id, content, entry["doc_type"], entry["title"], embedding
+            )
+        inserted += 1
+    logger.info("Seed complete: inserted=%d skipped=%d", inserted, skipped)
+
+
+@app.task()
+def create_knowledge_document_task(payload: dict) -> None:
+    document_id = UUID(payload["document_id"])
+    content = payload["content"]
+    doc_type = payload["doc_type"]
+    title = payload["title"]
+    embedding = RAGService.embed_text(content)
+    with get_worker_cursor() as cursor:
+        KnowledgeRepository.create_document(cursor, document_id, content, doc_type, title, embedding)
+    logger.info("Knowledge document created: document_id=%s", document_id)

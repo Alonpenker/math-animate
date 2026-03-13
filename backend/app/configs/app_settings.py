@@ -1,7 +1,8 @@
+from typing import Literal, Optional
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
-APP_NAME = "Manim-Generator"
+APP_NAME = "MathAnimate"
 APP_DESCRIPTION = """An API for teachers to generate clear, structured math lesson videos automatically. 
 The system turns a lesson idea into a reviewed scene plan, generates visual animations with Manim, 
 renders the video in an isolated environment, and stores the final artifacts for download. 
@@ -24,8 +25,12 @@ class Settings(BaseSettings):
     broker_url: str
     redis_url: str
 
-    ollama_base_url: str
-    
+    ollama_base_url: Optional[str] = None
+
     frontend_url: str
+
+    environment: Literal["local", "prod"] = "local"
+    aws_region: Optional[str] = None
+    sqs_queue_url: Optional[str] = None      # required when environment=prod
 
 settings = Settings()

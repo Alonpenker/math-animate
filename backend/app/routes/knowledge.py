@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -12,54 +10,27 @@ from app.schemas.knowledge import (
     KnowledgeDocumentCreate,
     KnowledgeDocumentResponse,
     KnowledgeDocumentsListResponse,
-    KnowledgeDocument,
     KnowledgeType,
-    SeedKnowledgeResponse,
 )
-from app.services.rag_service import RAGService
+from app.workers.runner import WorkerRunner
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
 
-@router.post("",
-             status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(LimitConfig.STRICT)
-def create_document(request: Request,
-                    body: KnowledgeDocumentCreate,
-                    cursor=Depends(get_cursor)) -> KnowledgeDocumentResponse:
+def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
     document_id = uuid4()
-    embedding = RAGService.embed_text(body.content)
-    KnowledgeRepository.create_document(
-        cursor, document_id, body.content, body.doc_type.value, body.title, embedding
+    WorkerRunner.handle_create_document(
+        document_id, body.content, body.doc_type.value, body.title
     )
-    document = KnowledgeDocument(
-        document_id=document_id,
-        content=body.content,
-        doc_type=body.doc_type,
-        title=body.title,
-    )
-    return KnowledgeDocumentResponse(document=document)
+    return {"document_id": str(document_id), "message": "Document creation queued."}
 
 
-@router.post("/seed", status_code=status.HTTP_200_OK)
+@router.post("/seed", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(LimitConfig.STRICT)
-def seed_knowledge(request: Request, cursor=Depends(get_cursor)) -> SeedKnowledgeResponse:
-    examples_dir = Path(__file__).resolve().parent.parent / "examples"
-    index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
-
-    inserted = 0
-    skipped = 0
-    for entry in index:
-        document_id = UUID(entry["document_id"])
-        if KnowledgeRepository.document_exists(cursor, document_id):
-            skipped += 1
-            continue
-        content = (examples_dir / entry["file"]).read_text(encoding="utf-8")
-        embedding = RAGService.embed_text(content)
-        KnowledgeRepository.create_document(
-            cursor, document_id, content, entry["doc_type"], entry["title"], embedding
-        )
-        inserted += 1
-    return SeedKnowledgeResponse(inserted=inserted, skipped=skipped)
+def seed_knowledge(request: Request) -> dict:
+    WorkerRunner.handle_seed()
+    return {"message": "Knowledge seeding queued."}
 
 
 @router.get("/{document_id}")

@@ -46,7 +46,7 @@ export function GlassNavbar() {
           className="text-lg font-bold text-chalk-white no-underline shrink-0"
           style={{ fontFamily: 'Patrick Hand, cursive', letterSpacing: '0.01em' }}
         >
-          ManimGenerator
+          MathAnimate
         </Link>
 
         {/* Desktop links — absolutely centered */}

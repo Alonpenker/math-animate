@@ -1,4 +1,4 @@
-# ManimGenerator
+# MathAnimate
 
 > **AI-powered backend that turns a teacher's lesson idea into a rendered math animation — automatically.**
 
@@ -159,13 +159,22 @@ cp .env.example .env
 
 ### 2. Start the stack
 
+**Backend only** (API + worker + all supporting services):
+
 ```bash
 docker-compose up
+```
+
+**Full stack** (adds the frontend served by NGINX at port 80):
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up
 ```
 
 This pulls and starts all services, including downloading the Manim image and the `nomic-embed-text` embedding model. First boot takes a few minutes.
 
 The API is available at **http://localhost:8000** — interactive docs at **http://localhost:8000/docs**.
+The frontend (full stack only) is available at **http://localhost:80**.
 
 ### 3. Seed the knowledge base
 
@@ -180,12 +189,12 @@ curl -X POST http://localhost:8000/api/v1/knowledge/seed
 Start the stack with stubbed LLM responses for integration testing without spending tokens:
 
 ```bash
+# bash
+E2E=true docker-compose up
+
 # PowerShell
 $env:E2E="true"; docker-compose up
 Remove-Item Env:E2E
-
-# bash
-E2E=true docker-compose up
 ```
 
 ---
@@ -312,20 +321,28 @@ uv run pytest
 # Run a single test file
 uv run pytest tests/test_jobs.py
 
-# Rebuild API and worker images after code changes
+# Rebuild backend images after a code change, then restart
 docker compose build api worker
+docker-compose up --attach worker --attach api
 
-# Start the full stack (preferred for development)
-docker-compose up --attach worker --attach api 
+# Backend-only stack with E2E stubs (bash)
+E2E=true docker-compose up --attach worker --attach api
 
-# Start the full stack with stubbed LLM calls
-$env:E2E="true"; docker-compose up --attach worker --attach api 
-Remove-Item Env:E2E # to remove 
+# Full stack (frontend at http://localhost:80)
+docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up --attach worker --attach api --attach frontend
+
+# Rebuild frontend after a frontend code change
+docker compose -f docker-compose.yml -f docker-compose.frontend.yml build frontend
+
+# Frontend-only dev server (Vite HMR, no Docker — requires backend already running)
+cd ../frontend && npm run dev
 ```
 
 ---
 
 ## Infrastructure Services
+
+`docker-compose.yml` — backend stack:
 
 | Service | Image | Purpose | Port |
 |---|---|---|---|
@@ -337,6 +354,12 @@ Remove-Item Env:E2E # to remove
 | `rabbitmq` | `rabbitmq:4-alpine` | Celery broker | 5672 |
 | `minio` | `minio/minio` | Artifact object storage | 9000 / 9001 |
 | `ollama` | `ollama/ollama` | Local embedding model | 11434 |
+
+`docker-compose.frontend.yml` — add-on for full-stack local testing:
+
+| Service | Image | Purpose | Port |
+|---|---|---|---|
+| `frontend` | project image | NGINX serving React build, proxies `/api/` to the backend | 80 |
 
 ---
 

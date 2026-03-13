@@ -2,23 +2,24 @@ from minio import Minio
 from app.services.files_storage_service import FilesStorageService
 from app.configs.app_settings import settings
 
-_minio_client: Minio | None = None
+_storage_client: Minio | None = None
 
 def get_storage_client() -> Minio:
-    global _minio_client
-    if _minio_client is None:
-        _minio_client = Minio(
+    global _storage_client
+    if _storage_client is None:
+        _storage_client = Minio(
             settings.storage_endpoint,
             access_key=settings.storage_access_key,
             secret_key=settings.storage_secret_key,
-            secure=False,
+            secure=(settings.environment == "prod"),
         )
-    return _minio_client
+    return _storage_client
 
 def init_storage() -> None:
-    client = get_storage_client()
-    if not client.bucket_exists(settings.storage_bucket):
-        client.make_bucket(settings.storage_bucket)     
+    if settings.environment == "local":
+        client = get_storage_client()
+        if not client.bucket_exists(settings.storage_bucket):
+            client.make_bucket(settings.storage_bucket)     
 
 def get_storage_service() -> FilesStorageService:
     return FilesStorageService(

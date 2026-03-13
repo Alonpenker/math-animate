@@ -23,7 +23,7 @@ export function UsagePage() {
             Token Usage
           </h1>
           <p className="mt-2 text-chalk-white/50 max-w-xl" style={{ fontFamily: 'Inter, sans-serif' }}>
-            ManimGenerator is free to use. To keep costs sustainable, there is a shared daily limit of 250,000 tokens. This resets at midnight UTC.
+            MathAnimate is free to use. To keep costs sustainable, there is a shared daily limit of 250,000 tokens. This resets at midnight UTC.
           </p>
         </div>
 

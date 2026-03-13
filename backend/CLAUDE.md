@@ -11,10 +11,10 @@ Backend system that generates short instructional 8th-grade math videos using LL
 All commands use `uv` as the package manager (never `pip` or `python` directly).
 
 ```bash
-# Run the API server locally
+# Run the API server locally (without Docker)
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-# Run the Celery worker locally
+# Run the Celery worker locally (without Docker)
 uv run celery -A app.workers.worker worker
 
 # Run all tests
@@ -23,19 +23,31 @@ uv run pytest
 # Run a single test file
 uv run pytest tests/test_jobs.py
 
-# Build both api and worker on code change
+# Rebuild api and worker images after a code change
 docker compose build api worker
 
-# Start the full stack (preferred for development)
-docker-compose up --attach worker --attach api 
+# --- Backend-only stack (no frontend) ---
+# Start (API available at http://localhost:8000)
+docker-compose up --attach worker --attach api
 
-# Start the full stack with stubbed LLM calls
-$env:E2E="true"; docker-compose up --attach worker --attach api 
+# With stubbed LLM calls (bash)
+E2E=true docker-compose up --attach worker --attach api
+
+# With stubbed LLM calls (PowerShell)
+$env:E2E="true"; docker-compose up --attach worker --attach api
 Remove-Item Env:E2E
 
+# --- Full stack (backend + frontend) ---
+# Frontend served by NGINX at http://localhost:80, proxies /api/ to the backend
+docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up --attach worker --attach api --attach frontend
+
+# Rebuild frontend image after a frontend code change
+docker compose -f docker-compose.yml -f docker-compose.frontend.yml build frontend
+
+# --- Teardown ---
 # Clear the backend database
 docker-compose down
-docker volume rm manim-generator-backend_postgres_data
+docker volume rm mathanimate-backend_postgres_data
 ```
 
 ## Architecture
@@ -104,16 +116,27 @@ Centralized in [app/configs/llm_settings.py](app/configs/llm_settings.py). Chang
 
 ## Infrastructure (docker-compose)
 
-| Service | Purpose | Port |
-|---|---|---|
-| api | FastAPI | 8000 |
-| worker | Celery | — |
-| docker-daemon | Docker-in-Docker for rendering | — |
-| postgres | pgvector-enabled DB | 5432 |
-| redis | Celery result backend | 6379 |
-| rabbitmq | Celery broker | 5672 |
-| minio | Artifact storage (S3-compatible) | 9000 |
-| ollama | Local embedding model | 11434 |
+Two compose files — merge them when you need the frontend:
+
+```bash
+# Backend only
+docker-compose up
+
+# Full stack
+docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up
+```
+
+| Service | File | Purpose | Port |
+|---|---|---|---|
+| api | docker-compose.yml | FastAPI | 8000 |
+| worker | docker-compose.yml | Celery | — |
+| docker-daemon | docker-compose.yml | Docker-in-Docker for rendering | — |
+| postgres | docker-compose.yml | pgvector-enabled DB | 5432 |
+| redis | docker-compose.yml | Celery result backend | 6379 |
+| rabbitmq | docker-compose.yml | Celery broker | 5672 |
+| minio | docker-compose.yml | Artifact storage (S3-compatible) | 9000 |
+| ollama | docker-compose.yml | Local embedding model | 11434 |
+| frontend | docker-compose.frontend.yml | NGINX serving React build, proxies /api/ | 80 |
 
 ## Critical Constraints
 

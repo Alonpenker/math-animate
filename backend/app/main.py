@@ -2,8 +2,6 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
-from requests import get
-
 from app.configs.app_settings import *
 from app.dependencies.limiter import limiter, handle_rate_limit_exceeded
 from app.dependencies.db import init_db_pool, init_db_tables, close_db_pool, get_cursor
@@ -48,7 +46,7 @@ app.add_exception_handler(Exception, handle_exceptions)
 
 @app.get("/")
 async def root():
-    return {"message":"Welcome to my Manim Generator API"}
+    return {"message":"Welcome to MathAnimate API"}
 
 @app.get("/health")
 async def health_check(cursor = Depends(get_cursor), 
@@ -61,15 +59,7 @@ async def health_check(cursor = Depends(get_cursor),
     try:
         redis.ping()
     except Exception as e:
-        raise HTTPException(status_code=503,detail=f"Redis is down: {e}")  
-    try:
-        get(settings.broker_url)
-    except Exception as e:
-        raise HTTPException(status_code=503,detail=f"RabbitMQ is down: {e}")
-    try:
-        get(settings.ollama_base_url)
-    except Exception as e:
-        raise HTTPException(status_code=503,detail=f"Ollama is down: {e}")
+        raise HTTPException(status_code=503,detail=f"Redis is down: {e}")
     try:
         storage.list_buckets()
     except Exception as e:

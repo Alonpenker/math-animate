@@ -1,6 +1,8 @@
+from uuid import UUID
+
 from app.domain.job_state import JobStatus
 from app.schemas.jobs import JobRequest
-from app.workers.worker import generate_plan, generate_code, generate_render
+from app.workers.worker import generate_plan, generate_code, generate_render, seed_knowledge_task, create_knowledge_document_task as create_knowledge_document
 
 class WorkerRunner:
     """Coordinates job steps; actual implementations live in planner.py and render.py"""
@@ -27,3 +29,16 @@ class WorkerRunner:
     @staticmethod
     def handle_render(job_request: JobRequest) -> None:
         generate_render.delay(job_request.model_dump(mode="json"))
+
+    @staticmethod
+    def handle_seed() -> None:
+        seed_knowledge_task.delay()
+
+    @staticmethod
+    def handle_create_document(document_id: UUID, content: str, doc_type: str, title: str) -> None:
+        create_knowledge_document.delay({
+            "document_id": str(document_id),
+            "content": content,
+            "doc_type": doc_type,
+            "title": title,
+        })
