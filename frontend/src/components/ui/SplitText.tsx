@@ -1,6 +1,9 @@
 import { motion, useInView, type Transition } from 'framer-motion';
 import { useRef } from 'react';
 
+type MotionSpanInitial = React.ComponentProps<typeof motion.span>['initial'];
+type MotionSpanAnimate = React.ComponentProps<typeof motion.span>['animate'];
+
 interface SplitTextProps {
   text: string;
   className?: string;
@@ -46,8 +49,8 @@ export function SplitText({
       {items.map((item, i) => (
         <motion.span
           key={i}
-          initial={from}
-          animate={isInView ? to : from}
+          initial={from as MotionSpanInitial}
+          animate={(isInView ? to : from) as MotionSpanAnimate}
           transition={{
             duration,
             delay: i * (delay / 1000),

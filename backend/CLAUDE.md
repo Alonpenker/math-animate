@@ -38,7 +38,7 @@ $env:E2E="true"; docker-compose up --attach worker --attach api
 Remove-Item Env:E2E
 
 # --- Full stack (backend + frontend) ---
-# Frontend served by NGINX at http://localhost:80, proxies /api/ to the backend
+# Frontend served by NGINX at http://localhost:8080, proxies /api/ to the backend
 docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up --attach worker --attach api --attach frontend
 
 # Rebuild frontend image after a frontend code change
@@ -136,7 +136,7 @@ docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up
 | rabbitmq | docker-compose.yml | Celery broker | 5672 |
 | minio | docker-compose.yml | Artifact storage (S3-compatible) | 9000 |
 | ollama | docker-compose.yml | Local embedding model | 11434 |
-| frontend | docker-compose.frontend.yml | NGINX serving React build, proxies /api/ | 80 |
+| frontend | docker-compose.frontend.yml | NGINX serving React build, proxies /api/ | 8080 |
 
 ## Critical Constraints
 
