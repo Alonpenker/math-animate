@@ -2,14 +2,8 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# Load backend env
-set -a
-# shellcheck source=../backend/.env
-source <(sed 's/\r//' backend/.env)
-set +a
-
+# Full stack, frontend (nginx) at http://localhost:8080, API at http://localhost:8000
 docker compose --project-directory . \
   -f backend/docker-compose.yml \
   -f frontend/docker-compose.yml \
-  -f docker-compose.vps.yml \
-  up -d --build
+  up --build --attach worker --attach api --attach frontend

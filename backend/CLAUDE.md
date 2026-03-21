@@ -28,26 +28,27 @@ docker compose build api worker
 
 # --- Backend-only stack (no frontend) ---
 # Start (API available at http://localhost:8000)
-docker-compose up --attach worker --attach api
+scripts/dev.sh
 
 # With stubbed LLM calls (bash)
-E2E=true docker-compose up --attach worker --attach api
+E2E=true scripts/dev.sh
 
 # With stubbed LLM calls (PowerShell)
-$env:E2E="true"; docker-compose up --attach worker --attach api
+$env:E2E="true"; scripts/dev.sh
 Remove-Item Env:E2E
 
 # --- Full stack (backend + frontend) ---
 # Frontend served by NGINX at http://localhost:8080, proxies /api/ to the backend
-docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up --attach worker --attach api --attach frontend
+scripts/dev-full.sh
 
-# Rebuild frontend image after a frontend code change
-docker compose -f docker-compose.yml -f docker-compose.frontend.yml build frontend
+# Rebuild images after a code change (run from repo root)
+docker compose -f backend/docker-compose.yml build api worker
+docker compose -f backend/docker-compose.yml -f frontend/docker-compose.yml build frontend
 
 # --- Teardown ---
 # Clear the backend database
-docker-compose down
-docker volume rm mathanimate-backend_postgres_data
+docker compose -f backend/docker-compose.yml down
+docker volume rm mathanimate_postgres_data
 ```
 
 ## Architecture
@@ -116,27 +117,27 @@ Centralized in [app/configs/llm_settings.py](app/configs/llm_settings.py). Chang
 
 ## Infrastructure (docker-compose)
 
-Two compose files — merge them when you need the frontend:
+Compose files live alongside their code. Stack them for the full environment:
 
 ```bash
 # Backend only
-docker-compose up
+scripts/dev.sh
 
 # Full stack
-docker-compose -f docker-compose.yml -f docker-compose.frontend.yml up
+scripts/dev-full.sh
 ```
 
 | Service | File | Purpose | Port |
 |---|---|---|---|
-| api | docker-compose.yml | FastAPI | 8000 |
-| worker | docker-compose.yml | Celery | — |
-| docker-daemon | docker-compose.yml | Docker-in-Docker for rendering | — |
-| postgres | docker-compose.yml | pgvector-enabled DB | 5432 |
-| redis | docker-compose.yml | Celery result backend | 6379 |
-| rabbitmq | docker-compose.yml | Celery broker | 5672 |
-| minio | docker-compose.yml | Artifact storage (S3-compatible) | 9000 |
-| ollama | docker-compose.yml | Local embedding model | 11434 |
-| frontend | docker-compose.frontend.yml | NGINX serving React build, proxies /api/ | 8080 |
+| api | backend/docker-compose.yml | FastAPI | 8000 |
+| worker | backend/docker-compose.yml | Celery | — |
+| docker-daemon | backend/docker-compose.yml | Docker-in-Docker for rendering | — |
+| postgres | backend/docker-compose.yml | pgvector-enabled DB | 5432 |
+| redis | backend/docker-compose.yml | Celery result backend | 6379 |
+| rabbitmq | backend/docker-compose.yml | Celery broker | 5672 |
+| minio | backend/docker-compose.yml | Artifact storage (S3-compatible) | 9000 |
+| ollama | backend/docker-compose.yml | Local embedding model | 11434 |
+| frontend | frontend/docker-compose.yml | NGINX serving React build, proxies /api/ | 8080 |
 
 ## Critical Constraints
 
