@@ -22,7 +22,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.vps.yml"
+COMPOSE="docker compose --project-directory . -f backend/docker-compose.yml -f frontend/docker-compose.yml -f docker-compose.vps.yml"
 API="http://localhost:8000/api/v1"
 
 pretty() {

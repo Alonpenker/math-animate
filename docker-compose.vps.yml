@@ -1,3 +1,5 @@
+name: mathanimate
+
 services:
   api:
     restart: unless-stopped

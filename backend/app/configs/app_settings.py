@@ -21,16 +21,13 @@ class Settings(BaseSettings):
     storage_bucket: str
     
     database_url: str
-    
     broker_url: str
     redis_url: str
-
     ollama_base_url: Optional[str] = None
-
     frontend_url: str
 
     environment: Literal["local", "prod"] = "local"
     aws_region: Optional[str] = None
-    sqs_queue_url: Optional[str] = None      # required when environment=prod
+    sqs_queue_url: Optional[str] = None # required when environment=prod
 
 settings = Settings()

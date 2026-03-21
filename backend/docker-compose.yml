@@ -1,4 +1,4 @@
-name: mathanimate-backend
+name: mathanimate
 
 services:
   api:
@@ -59,8 +59,8 @@ services:
   rabbitmq:
     image: rabbitmq:4-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
     healthcheck:
       test: ["CMD-SHELL","rabbitmq-diagnostics -q ping"]
       interval: 30s
@@ -73,12 +73,12 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: mathanimate
-      POSTGRES_USER: mathanimate
-      POSTGRES_PASSWORD: mathanimate
+      POSTGRES_DB: ${POSTGRES_DB:-mathanimate}
+      POSTGRES_USER: ${POSTGRES_USER:-mathanimate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mathanimate}
     command: ["postgres", "-c", "log_min_messages=WARNING"]
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U mathanimate"]
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-mathanimate}"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -90,11 +90,11 @@ services:
     image: minio/minio:latest
     command: ["server", "/data", "--console-address", ":9001","--quiet"]
     environment:
-      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-mathanimate}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-mathanimate}
     volumes:
       - minio_data:/data
-  
+
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped

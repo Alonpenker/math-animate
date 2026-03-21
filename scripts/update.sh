@@ -2,6 +2,8 @@
 set -e
 cd "$(dirname "$0")/.."
 
+git pull
+
 # Load backend env
 set -a
 # shellcheck source=../backend/.env

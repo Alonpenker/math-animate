@@ -1,3 +1,5 @@
+name: mathanimate
+
 services:
   frontend:
     build:
