@@ -89,9 +89,8 @@ services:
   minio:
     image: minio/minio:latest
     command: ["server", "/data", "--console-address", ":9001","--quiet"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-mathanimate}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-mathanimate}
+    env_file:
+      - ./backend/.env
     volumes:
       - minio_data:/data
 
