@@ -132,8 +132,12 @@ export function extractVideoPlan(data: unknown): VideoPlan | null {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': import.meta.env.VITE_X_API_KEY ?? '',
+      ...options?.headers,
+    },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => 'Unknown error');
@@ -141,6 +145,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
 
 export async function createJob(userRequest: UserRequest): Promise<JobResponse> {
   return request<JobResponse>('/jobs', {
@@ -192,6 +197,7 @@ export async function listArtifacts(params: {
 export function getArtifactStreamUrl(artifactId: string): string {
   return `${BASE_URL}/artifacts/${artifactId}/stream`;
 }
+
 
 export async function getTokenUsage(): Promise<TokenUsageResponse> {
   return request<TokenUsageResponse>('/usage');

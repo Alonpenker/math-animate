@@ -4,6 +4,7 @@ from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 from app.configs.app_settings import *
 from app.dependencies.limiter import limiter, handle_rate_limit_exceeded
+from app.dependencies.api_key import verify_api_key
 from app.dependencies.db import init_db_pool, init_db_tables, close_db_pool, get_cursor
 from app.dependencies.redis_client import init_redis_pool, close_redis_pool, get_redis_client
 from app.dependencies.storage import init_storage, get_storage_client
@@ -61,12 +62,12 @@ async def health_check(cursor = Depends(get_cursor),
     except Exception as e:
         raise HTTPException(status_code=503,detail=f"Redis is down: {e}")
     try:
-        storage.list_buckets()
+        storage.bucket_exists(settings.storage_bucket)
     except Exception as e:
         raise HTTPException(status_code=503,detail=f"MinIO is down: {e}")
     return {"message":"application healthy"}
 
-api_router = APIRouter(prefix=ROUTER_PREFIX)
+api_router = APIRouter(prefix=ROUTER_PREFIX, dependencies=[Depends(verify_api_key)])
 api_router.include_router(jobs_router)
 api_router.include_router(artifacts_router)
 api_router.include_router(knowledge_router)

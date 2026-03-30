@@ -13,7 +13,8 @@ APP_VERSION = "0.0.2"
 ROUTER_PREFIX = "/api/v1"
 
 class Settings(BaseSettings):
-    api_key: SecretStr
+    x_api_key: SecretStr
+    openai_api_key: SecretStr
 
     storage_endpoint: str
     storage_access_key: str
