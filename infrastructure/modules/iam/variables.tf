@@ -23,11 +23,6 @@ variable "artifact_bucket_name" {
   type        = string
 }
 
-variable "frontend_bucket_name" {
-  description = "Name of the S3 frontend bucket"
-  type        = string
-}
-
 variable "github_org" {
   description = "GitHub organisation or username"
   type        = string

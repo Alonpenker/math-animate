@@ -1,22 +1,5 @@
-resource "random_password" "db" {
-  length           = 32
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>?"
-}
-
-resource "aws_secretsmanager_secret" "db_password" {
-  name                    = "mathanimate/${var.environment}/db-password"
-  description             = "RDS master password for the mathanimate database"
-  recovery_window_in_days = 0 # Allows immediate deletion when pausing/destroying
-
-  tags = {
-    Name = "${var.name_prefix}-db-password"
-  }
-}
-
-resource "aws_secretsmanager_secret_version" "db_password" {
-  secret_id     = aws_secretsmanager_secret.db_password.id
-  secret_string = random_password.db.result
+data "aws_secretsmanager_secret_version" "db_password" {
+  secret_id = "mathanimate/${var.environment}/db-password"
 }
 
 resource "aws_db_subnet_group" "main" {
@@ -41,7 +24,7 @@ resource "aws_db_instance" "main" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = random_password.db.result
+  password = data.aws_secretsmanager_secret_version.db_password.secret_string
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [var.rds_sg_id]

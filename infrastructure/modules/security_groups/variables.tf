@@ -12,3 +12,8 @@ variable "vpc_cidr" {
   description = "VPC CIDR block (used for VPC endpoint ingress rule)"
   type        = string
 }
+
+variable "allowed_ingress_cidrs" {
+  description = "List of CIDRs allowed to reach the ALB on ports 80 and 443 (Cloudflare IPv4 ranges)"
+  type        = list(string)
+}

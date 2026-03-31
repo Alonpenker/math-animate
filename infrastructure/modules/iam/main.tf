@@ -19,7 +19,6 @@ data "aws_iam_policy_document" "ec2_assume" {
 }
 
 # ── ECS Execution Role ────────────────────────────────────────────────────────
-# Used by the ECS control plane to pull images and ship logs.
 resource "aws_iam_role" "ecs_execution" {
   name               = "${var.name_prefix}-ecs-execution-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
@@ -30,7 +29,6 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Allow ECS execution role to read any secrets with the mathanimate/ prefix
 data "aws_iam_policy_document" "ecs_execution_secrets" {
   statement {
     sid     = "ReadMathAnimateSecrets"
@@ -58,7 +56,6 @@ resource "aws_iam_role" "ecs_task" {
 }
 
 data "aws_iam_policy_document" "ecs_task" {
-  # Artifact S3 bucket read/write
   statement {
     sid     = "ArtifactBucketAccess"
     actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
@@ -68,7 +65,6 @@ data "aws_iam_policy_document" "ecs_task" {
     ]
   }
 
-  # SQS — send messages to the job queue
   statement {
     sid     = "SQSSend"
     actions = ["sqs:SendMessage", "sqs:GetQueueAttributes", "sqs:GetQueueUrl"]
@@ -78,7 +74,6 @@ data "aws_iam_policy_document" "ecs_task" {
     ]
   }
 
-  # Secrets Manager — read own secrets
   statement {
     sid     = "ReadMathAnimateSecrets"
     actions = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
@@ -105,7 +100,6 @@ resource "aws_iam_role" "ec2_worker" {
 }
 
 data "aws_iam_policy_document" "ec2_worker" {
-  # Artifact S3 bucket read/write
   statement {
     sid     = "ArtifactBucketAccess"
     actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
@@ -115,7 +109,6 @@ data "aws_iam_policy_document" "ec2_worker" {
     ]
   }
 
-  # SQS — receive and delete messages from the job queue
   statement {
     sid = "SQSWorker"
     actions = [
@@ -131,7 +124,6 @@ data "aws_iam_policy_document" "ec2_worker" {
     ]
   }
 
-  # Secrets Manager — read own secrets
   statement {
     sid     = "ReadMathAnimateSecrets"
     actions = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
@@ -140,16 +132,30 @@ data "aws_iam_policy_document" "ec2_worker" {
     ]
   }
 
-  # CloudWatch Logs — ship instance logs
+  statement {
+    sid       = "CloudWatchMetrics"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["MathAnimate/Worker"]
+    }
+  }
+
   statement {
     sid = "CloudWatchLogs"
     actions = [
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
       "logs:DescribeLogStreams",
     ]
-    resources = ["arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/mathanimate/*"]
+    resources = [
+      "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/mathanimate/*",
+      "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/mathanimate/*:log-stream:*",
+    ]
   }
 }
 
@@ -163,7 +169,6 @@ resource "aws_iam_role_policy_attachment" "ec2_worker" {
   policy_arn = aws_iam_policy.ec2_worker.arn
 }
 
-# Attach SSM managed policy so the instance is reachable via Session Manager
 resource "aws_iam_role_policy_attachment" "ec2_worker_ssm" {
   role       = aws_iam_role.ec2_worker.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -172,6 +177,38 @@ resource "aws_iam_role_policy_attachment" "ec2_worker_ssm" {
 resource "aws_iam_instance_profile" "ec2_worker" {
   name = "${var.name_prefix}-ec2-worker-profile"
   role = aws_iam_role.ec2_worker.name
+}
+
+# ── Storage IAM User (MinIO SDK requires explicit credentials) ─────────────────
+resource "aws_iam_user" "storage" {
+  name = "${var.name_prefix}-storage-user"
+}
+
+data "aws_iam_policy_document" "storage_user" {
+  statement {
+    sid       = "ListAllBuckets"
+    actions   = ["s3:ListAllMyBuckets"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "ArtifactBucketAccess"
+    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [
+      "arn:aws:s3:::${var.artifact_bucket_name}",
+      "arn:aws:s3:::${var.artifact_bucket_name}/*",
+    ]
+  }
+}
+
+resource "aws_iam_user_policy" "storage" {
+  name   = "${var.name_prefix}-storage-user-policy"
+  user   = aws_iam_user.storage.name
+  policy = data.aws_iam_policy_document.storage_user.json
+}
+
+resource "aws_iam_access_key" "storage" {
+  user = aws_iam_user.storage.name
 }
 
 # ── GitHub Actions OIDC Role ───────────────────────────────────────────────────
@@ -205,7 +242,6 @@ resource "aws_iam_role" "github_actions" {
 }
 
 data "aws_iam_policy_document" "github_actions" {
-  # ECS — deploy new task revisions
   statement {
     sid = "ECSdeploy"
     actions = [
@@ -220,24 +256,6 @@ data "aws_iam_policy_document" "github_actions" {
     resources = ["*"]
   }
 
-  # SSM — send commands to worker EC2
-  statement {
-    sid       = "SSMSendCommand"
-    actions   = ["ssm:SendCommand", "ssm:GetCommandInvocation"]
-    resources = ["*"]
-  }
-
-  # S3 — sync frontend build
-  statement {
-    sid     = "FrontendS3Sync"
-    actions = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
-    resources = [
-      "arn:aws:s3:::${var.frontend_bucket_name}",
-      "arn:aws:s3:::${var.frontend_bucket_name}/*",
-    ]
-  }
-
-  # IAM PassRole — needed for ECS run-task to pass task execution role
   statement {
     sid       = "IAMPassRole"
     actions   = ["iam:PassRole"]
@@ -249,7 +267,6 @@ data "aws_iam_policy_document" "github_actions" {
     }
   }
 
-  # Terraform state management
   statement {
     sid = "TerraformState"
     actions = [
@@ -273,7 +290,6 @@ data "aws_iam_policy_document" "github_actions" {
     ]
   }
 
-  # Full infrastructure management for terraform apply/destroy
   statement {
     sid       = "InfrastructureManagement"
     actions   = ["*"]

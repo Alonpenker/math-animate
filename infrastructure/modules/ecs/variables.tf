@@ -34,7 +34,7 @@ variable "ecs_task_role_arn" {
 }
 
 variable "image_uri" {
-  description = "Full Docker Hub image URI for the backend (e.g. youruser/math-animate-backend:abc1234)"
+  description = "Full Docker Hub image URI for the backend"
   type        = string
 }
 
@@ -82,7 +82,15 @@ variable "frontend_url" {
   type        = string
 }
 
-variable "dockerhub_credentials_secret_arn" {
-  description = "Secrets Manager ARN for Docker Hub credentials (JSON with username and password)"
+variable "storage_access_key" {
+  description = "AWS access key ID for MinIO SDK S3 access"
   type        = string
+  sensitive   = true
 }
+
+variable "storage_secret_key" {
+  description = "AWS secret access key for MinIO SDK S3 access"
+  type        = string
+  sensitive   = true
+}
+

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # build-and-push.sh — Build the backend Docker image and push to Docker Hub
 #
-# Usage: ./build-and-push.sh <dockerhub-username>
+# Usage: DOCKERHUB_TOKEN=<token> ./build-and-push.sh
 #
 # Example:
-#   DOCKERHUB_TOKEN=your-token ./build-and-push.sh myuser
+#   DOCKERHUB_TOKEN=your-token ./build-and-push.sh
 #
 # Requires DOCKERHUB_TOKEN to be set in the environment (use a Docker Hub
 # access token, not your account password).
@@ -14,13 +14,7 @@
 
 set -euo pipefail
 
-# ── Argument validation ────────────────────────────────────────────────────────
-if [[ $# -lt 1 ]]; then
-  echo "Usage: DOCKERHUB_TOKEN=<token> $0 <dockerhub-username>" >&2
-  exit 1
-fi
-
-DOCKERHUB_USERNAME="$1"
+DOCKERHUB_USERNAME="alonpenker"
 
 if [[ -z "${DOCKERHUB_TOKEN:-}" ]]; then
   echo "Error: DOCKERHUB_TOKEN environment variable is not set." >&2

@@ -60,8 +60,26 @@ variable "redis_url" {
   type        = string
 }
 
-variable "docker_compose_content" {
-  description = "Content of the EC2 docker-compose.yml to be injected into the userdata template"
+variable "log_group_name" {
+  description = "CloudWatch log group name that the CloudWatch agent ships logs to"
   type        = string
+  default     = "/mathanimate/ec2/worker"
+}
+
+variable "frontend_url" {
+  description = "Frontend URL (required by app Settings)"
+  type        = string
+}
+
+variable "storage_access_key" {
+  description = "AWS access key ID for MinIO SDK S3 access"
+  type        = string
+  sensitive   = true
+}
+
+variable "storage_secret_key" {
+  description = "AWS secret access key for MinIO SDK S3 access"
+  type        = string
+  sensitive   = true
 }
 

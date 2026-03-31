@@ -7,3 +7,8 @@ output "private_ip" {
   description = "EC2 worker private IP address"
   value       = aws_instance.worker.private_ip
 }
+
+output "log_group_name" {
+  description = "CloudWatch log group name for the EC2 worker"
+  value       = aws_cloudwatch_log_group.worker.name
+}

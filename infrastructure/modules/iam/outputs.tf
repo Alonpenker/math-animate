@@ -22,3 +22,14 @@ output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions OIDC deploy role"
   value       = aws_iam_role.github_actions.arn
 }
+
+output "storage_access_key_id" {
+  description = "Access key ID for the storage IAM user (MinIO SDK)"
+  value       = aws_iam_access_key.storage.id
+}
+
+output "storage_secret_access_key" {
+  description = "Secret access key for the storage IAM user (MinIO SDK)"
+  value       = aws_iam_access_key.storage.secret
+  sensitive   = true
+}

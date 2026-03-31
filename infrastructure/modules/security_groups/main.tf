@@ -1,29 +1,38 @@
 # ── ALB Security Group ────────────────────────────────────────────────────────
 resource "aws_security_group" "alb" {
   name        = "${var.name_prefix}-sg-alb"
-  description = "ALB: allow HTTPS inbound from internet, HTTP for demo"
+  description = "ALB: allow HTTPS and HTTP inbound from Cloudflare IP ranges only"
   vpc_id      = var.vpc_id
-
-  ingress {
-    description = "HTTPS from internet"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTP redirect / demo listener
-  ingress {
-    description = "HTTP from internet (redirect or demo)"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   tags = {
     Name = "${var.name_prefix}-sg-alb"
   }
+
+  timeouts {
+    delete = "5m"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https_cloudflare" {
+  for_each = toset(var.allowed_ingress_cidrs)
+
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = each.value
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "HTTPS from Cloudflare ${each.value}"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_http_cloudflare" {
+  for_each = toset(var.allowed_ingress_cidrs)
+
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = each.value
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  description       = "HTTP from Cloudflare ${each.value}"
 }
 
 # ── ECS API Security Group ─────────────────────────────────────────────────────
@@ -32,38 +41,27 @@ resource "aws_security_group" "ecs_api" {
   description = "ECS API: receive from ALB, egress to data layer"
   vpc_id      = var.vpc_id
 
-  # HTTPS to AWS VPC endpoints (SQS, Secrets Manager, CloudWatch, S3) and Docker Hub
-  egress {
-    description = "HTTPS to AWS endpoints and Docker Hub"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = {
     Name = "${var.name_prefix}-sg-ecs-api"
+  }
+
+  timeouts {
+    delete = "5m"
   }
 }
 
 # ── EC2 Worker Security Group ──────────────────────────────────────────────────
 resource "aws_security_group" "ec2_worker" {
   name        = "${var.name_prefix}-sg-ec2-worker"
-  description = "EC2 Worker: no inbound (SSM only), egress to data layer"
+  description = "EC2 Worker: no inbound, egress to data layer"
   vpc_id      = var.vpc_id
-
-  # No inbound rules — management only via SSM Session Manager
-
-  egress {
-    description = "HTTPS to AWS endpoints and Docker Hub"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   tags = {
     Name = "${var.name_prefix}-sg-ec2-worker"
+  }
+
+  timeouts {
+    delete = "5m"
   }
 }
 
@@ -76,6 +74,10 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "${var.name_prefix}-sg-rds"
   }
+
+  timeouts {
+    delete = "5m"
+  }
 }
 
 # ── Redis Security Group ───────────────────────────────────────────────────────
@@ -87,9 +89,43 @@ resource "aws_security_group" "redis" {
   tags = {
     Name = "${var.name_prefix}-sg-redis"
   }
+
+  timeouts {
+    delete = "5m"
+  }
 }
 
-# ── Inter-Security-Group Rules (split out to avoid dependency cycles) ──────────
+# ── ECS API egress: HTTPS (Secrets Manager, SQS, DockerHub) ───────────────────
+resource "aws_vpc_security_group_egress_rule" "ecs_api_https" {
+  security_group_id = aws_security_group.ecs_api.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "HTTPS to AWS endpoints and Docker Hub"
+}
+
+# ── EC2 Worker egress: HTTPS (Secrets Manager, SQS, DockerHub, S3) ────────────
+resource "aws_vpc_security_group_egress_rule" "ec2_worker_https" {
+  security_group_id = aws_security_group.ec2_worker.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "HTTPS to AWS endpoints and Docker Hub"
+}
+
+# ── EC2 Worker egress: HTTP (Docker image pulls from registries) ───────────────
+resource "aws_vpc_security_group_egress_rule" "ec2_worker_http" {
+  security_group_id = aws_security_group.ec2_worker.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  description       = "HTTP for Docker image pulls"
+}
+
+# ── Inter-Security-Group Rules ──────────
 resource "aws_vpc_security_group_egress_rule" "alb_to_ecs_api_8000" {
   security_group_id            = aws_security_group.alb.id
   referenced_security_group_id = aws_security_group.ecs_api.id

@@ -72,7 +72,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# ── NAT Gateway (placed in first public subnet) ───────────────────────────────
+# ── NAT Gateway  ───────────────────────────────
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -115,7 +115,7 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# ── S3 Gateway VPC Endpoint (free — no NAT needed for S3 traffic) ─────────────
+# ── S3 Gateway VPC Endpoint  ─────────────
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
@@ -175,7 +175,7 @@ resource "aws_vpc_endpoint" "logs" {
   }
 }
 
-# ── SSM Interface VPC Endpoints (for EC2 worker management) ───────────────────
+# ── SSM Interface VPC Endpoints (required for Session Manager on private EC2) ──
 resource "aws_vpc_endpoint" "ssm" {
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.aws_region}.ssm"
@@ -217,3 +217,4 @@ resource "aws_vpc_endpoint" "ec2messages" {
     Name = "${var.name_prefix}-vpce-ec2messages"
   }
 }
+

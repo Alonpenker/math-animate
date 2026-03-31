@@ -76,20 +76,11 @@ variable "artifact_lifecycle_days" {
   default = 30
 }
 
-variable "alb_certificate_arn" {
-  type    = string
-  default = ""
-}
-
 variable "image_uri" {
   description = "Docker Hub image URI for the backend (e.g. youruser/math-animate-backend:abc1234)"
   type        = string
 }
 
-variable "dockerhub_credentials_secret_arn" {
-  description = "Secrets Manager ARN for Docker Hub credentials used by ECS to pull images"
-  type        = string
-}
 
 variable "github_org" {
   type = string
@@ -98,3 +89,9 @@ variable "github_org" {
 variable "github_repo" {
   type = string
 }
+
+variable "frontend_url" {
+  description = "Frontend URL for CORS"
+  type        = string
+}
+

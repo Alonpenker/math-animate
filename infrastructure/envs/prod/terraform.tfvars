@@ -24,29 +24,19 @@ api_desired_count = 1
 
 # ── EC2 Worker ─────────────────────────────────────────────────────────────────
 worker_instance_type = "t3.medium"
-# worker_ami_id — set to latest Amazon Linux 2023 AMI for eu-north-1
-# Run: aws ec2 describe-images --owners amazon \
-#        --filters "Name=name,Values=al2023-ami-2023*" "Name=architecture,Values=x86_64" \
-#        --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
-worker_ami_id = "ami-0c02fb55956c7d316"
+worker_ami_id = "ami-0f77cdd9f61b7735e"
 
 # ── S3 ─────────────────────────────────────────────────────────────────────────
 artifact_lifecycle_days = 30
-
-# ── ALB (leave empty for HTTP-only demo; set ACM ARN to enable HTTPS) ──────────
-alb_certificate_arn = ""
 
 # ── Container Image ────────────────────────────────────────────────────────────
 # Populated after running build-and-push.sh; overridden by GitHub Actions on
 # each deploy. API and Worker share the same image (startup command differs).
 image_uri = "alonpenker/math-animate-backend:latest"
 
-# ── Docker Hub ─────────────────────────────────────────────────────────────────
-# ARN of the Secrets Manager secret containing Docker Hub credentials.
-# Create with: aws secretsmanager create-secret --name mathanimate/prod/dockerhub-credentials \
-#   --secret-string '{"username":"youruser","password":"your-access-token"}'
-dockerhub_credentials_secret_arn = "arn:aws:secretsmanager:eu-north-1:346971617751:secret:mathanimate/prod/dockerhub-credentials-Qd9dYj"
-
 # ── GitHub OIDC ────────────────────────────────────────────────────────────────
-github_org  = "https://github.com/Alonpenker"
+github_org  = "Alonpenker"
 github_repo = "math-animate"
+
+# ── CORS / Frontend URL ────────────────────────────────────────────────────────
+frontend_url = "https://mathanimate.com"

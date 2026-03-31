@@ -1,9 +1,21 @@
 data "aws_region" "current" {}
 
+data "aws_secretsmanager_secret" "dockerhub_credentials" {
+  name = "mathanimate/${var.environment}/dockerhub-credentials"
+}
+
+data "aws_secretsmanager_secret" "x_api_key" {
+  name = "mathanimate/${var.environment}/x-api-key"
+}
+
+data "aws_secretsmanager_secret" "openai_api_key" {
+  name = "mathanimate/${var.environment}/openai-api-key"
+}
+
 # ── CloudWatch Log Group ───────────────────────────────────────────────────────
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/mathanimate/ecs/api"
-  retention_in_days = 14
+  retention_in_days = 3
 
   tags = {
     Name = "/mathanimate/ecs/api"
@@ -16,7 +28,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
 
   tags = {
@@ -47,8 +59,9 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name  = "api"
-      image = var.image_uri
+      name    = "api"
+      image   = var.image_uri
+      command = ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
       portMappings = [
         {
@@ -65,26 +78,21 @@ resource "aws_ecs_task_definition" "api" {
         { name = "SQS_QUEUE_URL", value = var.sqs_queue_url },
         { name = "STORAGE_BUCKET", value = var.artifact_bucket_name },
         { name = "STORAGE_ENDPOINT", value = "s3.amazonaws.com" },
+        { name = "STORAGE_ACCESS_KEY", value = var.storage_access_key },
+        { name = "STORAGE_SECRET_KEY", value = var.storage_secret_key },
         { name = "DATABASE_URL", value = var.database_url },
         { name = "REDIS_URL", value = var.redis_url },
         { name = "FRONTEND_URL", value = var.frontend_url },
       ]
 
-      # ECS secrets injection: valueFrom accepts secret ARN or secret name.
-      # Using the secret name (path) is simpler and avoids the ARN random suffix.
-      # The execution role policy already grants access to mathanimate/<env>/* secrets.
       secrets = [
         {
-          name      = "API_KEY"
-          valueFrom = "mathanimate/${var.environment}/api-key"
+          name      = "X_API_KEY"
+          valueFrom = data.aws_secretsmanager_secret.x_api_key.arn
         },
         {
-          name      = "STORAGE_ACCESS_KEY"
-          valueFrom = "mathanimate/${var.environment}/storage-access-key"
-        },
-        {
-          name      = "STORAGE_SECRET_KEY"
-          valueFrom = "mathanimate/${var.environment}/storage-secret-key"
+          name      = "OPENAI_API_KEY"
+          valueFrom = data.aws_secretsmanager_secret.openai_api_key.arn
         },
       ]
 
@@ -106,7 +114,7 @@ resource "aws_ecs_task_definition" "api" {
       }
 
       repositoryCredentials = {
-        credentialsParameter = var.dockerhub_credentials_secret_arn
+        credentialsParameter = data.aws_secretsmanager_secret.dockerhub_credentials.arn
       }
 
       essential = true
@@ -144,10 +152,10 @@ resource "aws_ecs_service" "api" {
 
   deployment_circuit_breaker {
     enable   = true
-    rollback = false # Let GitHub Actions handle rollback decisions
+    rollback = true
   }
 
-  health_check_grace_period_seconds = 120
+  health_check_grace_period_seconds = 60
 
   # Ignore task definition changes from outside Terraform (GitHub Actions deploys)
   lifecycle {
