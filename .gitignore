@@ -1,4 +1,6 @@
 .env
 
+.claude
+settings.json
 PLAN*.md
 TODOS

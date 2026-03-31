@@ -12,6 +12,8 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
+    ports:
+      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
 
@@ -45,6 +47,7 @@ services:
   worker:
     image: ${WORKER_IMAGE_URI}
     restart: unless-stopped
+    network_mode: host
     command: ["uv", "run", "celery", "-A", "app.workers.worker", "worker", "--loglevel=info"]
     depends_on:
       ollama:
@@ -53,7 +56,7 @@ services:
         condition: service_healthy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: http://localhost:11434
     env_file: .env
     volumes:
       - docker_sock:/var/run

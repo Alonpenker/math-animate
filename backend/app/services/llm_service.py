@@ -38,7 +38,7 @@ class LLMService:
                 temperature=LLM_TEMPERATURE,
                 max_completion_tokens=LLM_MAX_TOKENS,
                 reasoning_effort=LLM_REASONING_EFFORT,
-                api_key=settings.api_key,
+                api_key=settings.openai_api_key,
             )
         return cls._chat_models[model_name]
 

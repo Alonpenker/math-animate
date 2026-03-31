@@ -1,0 +1,140 @@
+name: Pause
+
+# ── Trigger: MANUAL ONLY ──────────────────────────────────────────────────────
+# This workflow destroys all metered AWS resources while preserving:
+#   - Secrets Manager entries
+#   - Cloudflare DNS records (managed by Terraform but not destroyed here)
+#   - Docker Hub images (hosted externally, unaffected)
+#   - GitHub OIDC provider (created manually, unaffected by terraform destroy)
+#   - GitHub Actions IAM role (created manually, see infrastructure/README.md)
+#   - Terraform state backend (S3 bucket + DynamoDB table, created manually)
+#
+# To resume: run the apply.yml workflow (manual dispatch → terraform apply)
+# then run the deploy.yml workflow (manual dispatch).
+#
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'PAUSE' to confirm partial teardown"
+        required: true
+        type: string
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: infrastructure/envs/prod
+  TF_VERSION: "1.13.3"
+
+jobs:
+  pause:
+    name: Pause Infrastructure
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      # ── Safety guard ──────────────────────────────────────────────────────────
+      - name: Verify confirmation input
+        run: |
+          if [[ "${{ github.event.inputs.confirm }}" != "PAUSE" ]]; then
+            echo "ERROR: Confirmation input must be exactly 'PAUSE'. Got: '${{ github.event.inputs.confirm }}'"
+            exit 1
+          fi
+          echo "Confirmation accepted. Proceeding with partial teardown..."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: github-pause-${{ github.run_id }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Fetch Cloudflare credentials from Secrets Manager
+        run: |
+          CF=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/cloudflare-credentials" \
+            --query SecretString --output text)
+          CF_TOKEN=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_token'])")
+          echo "::add-mask::${CF_TOKEN}"
+          echo "CLOUDFLARE_API_TOKEN=${CF_TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="region=eu-north-1" \
+            -input=false
+
+      # ── Show what will be destroyed ────────────────────────────────────────────
+      - name: Terraform Destroy Plan (preview)
+        run: |
+          echo "==> The following modules will be destroyed:"
+          echo ""
+          echo "  - module.ecs          (ECS cluster, service, task definition)"
+          echo "  - module.ec2_worker   (EC2 worker instance)"
+          echo "  - module.alb          (Application Load Balancer)"
+          echo "  - module.rds          (RDS PostgreSQL — DATA WILL BE LOST)"
+          echo "  - module.elasticache  (ElastiCache Redis)"
+          echo "  - module.sqs          (SQS queues)"
+          echo "  - module.security_groups"
+          echo "  - module.networking   (VPC, subnets, endpoints)"
+          echo "  - module.s3           (S3 artifact bucket — DATA WILL BE LOST)"
+          echo "  - module.acm          (ACM certificate)"
+          echo "  - module.iam          (IAM roles, policies, storage user)"
+          echo ""
+          echo "==> The following resources will be PRESERVED:"
+          echo ""
+          echo "  - module.cloudflare   (Cloudflare DNS records)"
+          echo "  - GitHub Actions IAM role (manually created, not managed by Terraform)"
+          echo "  - Docker Hub images   (hosted externally, unaffected)"
+          echo "  - Secrets Manager entries"
+          echo "  - Terraform state     (S3 bucket + DynamoDB lock table)"
+          echo ""
+          echo "==> Starting targeted destroy in 10 seconds..."
+          sleep 10
+
+      # ── Targeted destroy: remove only expensive modules ────────────────────────
+      - name: Terraform Destroy (targeted)
+        run: |
+          terraform destroy \
+            -auto-approve \
+            -input=false \
+            -target=module.ecs \
+            -target=module.ec2_worker \
+            -target=module.alb \
+            -target=module.rds \
+            -target=module.elasticache \
+            -target=module.sqs \
+            -target=module.security_groups \
+            -target=module.networking \
+            -target=module.s3 \
+            -target=module.acm \
+            -target=module.iam
+
+      - name: Teardown complete
+        run: |
+          echo ""
+          echo "==> Infrastructure paused successfully."
+          echo ""
+          echo "    All metered resources have been destroyed."
+          echo "    Cloudflare DNS, Secrets Manager, Terraform state, Docker Hub images, and the manually-created GitHub Actions IAM role are intact."
+          echo ""
+          echo "==> To resume:"
+          echo "    1. Go to Actions → Apply → Run workflow (applies infrastructure)"
+          echo "    2. Go to Actions → Deploy → Run workflow (deploys application)"
