@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
-    branches: ["**"]
+    branches: ["main"]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -50,8 +50,8 @@ jobs:
           STORAGE_BUCKET: test-bucket
           OLLAMA_BASE_URL: http://localhost:11434
           FRONTEND_URL: http://localhost:3000
-          API_KEY: test-api-key
-          E2E: "true"
+          X_API_KEY: test-api-key
+          OPENAI_API_KEY: test-openai-key
         run: uv run pytest -v --tb=short
 
   # ── Frontend Type Check + Build ───────────────────────────────────────────────

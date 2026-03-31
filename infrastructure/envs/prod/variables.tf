@@ -82,14 +82,6 @@ variable "image_uri" {
 }
 
 
-variable "github_org" {
-  type = string
-}
-
-variable "github_repo" {
-  type = string
-}
-
 variable "frontend_url" {
   description = "Frontend URL for CORS"
   type        = string

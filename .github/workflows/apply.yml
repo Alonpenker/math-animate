@@ -1,0 +1,93 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: infrastructure/envs/prod
+  TF_VERSION: "1.13.3"
+
+jobs:
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: github-terraform-${{ github.run_id }}
+
+      - name: Fetch Cloudflare credentials from Secrets Manager
+        run: |
+          CF=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/cloudflare-credentials" \
+            --query SecretString --output text)
+          CF_TOKEN=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_token'])")
+          echo "::add-mask::${CF_TOKEN}"
+          echo "CLOUDFLARE_API_TOKEN=${CF_TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="region=eu-north-1" \
+            -input=false
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive -diff
+        continue-on-error: false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -input=false \
+            -out=tfplan \
+            -no-color \
+            2>&1 | tee plan-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "${GITHUB_OUTPUT}"
+        continue-on-error: true
+
+      - name: Check Plan Result
+        if: steps.plan.outputs.exit_code != '0' && steps.plan.outputs.exit_code != '2'
+        run: |
+          echo "Terraform plan failed with exit code ${{ steps.plan.outputs.exit_code }}"
+          exit 1
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.exit_code == '2'
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            tfplan
+
+      - name: No changes to apply
+        if: steps.plan.outputs.exit_code == '0'
+        run: echo "No infrastructure changes to apply."

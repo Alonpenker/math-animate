@@ -34,9 +34,5 @@ artifact_lifecycle_days = 30
 # each deploy. API and Worker share the same image (startup command differs).
 image_uri = "alonpenker/math-animate-backend:latest"
 
-# ── GitHub OIDC ────────────────────────────────────────────────────────────────
-github_org  = "Alonpenker"
-github_repo = "math-animate"
-
 # ── CORS / Frontend URL ────────────────────────────────────────────────────────
 frontend_url = "https://mathanimate.com"

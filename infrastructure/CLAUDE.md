@@ -4,7 +4,7 @@ Terraform infrastructure for the **math-animate** project, targeting AWS.
 
 ## Stack
 
-- **IaC:** Terraform >= 1.6.0 (CI pins `TF_VERSION: "1.9.0"` in `.github/workflows/terraform.yml`)
+- **IaC:** Terraform >= 1.6.0 (CI pins `TF_VERSION: "1.13.3"` in `.github/workflows/apply.yml`)
 - **Remote state:** S3 bucket `mathanimate-tf-state`, DynamoDB lock table `mathanimate-tf-locks`, region `eu-north-1`, encryption enabled
 - **Default region:** `eu-north-1` (Stockholm)
 - **Environment:** `prod`
@@ -172,7 +172,7 @@ The `DATABASE_URL` template passed to ECS is password-free: `postgresql://{usern
 - User data writes `/opt/mathanimate-worker/.env` (mode 600) and installs `celery-worker.service`
 - The systemd service runs: `docker run --rm --name celery-worker --env-file /opt/mathanimate-worker/.env --volume /var/run/docker.sock:/var/run/docker.sock --volume /job:/job {image_uri} uv run celery -A app.workers.worker worker --loglevel=info`
 - Terraform ignores `user_data` and `ami` changes post-provisioning (`lifecycle.ignore_changes`)
-- GitHub Actions updates the worker by SSM send-command: `docker pull` + `systemctl restart celery-worker`
+- GitHub Actions updates the worker by rebooting the EC2 instance via `infrastructure/scripts/deploy-worker.sh`; the `celery-worker.service` is enabled and starts automatically on boot
 - CloudWatch agent ships `/var/log/user-data.log` and `/var/log/celery-worker.log` to log group `/mathanimate/ec2/worker`
 
 ## CloudWatch Log Groups
@@ -235,7 +235,6 @@ To resume: run the `Terraform` workflow (manual dispatch) to re-apply infrastruc
 
 | Script | Usage | Description |
 |---|---|---|
-| `build-and-push.sh` | `DOCKERHUB_TOKEN=<tok> ./build-and-push.sh` | Builds `:sha` + `:latest` tags for `linux/amd64`; writes `image_uri` to `GITHUB_OUTPUT` in CI |
+| `build-and-push.sh` | `DOCKERHUB_USERNAME=<user> DOCKERHUB_TOKEN=<tok> ./build-and-push.sh` | Builds and pushes `:latest` tag for `linux/amd64` to Docker Hub |
+| `deploy-worker.sh` | `./deploy-worker.sh` | Reboots the EC2 worker instance (found by `Project`/`Environment` tags) and waits for status checks to pass |
 | `run-migrations.sh` | `./run-migrations.sh eu-north-1 mathanimate-prod-cluster` | Launches ECS one-off task that calls `init_db_pool()` + `init_db_tables()`; polls 300 s |
-| `seed-knowledge.sh` | `./seed-knowledge.sh http://<alb-dns> [x-api-key]` | Calls `POST /api/v1/knowledge/seed`; idempotent; waits for API health first |
-| `worker-userdata.sh` | Reference only | Standalone version of the EC2 user data; not used by Terraform directly |

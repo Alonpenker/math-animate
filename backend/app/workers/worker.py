@@ -68,6 +68,10 @@ def init_worker(**kwargs) -> None:
     init_storage()
     init_db_pool()
     init_redis_pool()
+    try:
+        seed_knowledge_task()
+    except Exception:
+        logger.warning("Knowledge auto-seed on startup failed; worker will continue.", exc_info=True)
 
 
 @worker_process_shutdown.connect

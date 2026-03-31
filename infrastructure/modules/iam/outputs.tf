@@ -20,7 +20,7 @@ output "ec2_worker_instance_profile_name" {
 
 output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions OIDC deploy role"
-  value       = aws_iam_role.github_actions.arn
+  value       = data.aws_iam_role.github_actions.arn
 }
 
 output "storage_access_key_id" {

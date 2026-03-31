@@ -89,8 +89,6 @@ module "iam" {
   aws_account_id       = data.aws_caller_identity.current.account_id
   environment          = var.environment
   artifact_bucket_name = module.s3.artifact_bucket_name
-  github_org           = var.github_org
-  github_repo          = var.github_repo
 }
 
 # ── Networking: VPC, subnets, route tables, S3 gateway endpoint ──────

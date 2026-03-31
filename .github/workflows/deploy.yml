@@ -1,55 +1,21 @@
 name: Deploy
 
 on:
-  # Automatic deploy when CI passes on main
-  push:
-    branches: [main]
-
-  # Manual trigger — use for redeploys without a code change (e.g. after resume)
   workflow_dispatch:
 
-# Prevent concurrent deploys from racing each other
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
 permissions:
-  id-token: write   # Required for OIDC token exchange
+  id-token: write
   contents: read
 
 jobs:
-  # ── Wait for CI to pass (skipped on workflow_dispatch) ────────────────────────
-  wait-for-ci:
-    name: Wait for CI
-    runs-on: ubuntu-latest
-    # Only run this gate on automatic push; manual dispatch skips it
-    if: github.event_name == 'push'
-    steps:
-      - name: Check CI status
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.sha }}
-          check-name: "Backend Tests"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-
-      - name: Check frontend CI status
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.sha }}
-          check-name: "Frontend Build Check"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-
   # ── Build & Push Images ────────────────────────────────────────────────────────
   build-and-push:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    needs: [wait-for-ci]
-    if: always() && (needs.wait-for-ci.result == 'success' || needs.wait-for-ci.result == 'skipped')
-
-    outputs:
-      image_uri: ${{ steps.build.outputs.image_uri }}
 
     steps:
       - name: Checkout
@@ -59,147 +25,81 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: eu-north-1
           role-session-name: github-deploy-${{ github.run_id }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Fetch DockerHub credentials from Secrets Manager
+        run: |
+          DH=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/dockerhub-credentials" \
+            --query SecretString --output text)
+          DH_USER=$(echo "$DH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['username'])")
+          DH_TOKEN=$(echo "$DH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['password'])")
+          echo "::add-mask::${DH_TOKEN}"
+          echo "DOCKERHUB_USERNAME=${DH_USER}" >> "$GITHUB_ENV"
+          echo "DOCKERHUB_TOKEN=${DH_TOKEN}" >> "$GITHUB_ENV"
+
       - name: Build and push images
-        id: build
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           chmod +x infrastructure/scripts/build-and-push.sh
-          ./infrastructure/scripts/build-and-push.sh \
-            "${{ secrets.DOCKERHUB_USERNAME }}"
+          ./infrastructure/scripts/build-and-push.sh
+
+  # ── Deploy EC2 Worker ─────────────────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy EC2 Worker
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: github-deploy-worker-${{ github.run_id }}
+
+      - name: Reboot worker instance
+        timeout-minutes: 15
+        run: |
+          chmod +x infrastructure/scripts/deploy-worker.sh
+          ./infrastructure/scripts/deploy-worker.sh
 
   # ── Deploy API (ECS) ──────────────────────────────────────────────────────────
   deploy-api:
     name: Deploy ECS API
     runs-on: ubuntu-latest
-    needs: [build-and-push]
+    needs: [deploy-worker]
 
     steps:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: eu-north-1
           role-session-name: github-deploy-api-${{ github.run_id }}
 
       - name: Force new ECS deployment
         run: |
           aws ecs update-service \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --service "${{ secrets.ECS_SERVICE_API }}" \
+            --cluster "mathanimate-prod-cluster" \
+            --service "mathanimate-prod-api" \
             --force-new-deployment \
-            --region "${{ secrets.AWS_REGION }}"
+            --region "eu-north-1"
 
-          echo "ECS deployment triggered for service: ${{ secrets.ECS_SERVICE_API }}"
+          echo "ECS deployment triggered for service: mathanimate-prod-api"
 
       - name: Wait for ECS service to stabilise
         run: |
           echo "Waiting for ECS service to reach steady state..."
           aws ecs wait services-stable \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --services "${{ secrets.ECS_SERVICE_API }}" \
-            --region "${{ secrets.AWS_REGION }}"
+            --cluster "mathanimate-prod-cluster" \
+            --services "mathanimate-prod-api" \
+            --region "eu-north-1"
           echo "ECS service is stable."
-
-  # ── Update Worker EC2 ──────────────────────────────────────────────────────────
-  deploy-worker:
-    name: Update EC2 Worker
-    runs-on: ubuntu-latest
-    needs: [build-and-push]
-
-    steps:
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-session-name: github-deploy-worker-${{ github.run_id }}
-
-      - name: Pull new worker image and restart Celery via SSM
-        run: |
-          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
-          WORKER_IMAGE="${{ needs.build-and-push.outputs.image_uri }}"
-
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_WORKER_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "commands=[
-              \"aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${ECR_REGISTRY}\",
-              \"docker pull ${WORKER_IMAGE}\",
-              \"systemctl restart celery-worker\",
-              \"sleep 5\",
-              \"systemctl is-active celery-worker && echo 'Worker restarted successfully' || (echo 'Worker failed to start' && exit 1)\"
-            ]" \
-            --region "${{ secrets.AWS_REGION }}" \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "SSM Command ID: ${COMMAND_ID}"
-          echo "Waiting for SSM command to complete..."
-
-          # Poll for command completion
-          for i in $(seq 1 30); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "${COMMAND_ID}" \
-              --instance-id "${{ secrets.EC2_WORKER_INSTANCE_ID }}" \
-              --region "${{ secrets.AWS_REGION }}" \
-              --query "Status" \
-              --output text 2>/dev/null || echo "Pending")
-
-            echo "  Attempt ${i}/30: Status=${STATUS}"
-
-            case "${STATUS}" in
-              Success)
-                echo "Worker updated successfully."
-                exit 0
-                ;;
-              Failed|Cancelled|TimedOut|DeliveryTimedOut)
-                echo "ERROR: SSM command failed with status: ${STATUS}"
-                aws ssm get-command-invocation \
-                  --command-id "${COMMAND_ID}" \
-                  --instance-id "${{ secrets.EC2_WORKER_INSTANCE_ID }}" \
-                  --region "${{ secrets.AWS_REGION }}" \
-                  --query "StandardErrorContent" \
-                  --output text
-                exit 1
-                ;;
-            esac
-
-            sleep 10
-          done
-
-          echo "ERROR: SSM command did not complete within 300s"
-          exit 1
-
-  # ── Run Migrations ─────────────────────────────────────────────────────────────
-  run-migrations:
-    name: Run DB Migrations
-    runs-on: ubuntu-latest
-    needs: [deploy-api]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-session-name: github-migrations-${{ github.run_id }}
-
-      - name: Run migrations
-        run: |
-          chmod +x infrastructure/scripts/run-migrations.sh
-          ./infrastructure/scripts/run-migrations.sh \
-            "${{ secrets.AWS_REGION }}" \
-            "${{ secrets.ECS_CLUSTER }}"
 
   # ── Deploy Frontend ────────────────────────────────────────────────────────────
   deploy-frontend:
@@ -225,64 +125,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: github-deploy-frontend-${{ github.run_id }}
+
+      - name: Fetch x-api-key from Secrets Manager
+        run: |
+          X_API_KEY=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/x-api-key" \
+            --query SecretString --output text)
+          echo "::add-mask::${X_API_KEY}"
+          echo "VITE_X_API_KEY=${X_API_KEY}" >> "$GITHUB_ENV"
+
       - name: Build frontend
-        run: npm run build
+        run: VITE_API_BASE_URL="https://api.mathanimate.com/api/v1" npm run build
 
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-session-name: github-frontend-${{ github.run_id }}
-
-      - name: Sync to S3
+      - name: Fetch Cloudflare credentials from Secrets Manager
         run: |
-          aws s3 sync dist/ "s3://${{ secrets.S3_FRONTEND_BUCKET }}/" \
-            --delete \
-            --cache-control "public, max-age=31536000, immutable" \
-            --exclude "index.html"
+          CF=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/cloudflare-credentials" \
+            --query SecretString --output text)
+          CF_TOKEN=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_token'])")
+          CF_ACCOUNT=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['account_id'])")
+          echo "::add-mask::${CF_TOKEN}"
+          echo "::add-mask::${CF_ACCOUNT}"
+          echo "CLOUDFLARE_API_TOKEN=${CF_TOKEN}" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT}" >> "$GITHUB_ENV"
 
-          # index.html must not be cached aggressively so new deploys are picked up
-          aws s3 cp dist/index.html "s3://${{ secrets.S3_FRONTEND_BUCKET }}/index.html" \
-            --cache-control "public, max-age=0, must-revalidate"
-
-  # ── Seed Knowledge Base ───────────────────────────────────────────────────────
-  seed-knowledge:
-    name: Seed RAG Knowledge Base
-    runs-on: ubuntu-latest
-    needs: [run-migrations]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Seed knowledge base
-        run: |
-          chmod +x infrastructure/scripts/seed-knowledge.sh
-          # The seed endpoint is idempotent — existing documents are skipped.
-          ./infrastructure/scripts/seed-knowledge.sh \
-            "${{ secrets.SMOKE_TEST_API_URL }}"
-
-  # ── Smoke Test ────────────────────────────────────────────────────────────────
-  smoke-test:
-    name: Smoke Test
-    runs-on: ubuntu-latest
-    needs: [seed-knowledge, deploy-frontend, deploy-worker]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-session-name: github-smoketest-${{ github.run_id }}
-
-      - name: Run smoke test
-        run: |
-          chmod +x infrastructure/scripts/smoke-test.sh
-          # SMOKE_TEST_API_KEY is optional — the API uses rate limiting, not endpoint auth keys
-          ./infrastructure/scripts/smoke-test.sh \
-            "${{ secrets.SMOKE_TEST_API_URL }}"
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler@3 pages deploy dist/ --project-name mathanimate
