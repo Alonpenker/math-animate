@@ -1,19 +1,27 @@
-FROM python:3.13-slim
+FROM python:3.13-slim AS builder
 
-# Install system dependencies for postgreSQL and Docker CLI and clean apt cache
-RUN apt-get update && apt-get install -y libpq-dev gcc curl docker.io \
+RUN apt-get update && apt-get install -y libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (package manager)
 RUN pip install uv
 
 WORKDIR /app
 
-# Copy only dependency manifests
 COPY pyproject.toml uv.lock ./
 
-# Install deps (cached unless lockfile changes)
 RUN uv sync --frozen
 
-# Copy application code
+FROM python:3.13-slim
+
+RUN apt-get update && apt-get install -y libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
+
+RUN pip install uv
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+
 COPY . .

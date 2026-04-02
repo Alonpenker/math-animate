@@ -6,7 +6,7 @@ services:
       context: ./backend
     ports:
       - "127.0.0.1:8000:8000"
-    command: ["uv","run","uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uv","run","gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "--bind", "0.0.0.0:8000"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
   worker:
     build:
       context: ./backend
-    command: ["uv", "run", "celery", "-A", "app.workers.worker", "worker"]
+    command: ["uv", "run", "celery", "-A", "app.workers.worker", "worker", "--concurrency=2"]
     depends_on:
       postgres:
         condition: service_healthy
