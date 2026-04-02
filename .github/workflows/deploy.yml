@@ -169,5 +169,5 @@ jobs:
           echo "CLOUDFLARE_API_TOKEN=${CF_TOKEN}" >> "$GITHUB_ENV"
           echo "CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT}" >> "$GITHUB_ENV"
 
-      - name: Deploy to Cloudflare Pages
-        run: npx wrangler@3 pages deploy dist/ --project-name mathanimate
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler@4 deploy
