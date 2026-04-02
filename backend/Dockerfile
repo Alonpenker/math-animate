@@ -13,7 +13,7 @@ RUN uv sync --frozen
 
 FROM python:3.13-slim
 
-RUN apt-get update && apt-get install -y libpq5 \
+RUN apt-get update && apt-get install -y libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
