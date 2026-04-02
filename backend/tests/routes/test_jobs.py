@@ -15,6 +15,7 @@ from app.schemas.plan import Plan
 def test_create_job_persists_created_status_and_enqueues_worker(
     jobs_routes_with_runner_mock,
     sample_user_request,
+    fake_cursor,
     test_store,
 ):
     # Given
@@ -22,7 +23,7 @@ def test_create_job_persists_created_status_and_enqueues_worker(
 
     # When
     response = jobs_routes_with_runner_mock.create_job(
-        sample_user_request, redis_client=fake_redis
+        request=object(), user_request=sample_user_request, redis_client=fake_redis, cursor=fake_cursor
     )
 
     # Then
@@ -41,6 +42,7 @@ def test_create_job_persists_created_status_and_enqueues_worker(
 
 def test_get_job_status_returns_current_status(
     jobs_routes_with_runner_mock,
+    fake_cursor,
     test_store,
 ):
     # Given
@@ -50,7 +52,7 @@ def test_get_job_status_returns_current_status(
 
     # When
     response = jobs_routes_with_runner_mock.get_job_status(
-        job.job_id, redis_client=fake_redis
+        request=object(), job_id=job.job_id, redis_client=fake_redis
     )
 
     # Then
@@ -60,6 +62,7 @@ def test_get_job_status_returns_current_status(
 
 def test_get_job_status_raises_404_when_job_does_not_exist(
     jobs_routes_with_runner_mock,
+    fake_cursor,
 ):
     # Given
     missing_id = uuid4()
@@ -67,7 +70,7 @@ def test_get_job_status_raises_404_when_job_does_not_exist(
 
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
-        jobs_routes_with_runner_mock.get_job_status(missing_id, redis_client=fake_redis)
+        jobs_routes_with_runner_mock.get_job_status(request=object(), job_id=missing_id, redis_client=fake_redis)
 
     assert exc_info.value.status_code == 404
     assert "Job not found" in exc_info.value.detail
@@ -92,7 +95,7 @@ def test_get_plan_returns_job_and_plan_data(
 
     # When
     response = jobs_routes_with_runner_mock.get_plan(
-        job.job_id, redis_client=object(), cursor=fake_cursor
+        request=object(), job_id=job.job_id, redis_client=object(), cursor=fake_cursor
     )
 
     # Then
@@ -114,7 +117,7 @@ def test_get_plan_raises_404_when_plan_not_yet_created(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         jobs_routes_with_runner_mock.get_plan(
-            job.job_id, redis_client=object(), cursor=fake_cursor
+            request=object(), job_id=job.job_id, redis_client=object(), cursor=fake_cursor
         )
 
     assert exc_info.value.status_code == 404
@@ -140,7 +143,7 @@ def test_approve_plan_with_true_updates_status_and_enqueues_worker(
 
     # When
     response = jobs_routes_with_runner_mock.approve_plan(
-        job.job_id, approved=True, redis_client=object(), cursor=fake_cursor
+        request=object(), job_id=job.job_id, approved=True, redis_client=object(), cursor=fake_cursor
     )
 
     # Then
@@ -168,7 +171,7 @@ def test_approve_plan_with_false_cancels_job_without_enqueuing_worker(
 
     # When
     response = jobs_routes_with_runner_mock.approve_plan(
-        job.job_id, approved=False, redis_client=object(), cursor=fake_cursor
+        request=object(), job_id=job.job_id, approved=False, redis_client=object(), cursor=fake_cursor
     )
 
     # Then
@@ -189,7 +192,7 @@ def test_approve_plan_raises_409_when_job_is_not_in_planned_state(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         jobs_routes_with_runner_mock.approve_plan(
-            job.job_id, approved=True, redis_client=object(), cursor=fake_cursor
+            request=object(), job_id=job.job_id, approved=True, redis_client=object(), cursor=fake_cursor
         )
 
     assert exc_info.value.status_code == 409

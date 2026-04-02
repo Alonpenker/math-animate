@@ -38,7 +38,7 @@ def test_list_artifacts_returns_all_when_no_filters_applied(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=None, job_id=None, cursor=fake_cursor
+        request=object(), artifact_type=None, job_id=None, cursor=fake_cursor
     )
 
     # Then
@@ -60,7 +60,7 @@ def test_list_artifacts_returns_only_matching_type_when_type_filter_provided(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=ArtifactType.PYTHON_FILE, job_id=None, cursor=fake_cursor
+        request=object(), artifact_type=ArtifactType.PYTHON_FILE, job_id=None, cursor=fake_cursor
     )
 
     # Then
@@ -82,7 +82,7 @@ def test_list_artifacts_returns_only_matching_job_when_job_filter_provided(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=None, job_id=job_a, cursor=fake_cursor
+        request=object(), artifact_type=None, job_id=job_a, cursor=fake_cursor
     )
 
     # Then
@@ -106,7 +106,7 @@ def test_list_artifacts_applies_both_type_and_job_id_filters_simultaneously(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=ArtifactType.PYTHON_FILE, job_id=job_id, cursor=fake_cursor
+        request=object(), artifact_type=ArtifactType.PYTHON_FILE, job_id=job_id, cursor=fake_cursor
     )
 
     # Then
@@ -123,7 +123,7 @@ def test_list_artifacts_returns_empty_list_when_no_artifacts_exist(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=None, job_id=None, cursor=fake_cursor
+        request=object(), artifact_type=None, job_id=None, cursor=fake_cursor
     )
 
     # Then
@@ -142,7 +142,7 @@ def test_list_artifacts_response_does_not_expose_storage_path(
 
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
-        artifact_type=None, job_id=None, cursor=fake_cursor
+        request=object(), artifact_type=None, job_id=None, cursor=fake_cursor
     )
 
     # Then
@@ -163,7 +163,7 @@ def test_get_artifact_returns_metadata_for_existing_artifact(
     test_store["artifacts"][a.artifact_id] = a
 
     # When
-    result = artifacts_routes_with_mocks.get_artifact(a.artifact_id, cursor=fake_cursor)
+    result = artifacts_routes_with_mocks.get_artifact(request=object(), artifact_id=a.artifact_id, cursor=fake_cursor)
 
     # Then
     assert isinstance(result, ArtifactResponse)
@@ -182,7 +182,7 @@ def test_get_artifact_raises_404_when_artifact_not_found(
 
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
-        artifacts_routes_with_mocks.get_artifact(missing_id, cursor=fake_cursor)
+        artifacts_routes_with_mocks.get_artifact(request=object(), artifact_id=missing_id, cursor=fake_cursor)
 
     assert exc_info.value.status_code == 404
     assert "Artifact not found" in exc_info.value.detail
@@ -198,7 +198,7 @@ def test_get_artifact_response_does_not_expose_storage_path(
     test_store["artifacts"][a.artifact_id] = a
 
     # When
-    result = artifacts_routes_with_mocks.get_artifact(a.artifact_id, cursor=fake_cursor)
+    result = artifacts_routes_with_mocks.get_artifact(request=object(), artifact_id=a.artifact_id, cursor=fake_cursor)
 
     # Then
     assert "path" not in type(result).model_fields
@@ -222,7 +222,7 @@ def test_download_artifact_returns_file_response_with_correct_filename_and_media
 
     # When
     result = artifacts_routes_with_mocks.download_artifact(
-        a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
+        request=object(), artifact_id=a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
     )
 
     # Then
@@ -245,7 +245,7 @@ def test_download_artifact_uses_video_mp4_media_type_for_mp4_artifacts(
 
     # When
     result = artifacts_routes_with_mocks.download_artifact(
-        a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
+        request=object(), artifact_id=a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
     )
 
     # Then
@@ -264,7 +264,7 @@ def test_download_artifact_raises_404_when_artifact_not_found(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         artifacts_routes_with_mocks.download_artifact(
-            missing_id, cursor=fake_cursor, storage=mock_storage_service
+            request=object(), artifact_id=missing_id, cursor=fake_cursor, storage=mock_storage_service
         )
 
     assert exc_info.value.status_code == 404
@@ -288,7 +288,7 @@ def test_delete_artifact_removes_record_from_store_and_storage(
 
     # When
     result = artifacts_routes_with_mocks.delete_artifact(
-        a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
+        request=object(), artifact_id=a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
     )
 
     # Then
@@ -308,7 +308,7 @@ def test_delete_artifact_raises_404_when_artifact_not_found(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         artifacts_routes_with_mocks.delete_artifact(
-            missing_id, cursor=fake_cursor, storage=mock_storage_service
+            request=object(), artifact_id=missing_id, cursor=fake_cursor, storage=mock_storage_service
         )
 
     assert exc_info.value.status_code == 404
@@ -328,7 +328,7 @@ def test_delete_artifact_succeeds_even_when_minio_object_already_missing(
 
     # When
     result = artifacts_routes_with_mocks.delete_artifact(
-        a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
+        request=object(), artifact_id=a.artifact_id, cursor=fake_cursor, storage=mock_storage_service
     )
 
     # Then
@@ -355,7 +355,8 @@ def test_stream_artifact_returns_200_with_full_content_headers_when_no_range(
 
     # When
     result = artifacts_routes_with_mocks.stream_artifact(
-        a.artifact_id,
+        request=object(),
+        artifact_id=a.artifact_id,
         range_header=None,
         cursor=fake_cursor,
         storage=mock_storage_service,
@@ -384,7 +385,8 @@ def test_stream_artifact_returns_206_with_partial_content_headers_when_range_pro
 
     # When
     result = artifacts_routes_with_mocks.stream_artifact(
-        a.artifact_id,
+        request=object(),
+        artifact_id=a.artifact_id,
         range_header="bytes=2-5",
         cursor=fake_cursor,
         storage=mock_storage_service,
@@ -413,7 +415,8 @@ def test_stream_artifact_raises_416_when_range_header_format_is_invalid(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         artifacts_routes_with_mocks.stream_artifact(
-            a.artifact_id,
+            request=object(),
+            artifact_id=a.artifact_id,
             range_header="2-5",
             cursor=fake_cursor,
             storage=mock_storage_service,

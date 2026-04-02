@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.schemas.knowledge import KnowledgeType
+from app.schemas.knowledge import KnowledgeDocumentSchema, KnowledgeType
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -12,7 +12,6 @@ from app.schemas.knowledge import KnowledgeType
 
 def test_create_document_persists_document_with_correct_fields(
     knowledge_routes_with_mocks,
-    fake_cursor,
     test_store,
 ):
     # Given
@@ -25,18 +24,24 @@ def test_create_document_persists_document_with_correct_fields(
     )
 
     # When
-    response = knowledge_routes_with_mocks.create_document(body, cursor=fake_cursor)
+    response = knowledge_routes_with_mocks.create_document(request=object(), body=body)
 
     # Then
-    assert response.document.content == "Example plan content"
-    assert response.document.doc_type == KnowledgeType.PLAN
-    assert response.document.title == "Test Plan"
-    assert response.document.document_id in test_store["knowledge"]
+    assert "document_id" in response
+    assert isinstance(response["document_id"], str)
+    assert "message" in response
+    assert len(response["message"]) > 0
+
+    # Verify WorkerRunner.handle_create_document was called correctly
+    assert len(test_store["worker_runner_calls"]) == 1
+    call = test_store["worker_runner_calls"][0]
+    assert call["content"] == "Example plan content"
+    assert call["doc_type"] == KnowledgeType.PLAN.value
+    assert call["title"] == "Test Plan"
 
 
 def test_create_document_persists_code_type_document(
     knowledge_routes_with_mocks,
-    fake_cursor,
     test_store,
 ):
     # Given
@@ -49,11 +54,19 @@ def test_create_document_persists_code_type_document(
     )
 
     # When
-    response = knowledge_routes_with_mocks.create_document(body, cursor=fake_cursor)
+    response = knowledge_routes_with_mocks.create_document(request=object(), body=body)
 
     # Then
-    assert response.document.doc_type == KnowledgeType.CODE
-    assert response.document.document_id in test_store["knowledge"]
+    assert "document_id" in response
+    assert isinstance(response["document_id"], str)
+    assert "message" in response
+    assert len(response["message"]) > 0
+
+    assert len(test_store["worker_runner_calls"]) == 1
+    call = test_store["worker_runner_calls"][0]
+    assert call["content"] == "from manim import *"
+    assert call["doc_type"] == KnowledgeType.CODE.value
+    assert call["title"] == "Scene1 example"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -63,20 +76,22 @@ def test_create_document_persists_code_type_document(
 def test_get_document_returns_matching_document(
     knowledge_routes_with_mocks,
     fake_cursor,
+    test_store,
 ):
-    # Given
-    from app.schemas.knowledge import KnowledgeDocumentCreate
-
-    body = KnowledgeDocumentCreate(
-        content="Some code example",
-        doc_type=KnowledgeType.CODE,
-        title="Test Code",
-    )
-    create_response = knowledge_routes_with_mocks.create_document(body, cursor=fake_cursor)
-    doc_id = create_response.document.document_id
+    # Given — seed knowledge store directly
+    S = KnowledgeDocumentSchema
+    doc_id = uuid4()
+    test_store["knowledge"][doc_id] = {
+        S.DOCUMENT_ID.name: doc_id,
+        S.CONTENT.name: "Some code example",
+        S.DOC_TYPE.name: KnowledgeType.CODE.value,
+        S.TITLE.name: "Test Code",
+    }
 
     # When
-    response = knowledge_routes_with_mocks.get_document(doc_id, cursor=fake_cursor)
+    response = knowledge_routes_with_mocks.get_document(
+        request=object(), document_id=doc_id, cursor=fake_cursor
+    )
 
     # Then
     assert response.document.document_id == doc_id
@@ -93,7 +108,9 @@ def test_get_document_raises_404_when_document_not_found(
 
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
-        knowledge_routes_with_mocks.get_document(missing_id, cursor=fake_cursor)
+        knowledge_routes_with_mocks.get_document(
+            request=object(), document_id=missing_id, cursor=fake_cursor
+        )
 
     assert exc_info.value.status_code == 404
     assert "Document not found" in exc_info.value.detail
@@ -108,20 +125,21 @@ def test_delete_document_removes_document_from_store(
     fake_cursor,
     test_store,
 ):
-    # Given
-    from app.schemas.knowledge import KnowledgeDocumentCreate
-
-    body = KnowledgeDocumentCreate(
-        content="To be deleted",
-        doc_type=KnowledgeType.PLAN,
-        title="Delete Me",
-    )
-    create_response = knowledge_routes_with_mocks.create_document(body, cursor=fake_cursor)
-    doc_id = create_response.document.document_id
+    # Given — seed knowledge store directly
+    S = KnowledgeDocumentSchema
+    doc_id = uuid4()
+    test_store["knowledge"][doc_id] = {
+        S.DOCUMENT_ID.name: doc_id,
+        S.CONTENT.name: "To be deleted",
+        S.DOC_TYPE.name: KnowledgeType.PLAN.value,
+        S.TITLE.name: "Delete Me",
+    }
     assert doc_id in test_store["knowledge"]
 
     # When
-    knowledge_routes_with_mocks.delete_document(doc_id, cursor=fake_cursor)
+    knowledge_routes_with_mocks.delete_document(
+        request=object(), document_id=doc_id, cursor=fake_cursor
+    )
 
     # Then
     assert doc_id not in test_store["knowledge"]
@@ -136,7 +154,9 @@ def test_delete_document_raises_404_when_document_not_found(
 
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
-        knowledge_routes_with_mocks.delete_document(missing_id, cursor=fake_cursor)
+        knowledge_routes_with_mocks.delete_document(
+            request=object(), document_id=missing_id, cursor=fake_cursor
+        )
 
     assert exc_info.value.status_code == 404
     assert "Document not found" in exc_info.value.detail
@@ -149,22 +169,28 @@ def test_delete_document_raises_404_when_document_not_found(
 def test_get_documents_by_type_returns_only_matching_type(
     knowledge_routes_with_mocks,
     fake_cursor,
+    test_store,
 ):
-    # Given
-    from app.schemas.knowledge import KnowledgeDocumentCreate
-
-    knowledge_routes_with_mocks.create_document(
-        KnowledgeDocumentCreate(content="Plan content", doc_type=KnowledgeType.PLAN, title="Plan Doc"),
-        cursor=fake_cursor,
-    )
-    knowledge_routes_with_mocks.create_document(
-        KnowledgeDocumentCreate(content="Code content", doc_type=KnowledgeType.CODE, title="Code Doc"),
-        cursor=fake_cursor,
-    )
+    # Given — seed knowledge store directly
+    S = KnowledgeDocumentSchema
+    plan_id = uuid4()
+    code_id = uuid4()
+    test_store["knowledge"][plan_id] = {
+        S.DOCUMENT_ID.name: plan_id,
+        S.CONTENT.name: "Plan content",
+        S.DOC_TYPE.name: KnowledgeType.PLAN.value,
+        S.TITLE.name: "Plan Doc",
+    }
+    test_store["knowledge"][code_id] = {
+        S.DOCUMENT_ID.name: code_id,
+        S.CONTENT.name: "Code content",
+        S.DOC_TYPE.name: KnowledgeType.CODE.value,
+        S.TITLE.name: "Code Doc",
+    }
 
     # When
     response = knowledge_routes_with_mocks.get_documents(
-        doc_type=KnowledgeType.PLAN, cursor=fake_cursor
+        request=object(), doc_type=KnowledgeType.PLAN, cursor=fake_cursor
     )
 
     # Then
@@ -181,7 +207,7 @@ def test_get_documents_by_type_returns_empty_list_when_none_of_that_type_exist(
 
     # When
     response = knowledge_routes_with_mocks.get_documents(
-        doc_type=KnowledgeType.CODE, cursor=fake_cursor
+        request=object(), doc_type=KnowledgeType.CODE, cursor=fake_cursor
     )
 
     # Then

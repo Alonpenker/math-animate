@@ -180,11 +180,21 @@ def mock_knowledge_repository(
 
 @pytest.fixture
 def knowledge_routes_with_mocks(
+    monkeypatch: pytest.MonkeyPatch,
     mock_knowledge_repository: None,
     mock_rag_service: None,
+    test_store: dict[str, Any],
 ):
-    """Returns the knowledge routes module with repository and RAG mocked."""
+    """Returns the knowledge routes module with repository, RAG, and WorkerRunner mocked."""
     from app.routes import knowledge as knowledge_routes
+
+    monkeypatch.setattr(
+        knowledge_routes.WorkerRunner,
+        "handle_create_document",
+        staticmethod(lambda document_id, content, doc_type, title: test_store["worker_runner_calls"].append(
+            {"document_id": document_id, "content": content, "doc_type": doc_type, "title": title}
+        )),
+    )
 
     return knowledge_routes
 

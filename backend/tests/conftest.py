@@ -4,14 +4,15 @@ from typing import Any
 import pytest
 
 # Ensure settings can load during module imports across all test modules.
-os.environ.setdefault("api_key", "test-api-key")
+os.environ.setdefault("x_api_key", "test-api-key")
+os.environ.setdefault("openai_api_key", "sk-test-openai-key")
+os.environ.setdefault("frontend_url", "http://localhost:3000")
 os.environ.setdefault("storage_endpoint", "localhost:9000")
 os.environ.setdefault("storage_access_key", "minioadmin")
 os.environ.setdefault("storage_secret_key", "minioadmin")
 os.environ.setdefault("storage_bucket", "test-bucket")
 os.environ.setdefault("database_url", "postgresql://manim:manim@localhost:5432/manim")
 os.environ.setdefault("broker_url", "redis://localhost:6379/0")
-os.environ.setdefault("backend_url", "redis://localhost:6379/1")
 os.environ.setdefault("ollama_base_url", "http://localhost:11434")
 os.environ.setdefault("redis_url", "redis://localhost:6379/0")
 

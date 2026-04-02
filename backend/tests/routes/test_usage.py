@@ -49,7 +49,7 @@ def test_get_usage_aggregates_consumed_and_reserved_from_ledger(
     ])
 
     # When
-    result = usage_routes_with_mocks.get_usage(cursor=fake_cursor)
+    result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
     # Then
     assert isinstance(result, TokenUsageResponse)
@@ -71,7 +71,7 @@ def test_get_usage_returns_full_remaining_when_no_tokens_used(
     # Given — empty ledger
 
     # When
-    result = usage_routes_with_mocks.get_usage(cursor=fake_cursor)
+    result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
     # Then
     assert result.consumed == 0
@@ -97,7 +97,7 @@ def test_get_usage_active_reservations_reduce_remaining_capacity(
     ])
 
     # When
-    result = usage_routes_with_mocks.get_usage(cursor=fake_cursor)
+    result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
     # Then
     assert result.reserved == 50_000
@@ -121,7 +121,7 @@ def test_get_usage_detects_soft_threshold_exceeded(
     )
 
     # When
-    result = usage_routes_with_mocks.get_usage(cursor=fake_cursor)
+    result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
     # Then
     assert result.soft_threshold_exceeded is True
@@ -146,7 +146,7 @@ def test_get_usage_remaining_is_zero_at_hard_limit(
     )
 
     # When
-    result = usage_routes_with_mocks.get_usage(cursor=fake_cursor)
+    result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
     # Then
     assert result.remaining == 0
