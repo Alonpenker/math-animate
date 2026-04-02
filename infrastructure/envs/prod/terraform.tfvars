@@ -24,7 +24,7 @@ api_desired_count = 1
 
 # ── EC2 Worker ─────────────────────────────────────────────────────────────────
 worker_instance_type = "t3.medium"
-worker_ami_id = "ami-0f77cdd9f61b7735e"
+worker_ami_id        = "ami-0f77cdd9f61b7735e"
 
 # ── S3 ─────────────────────────────────────────────────────────────────────────
 artifact_lifecycle_days = 30

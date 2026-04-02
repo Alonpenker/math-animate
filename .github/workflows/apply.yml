@@ -1,4 +1,4 @@
-name: Terraform
+name: Apply
 
 on:
   workflow_dispatch:
@@ -57,7 +57,7 @@ jobs:
             -input=false
 
       - name: Terraform Format Check
-        run: terraform fmt -check -recursive -diff
+        run: terraform fmt -check -recursive
         continue-on-error: false
 
       - name: Terraform Validate
@@ -66,6 +66,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: |
+          set +e
           terraform plan \
             -input=false \
             -out=tfplan \

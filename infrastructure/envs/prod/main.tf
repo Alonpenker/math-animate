@@ -117,22 +117,22 @@ module "security_groups" {
 module "rds" {
   source = "../../modules/rds"
 
-  name_prefix             = local.name_prefix
-  environment             = var.environment
+  name_prefix        = local.name_prefix
+  environment        = var.environment
   private_subnet_ids = module.networking.private_subnet_ids
   rds_sg_id          = module.security_groups.rds_sg_id
-  instance_class          = var.db_instance_class
-  db_name                 = var.db_name
-  db_username             = var.db_username
+  instance_class     = var.db_instance_class
+  db_name            = var.db_name
+  db_username        = var.db_username
 }
 
 module "elasticache" {
   source = "../../modules/elasticache"
 
-  name_prefix             = local.name_prefix
+  name_prefix        = local.name_prefix
   private_subnet_ids = module.networking.private_subnet_ids
   redis_sg_id        = module.security_groups.redis_sg_id
-  node_type               = var.cache_node_type
+  node_type          = var.cache_node_type
 }
 
 module "sqs" {
@@ -166,12 +166,12 @@ module "ecs" {
 
   name_prefix            = local.name_prefix
   environment            = var.environment
-  private_subnet_ids = module.networking.private_subnet_ids
-  ecs_api_sg_id      = module.security_groups.ecs_api_sg_id
+  private_subnet_ids     = module.networking.private_subnet_ids
+  ecs_api_sg_id          = module.security_groups.ecs_api_sg_id
   target_group_arn       = module.alb.target_group_arn
   ecs_execution_role_arn = module.iam.ecs_execution_role_arn
   ecs_task_role_arn      = module.iam.ecs_task_role_arn
-  image_uri                        = var.image_uri
+  image_uri              = var.image_uri
   cpu                    = var.api_cpu
   memory                 = var.api_memory
   desired_count          = var.api_desired_count
@@ -187,21 +187,21 @@ module "ecs" {
 module "ec2_worker" {
   source = "../../modules/ec2"
 
-  name_prefix            = local.name_prefix
-  environment            = var.environment
-  ami_id                 = var.worker_ami_id
-  instance_type          = var.worker_instance_type
-  private_subnet_ids     = module.networking.private_subnet_ids
-  worker_sg_id           = module.security_groups.ec2_worker_sg_id
-  instance_profile_name  = module.iam.ec2_worker_instance_profile_name
-  image_uri              = var.image_uri
-  artifact_bucket_name   = module.s3.artifact_bucket_name
-  sqs_queue_url          = module.sqs.queue_url
-  database_url           = local.database_url
-  redis_url              = module.elasticache.redis_url
-  frontend_url           = var.frontend_url
-  storage_access_key     = module.iam.storage_access_key_id
-  storage_secret_key     = module.iam.storage_secret_access_key
+  name_prefix           = local.name_prefix
+  environment           = var.environment
+  ami_id                = var.worker_ami_id
+  instance_type         = var.worker_instance_type
+  private_subnet_ids    = module.networking.private_subnet_ids
+  worker_sg_id          = module.security_groups.ec2_worker_sg_id
+  instance_profile_name = module.iam.ec2_worker_instance_profile_name
+  image_uri             = var.image_uri
+  artifact_bucket_name  = module.s3.artifact_bucket_name
+  sqs_queue_url         = module.sqs.queue_url
+  database_url          = local.database_url
+  redis_url             = module.elasticache.redis_url
+  frontend_url          = var.frontend_url
+  storage_access_key    = module.iam.storage_access_key_id
+  storage_secret_key    = module.iam.storage_secret_access_key
 }
 
 # ── Cloudflare DNS ─────────────────────────────────────────────────────────────
