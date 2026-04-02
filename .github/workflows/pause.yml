@@ -1,9 +1,8 @@
 name: Pause
 
 # ── Trigger: MANUAL ONLY ──────────────────────────────────────────────────────
-# This workflow destroys all metered AWS resources while preserving:
+# This workflow destroys all metered AWS resources and Cloudflare DNS records while preserving:
 #   - Secrets Manager entries
-#   - Cloudflare DNS records (managed by Terraform but not destroyed here)
 #   - Docker Hub images (hosted externally, unaffected)
 #   - GitHub OIDC provider (created manually, unaffected by terraform destroy)
 #   - GitHub Actions IAM role (created manually, see infrastructure/README.md)
@@ -81,7 +80,6 @@ jobs:
             -backend-config="region=eu-north-1" \
             -input=false
 
-      # ── Show what will be destroyed ────────────────────────────────────────────
       - name: Terraform Destroy Plan (preview)
         run: |
           echo "==> The following modules will be destroyed:"
@@ -97,10 +95,10 @@ jobs:
           echo "  - module.s3           (S3 artifact bucket — DATA WILL BE LOST)"
           echo "  - module.acm          (ACM certificate)"
           echo "  - module.iam          (IAM roles, policies, storage user)"
+          echo "  - module.cloudflare   (Cloudflare DNS records)"
           echo ""
           echo "==> The following resources will be PRESERVED:"
           echo ""
-          echo "  - module.cloudflare   (Cloudflare DNS records)"
           echo "  - GitHub Actions IAM role (manually created, not managed by Terraform)"
           echo "  - Docker Hub images   (hosted externally, unaffected)"
           echo "  - Secrets Manager entries"
@@ -125,15 +123,16 @@ jobs:
             -target=module.networking \
             -target=module.s3 \
             -target=module.acm \
-            -target=module.iam
+            -target=module.iam \
+            -target=module.cloudflare
 
       - name: Teardown complete
         run: |
           echo ""
           echo "==> Infrastructure paused successfully."
           echo ""
-          echo "    All metered resources have been destroyed."
-          echo "    Cloudflare DNS, Secrets Manager, Terraform state, Docker Hub images, and the manually-created GitHub Actions IAM role are intact."
+          echo "    All metered resources and Cloudflare DNS records have been destroyed."
+          echo "    Secrets Manager, Terraform state, Docker Hub images, and the manually-created GitHub Actions IAM role are intact."
           echo ""
           echo "==> To resume:"
           echo "    1. Go to Actions → Apply → Run workflow (applies infrastructure)"

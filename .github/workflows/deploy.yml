@@ -1,5 +1,14 @@
 name: Deploy
 
+# ── Trigger: MANUAL ONLY ──────────────────────────────────────────────────────
+# This workflow builds and deploys the full application stack in order:
+#   1. Build & push Docker images to Docker Hub
+#   2. Deploy EC2 worker (reboot to pull latest image)
+#   3. Deploy API (force new ECS deployment, wait for stability)
+#   4. Deploy frontend (build and publish to Cloudflare Pages)
+#
+# Prerequisites: infrastructure must be provisioned via apply.yml before running.
+#
 on:
   workflow_dispatch:
 
