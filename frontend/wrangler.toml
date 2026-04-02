@@ -1,5 +1,6 @@
 name = "mathanimate"
 compatibility_date = "2025-01-01"
+preview_urls = false
 
 [assets]
 directory = "./dist"

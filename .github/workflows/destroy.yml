@@ -1,4 +1,4 @@
-name: Pause
+name: Destroy
 
 # ── Trigger: MANUAL ONLY ──────────────────────────────────────────────────────
 # This workflow destroys all metered AWS resources and Cloudflare DNS records while preserving:
@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type 'PAUSE' to confirm partial teardown"
+        description: "Type 'DESTROY' to confirm teardown"
         required: true
         type: string
 
@@ -32,32 +32,31 @@ env:
   TF_VERSION: "1.13.3"
 
 jobs:
-  pause:
-    name: Pause Infrastructure
+  destroy:
+    name: Destroy Infrastructure
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
-      # ── Safety guard ──────────────────────────────────────────────────────────
-      - name: Verify confirmation input
-        run: |
-          if [[ "${{ github.event.inputs.confirm }}" != "PAUSE" ]]; then
-            echo "ERROR: Confirmation input must be exactly 'PAUSE'. Got: '${{ github.event.inputs.confirm }}'"
-            exit 1
-          fi
-          echo "Confirmation accepted. Proceeding with partial teardown..."
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify confirmation input
+        run: |
+          if [[ "${{ github.event.inputs.confirm }}" != "DESTROY" ]]; then
+            echo "ERROR: Confirmation input must be exactly 'DESTROY'. Got: '${{ github.event.inputs.confirm }}'"
+            exit 1
+          fi
+          echo "Confirmation accepted. Proceeding with teardown..."
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-north-1
-          role-session-name: github-pause-${{ github.run_id }}
+          role-session-name: github-destroy-${{ github.run_id }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -107,7 +106,7 @@ jobs:
           echo "==> Starting targeted destroy in 10 seconds..."
           sleep 10
 
-      # ── Targeted destroy: remove only expensive modules ────────────────────────
+      # ── Targeted destroy: remove all managed modules ───────────────────────────
       - name: Terraform Destroy (targeted)
         run: |
           terraform destroy \
@@ -126,10 +125,10 @@ jobs:
             -target=module.iam \
             -target=module.cloudflare
 
-      - name: Teardown complete
+      - name: Destroy complete
         run: |
           echo ""
-          echo "==> Infrastructure paused successfully."
+          echo "==> Infrastructure destroyed successfully."
           echo ""
           echo "    All metered resources and Cloudflare DNS records have been destroyed."
           echo "    Secrets Manager, Terraform state, Docker Hub images, and the manually-created GitHub Actions IAM role are intact."
