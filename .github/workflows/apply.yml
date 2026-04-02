@@ -69,6 +69,7 @@ jobs:
           set +e
           terraform plan \
             -input=false \
+            -detailed-exitcode \
             -out=tfplan \
             -no-color \
             2>&1 | tee plan-output.txt
