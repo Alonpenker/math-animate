@@ -21,7 +21,7 @@ from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import Artifact, ArtifactType
 from app.services.budget_service import BudgetService
 from app.services.files_storage_service import FilesStorageService
-from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, PathNames, DockerCommands
+from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, DRY_RUN_TIMEOUT_SECONDS, PathNames, DockerCommands
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -189,14 +189,14 @@ def dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str, bool]:
 
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=60, input="*\n",
+            command, capture_output=True, text=True, timeout=DRY_RUN_TIMEOUT_SECONDS, input="*\n",
         )
         if result.returncode == 0:
             return True, "", True
         error_output = (result.stdout or "") + (result.stderr or "")
         return False, extract_traceback(error_output), True
     except subprocess.TimeoutExpired:
-        return False, "Dry-run timed out after 60s.", False
+        return False, f"Dry-run timed out after {DRY_RUN_TIMEOUT_SECONDS}s.", False
     except Exception as exc:
         return False, str(exc), False
 

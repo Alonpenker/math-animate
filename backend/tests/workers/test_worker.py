@@ -365,7 +365,7 @@ def test_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path
 
     # Then
     assert passed is False
-    assert "Dry-run timed out after 60s." in error
+    assert "Dry-run timed out after 90s." in error
     assert is_fixable is False
 
 
@@ -698,6 +698,7 @@ def test_verify_code_task_enqueues_fix_on_first_static_analysis_failure(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_worker_paths,
     test_store,
 ):
     # Given
@@ -735,6 +736,7 @@ def test_verify_code_task_sets_failed_verification_on_second_static_failure(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_worker_paths,
     test_store,
 ):
     # Given
@@ -765,6 +767,7 @@ def test_verify_code_task_does_not_persist_artifact_when_verification_fails(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_worker_paths,
     test_store,
 ):
     # Given — code that fails static analysis should never be saved

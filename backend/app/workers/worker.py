@@ -1,5 +1,5 @@
 from celery import Celery
-from celery.signals import worker_process_init, worker_process_shutdown
+from celery.signals import worker_process_init, worker_process_shutdown, worker_ready
 from pathlib import Path
 from uuid import UUID, uuid4
 import json
@@ -24,6 +24,7 @@ from app.schemas.artifact import ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
+import psycopg2
 from app.workers.worker_helpers import (
     log_context,
     transition_job,
@@ -68,10 +69,17 @@ def init_worker(**kwargs) -> None:
     init_storage()
     init_db_pool()
     init_redis_pool()
+
+
+@worker_ready.connect
+def on_worker_ready(**kwargs) -> None:
+    init_db_pool()
     try:
         seed_knowledge_task()
     except Exception:
         logger.warning("Knowledge auto-seed on startup failed; worker will continue.", exc_info=True)
+    finally:
+        close_db_pool()
 
 
 @worker_process_shutdown.connect
@@ -420,11 +428,14 @@ def seed_knowledge_task() -> None:
                 continue
         content = (examples_dir / entry["file"]).read_text(encoding="utf-8")
         embedding = RAGService.embed_text(content)
-        with get_worker_cursor() as cursor:
-            KnowledgeRepository.create_document(
-                cursor, document_id, content, entry["doc_type"], entry["title"], embedding
-            )
-        inserted += 1
+        try:
+            with get_worker_cursor() as cursor:
+                KnowledgeRepository.create_document(
+                    cursor, document_id, content, entry["doc_type"], entry["title"], embedding
+                )
+            inserted += 1
+        except psycopg2.errors.UniqueViolation:
+            skipped += 1
     logger.info("Seed complete: inserted=%d skipped=%d", inserted, skipped)
 
 

@@ -11,6 +11,7 @@ DANGEROUS_BUILTINS: frozenset[str] = frozenset({
     "exec", "eval", "open", "__import__", "compile",
 })
 
+DRY_RUN_TIMEOUT_SECONDS: int = 90
 RENDER_TIMEOUT_SECONDS: int = 600
 
 class PathNames:
