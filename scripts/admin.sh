@@ -22,7 +22,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE="docker compose --project-directory . -f backend/docker-compose.yml -f frontend/docker-compose.yml -f docker-compose.vps.yml"
+# Load env to pick up X_API_KEY
+if [[ -f backend/.env ]]; then
+  set -a
+  source <(sed 's/\r//' backend/.env)
+  set +a
+fi
+[[ -z "${X_API_KEY:-}" ]] && { echo "ERROR: X_API_KEY is not set. Add it to backend/.env." >&2; exit 1; }
+
+COMPOSE="docker compose --project-directory . -f backend/docker-compose.yml -f docker-compose.vps.yml"
 API="http://localhost:8000/api/v1"
 
 pretty() {
@@ -31,7 +39,9 @@ pretty() {
 
 api() {
   local method="$1" path="$2" data="${3:-}"
-  local args=(-s -X "$method" "http://localhost:8000${path}" -H "Content-Type: application/json")
+  local args=(-s -X "$method" "http://localhost:8000${path}" \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: ${X_API_KEY}")
   [[ -n "$data" ]] && args+=(-d "$data")
   $COMPOSE exec -T api curl "${args[@]}" | pretty
 }
@@ -84,7 +94,8 @@ case "$CMD" in
     api GET "$path" ;;
 
   rm_artifact)
-    $COMPOSE exec -T api curl -s -X DELETE "$API/artifacts/$ARTIFACT_ID" | pretty ;;
+    $COMPOSE exec -T api curl -s -X DELETE "$API/artifacts/$ARTIFACT_ID" \
+      -H "X-API-Key: ${X_API_KEY}" | pretty ;;
 
   list_jobs)
     path="/api/v1/jobs?"
@@ -97,7 +108,8 @@ case "$CMD" in
     api GET "/api/v1/knowledge?doc_type=$TYPE" ;;
 
   rm_knowledge)
-    $COMPOSE exec -T api curl -s -X DELETE "$API/knowledge/$DOC_ID" | pretty ;;
+    $COMPOSE exec -T api curl -s -X DELETE "$API/knowledge/$DOC_ID" \
+      -H "X-API-Key: ${X_API_KEY}" | pretty ;;
 
   create_knowledge)
     [[ -z "$TYPE" || -z "$TITLE" || -z "$CONTENT" ]] && {

@@ -1,0 +1,70 @@
+name: Deploy Frontend
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend to Cloudflare
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: github-deploy-frontend-${{ github.run_id }}
+
+      - name: Fetch x-api-key from Secrets Manager
+        run: |
+          X_API_KEY=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/x-api-key" \
+            --query SecretString --output text)
+          echo "::add-mask::${X_API_KEY}"
+          echo "VITE_X_API_KEY=${X_API_KEY}" >> "$GITHUB_ENV"
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Fetch Cloudflare credentials from Secrets Manager
+        run: |
+          CF=$(aws secretsmanager get-secret-value \
+            --region eu-north-1 \
+            --secret-id "mathanimate/prod/cloudflare-credentials" \
+            --query SecretString --output text)
+          CF_TOKEN=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_token'])")
+          CF_ACCOUNT=$(echo "$CF" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['account_id'])")
+          echo "::add-mask::${CF_TOKEN}"
+          echo "::add-mask::${CF_ACCOUNT}"
+          echo "CLOUDFLARE_API_TOKEN=${CF_TOKEN}" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT}" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler@4 deploy

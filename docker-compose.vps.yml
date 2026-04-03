@@ -25,22 +25,12 @@ services:
   docker-daemon:
     restart: unless-stopped
 
-  frontend:
-    restart: unless-stopped
-
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
-    env_file:
-      - .env
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
     depends_on:
-      - frontend
-
-volumes:
-  caddy_data:
+      - api
