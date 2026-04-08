@@ -57,12 +57,6 @@ export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps
                   <p className="mt-1 text-sm text-chalk-white/80" style={{ fontFamily: 'Inter, sans-serif' }}>{value}</p>
                 </div>
               ))}
-              {scene.template_hints && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-chalk-white/45" style={{ fontFamily: 'Inter, sans-serif' }}>Template Hints</p>
-                  <p className="mt-1 text-xs text-chalk-white/55 italic" style={{ fontFamily: 'Inter, sans-serif' }}>{scene.template_hints}</p>
-                </div>
-              )}
             </div>
           </div>
         ))}

@@ -22,7 +22,6 @@ export interface ScenePlan {
   learning_objective: string;
   visual_storyboard: string;
   voice_notes: string;
-  template_hints?: string;
 }
 
 export interface VideoPlan {

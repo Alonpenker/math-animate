@@ -141,7 +141,7 @@ def test_render_fix_prompt_uses_codegen_fix_system_prompt():
 # LLMService.render_plan_prompt
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_render_plan_prompt_injects_rag_examples_into_system_prompt(
+def test_render_plan_prompt_injects_rag_examples_into_user_query(
     monkeypatch: pytest.MonkeyPatch,
     sample_user_request,
 ):
@@ -162,7 +162,8 @@ def test_render_plan_prompt_injects_rag_examples_into_system_prompt(
     system_prompt, user_query = LLMService.render_plan_prompt(sample_user_request)
 
     # Then
-    assert "example plan content" in system_prompt
+    assert "example plan content" in user_query
+    assert "example plan content" not in system_prompt
     assert sample_user_request.topic in user_query
 
 

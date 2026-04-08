@@ -1,159 +1,140 @@
 from manim import *
 
 
-def make_condition_panel(
-    product_value: str,
-    sum_value: str,
-    anchor: np.ndarray,
-) -> tuple[VGroup, Text, MathTex, Text, MathTex]:
-    panel = RoundedRectangle(
-        corner_radius=0.16,
-        width=4.6,
-        height=2.5,
-        color=BLUE_E,
-        stroke_width=2,
-    )
-    panel.set_fill(BLUE_E, opacity=0.06)
-    panel.move_to(anchor)
-
-    title = Text("Need two numbers", font_size=28, weight=BOLD).move_to(
-        panel.get_top() + DOWN * 0.38
-    )
-    product_label = Text("Product", font_size=24, color=TEAL_D)
-    product_equal = MathTex("=", font_size=30, color=TEAL_D)
-    product_value_tex = MathTex(product_value, font_size=34, color=TEAL_D)
-    product_row = VGroup(product_label, product_equal, product_value_tex).arrange(RIGHT, buff=0.16)
-
-    sum_label = Text("Sum", font_size=24, color=ORANGE)
-    sum_equal = MathTex("=", font_size=30, color=ORANGE)
-    sum_value_tex = MathTex(sum_value, font_size=34, color=ORANGE)
-    sum_row = VGroup(sum_label, sum_equal, sum_value_tex).arrange(RIGHT, buff=0.16)
-
-    rows = VGroup(product_row, sum_row).arrange(DOWN, aligned_edge=LEFT, buff=0.35)
-    rows.move_to(panel.get_center() + DOWN * 0.18)
-
-    group = VGroup(panel, title, rows)
-    return group, product_label, product_value_tex, sum_label, sum_value_tex
-
-
-def make_pair_row(
-    left_value: str,
-    right_value: str,
-    product_text: str,
-    sum_text: str,
-    color: ManimColor = WHITE,
-) -> VGroup:
-    pair_tex = MathTex(
-        "(",
-        left_value,
-        ",",
-        right_value,
-        ")",
-        font_size=34,
-        color=color,
-    )
-    product_tex = MathTex(product_text, font_size=34, color=TEAL_D)
-    sum_tex = MathTex(sum_text, font_size=34, color=ORANGE)
-    row = VGroup(pair_tex, product_tex, sum_tex).arrange(RIGHT, buff=0.35)
-    return row
-
-
-def make_factor_table(rows: list[VGroup], anchor: np.ndarray) -> tuple[VGroup, Text]:
-    panel = RoundedRectangle(
-        corner_radius=0.16,
-        width=5.2,
-        height=3.6,
-        color=GRAY_B,
-        stroke_width=2,
-    )
-    panel.set_fill(GRAY_E, opacity=0.08)
-    panel.move_to(anchor)
-
-    title = Text("Factor Pairs", font_size=28, weight=BOLD).move_to(
-        panel.get_top() + DOWN * 0.35
-    )
-    body = VGroup(*rows).arrange(DOWN, aligned_edge=LEFT, buff=0.38)
-    body.move_to(panel.get_center() + DOWN * 0.15)
-    group = VGroup(panel, title, body)
-    return group, title
-
-
 class Scene1(Scene):
-    def construct(self) -> None:
-        title = Text("Factor x^2 + bx + c", font_size=40, weight=BOLD).to_edge(UP, buff=0.35)
-        expression = MathTex("x^2", "+", "5", "x", "+", "6", font_size=68).move_to(UP * 1.15)
+    def construct(self):
+        title_group = VGroup()
+        middle_group = VGroup()
+        bottom_group = VGroup()
 
-        panel_group, _, product_value_tex, _, sum_value_tex = make_condition_panel("?", "?", LEFT * 3.3 + DOWN * 1.8)
+        color_a = BLUE_B
+        color_b = BLUE_D
+        color_c = BLUE_E
 
-        row1 = make_pair_row("1", "6", "1\\cdot 6=6", "1+6=7")
-        row2 = make_pair_row("2", "3", "2\\cdot 3=6", "2+3=5")
-        table_group, _ = make_factor_table([row1, row2], RIGHT * 3.2 + DOWN * 1.7)
+        # Title section:
+        title = Text("Factor ax^2 + bx + c")
+        title.to_edge(UP)
+        title_group.add(title)
+        self.play(Write(title), run_time=2)
+        self.wait(1.5)
 
-        self.play(FadeIn(title, shift=DOWN * 0.2), run_time=0.8)
-        self.wait(1)
+        # Middle section:
+        general_expr = MathTex("a", "x^2", "+", "b", "x", "+", "c")
+        general_expr.move_to(UP * 2)
+        middle_group.add(general_expr)
+        self.play(Write(general_expr), run_time=0.8)
+        self.wait(2)
 
-        self.play(Write(expression), run_time=1.0)
-        self.wait(1)
+        example_expr = MathTex("x^2", "+", "5", "x", "+", "6")
+        example_expr.next_to(general_expr, DOWN, buff=0.6)
+        middle_group.add(example_expr)
+        self.play(Write(example_expr), run_time=0.8)
+        self.wait(2)
 
-        self.play(FadeIn(panel_group, shift=UP * 0.2), run_time=0.8)
-        self.wait(1)
+        general_colored = MathTex("a", "x^2", "+", "b", "x", "+", "c")
+        general_colored.move_to(UP * 2)
+        general_colored.set_color_by_tex("a", color_a)
+        general_colored.set_color_by_tex("b", color_b)
+        general_colored.set_color_by_tex("c", color_c)
 
-        product_target = MathTex("6", font_size=34, color=TEAL_D).move_to(product_value_tex)
-        sum_target = MathTex("5", font_size=34, color=ORANGE).move_to(sum_value_tex)
+        example_colored = MathTex("x^2", "+", "5", "x", "+", "6")
+        example_colored.next_to(general_colored, DOWN, buff=0.6)
+        example_colored.set_color_by_tex("5", color_b)
+        example_colored.set_color_by_tex("6", color_c)
 
-        self.play(Indicate(expression[5], color=TEAL_D, scale_factor=1.08), run_time=0.7)
-        moving_six = expression[5].copy()
-        self.add(moving_six)
-        self.play(moving_six.animate.move_to(product_value_tex.get_center()), run_time=0.8)
+        next_middle_group = VGroup()
+        next_middle_group.add(general_colored)
+        next_middle_group.add(example_colored)
         self.play(
-            FadeOut(moving_six, scale=0.85),
-            Transform(product_value_tex, product_target),
-            run_time=0.6,
-        )
-        self.wait(1)
-
-        self.play(Indicate(expression[2], color=ORANGE, scale_factor=1.08), run_time=0.7)
-        moving_five = expression[2].copy()
-        self.add(moving_five)
-        self.play(moving_five.animate.move_to(sum_value_tex.get_center()), run_time=0.8)
-        self.play(
-            FadeOut(moving_five, scale=0.85),
-            Transform(sum_value_tex, sum_target),
-            run_time=0.6,
-        )
-        self.wait(1)
-
-        self.play(FadeIn(table_group, shift=UP * 0.2), run_time=0.8)
-        self.wait(1)
-
-        row1_box = SurroundingRectangle(row1, color=GRAY_B, buff=0.12)
-        row2_box = SurroundingRectangle(row2, color=GREEN_E, buff=0.12)
-
-        self.play(Create(row1_box), run_time=0.6)
-        self.wait(1)
-        wrong_note = Text("Sum is 7, not 5", font_size=20, color=RED_E)
-        wrong_note.next_to(row2, DOWN, buff=0.18)
-        wrong_note.align_to(row2, LEFT)
-        self.play(FadeIn(wrong_note, shift=UP * 0.1), run_time=0.6)
-        self.wait(1)
-
-        self.play(
-            ReplacementTransform(row1_box, row2_box),
-            FadeOut(wrong_note, shift=DOWN * 0.1),
-            row2[0].animate.set_color(GREEN_E),
+            ReplacementTransform(general_expr, general_colored),
+            ReplacementTransform(example_expr, example_colored),
             run_time=0.8,
         )
+        middle_group = next_middle_group
+        self.wait(2)
+
+        map_a = MathTex("a", "=", "1")
+        map_a.set_color_by_tex("a", color_a)
+        map_a.set_color_by_tex("1", color_a)
+
+        map_b = MathTex("b", "=", "5")
+        map_b.set_color_by_tex("b", color_b)
+        map_b.set_color_by_tex("5", color_b)
+
+        map_c = MathTex("c", "=", "6")
+        map_c.set_color_by_tex("c", color_c)
+        map_c.set_color_by_tex("6", color_c)
+
+        parameter_map = VGroup(map_a, map_b, map_c)
+        parameter_map.arrange(DOWN, buff=0.35)
+        parameter_map.next_to(example_colored, DOWN, buff=0.5)
+        middle_group.add(parameter_map)
+        self.play(Write(parameter_map), run_time=0.8)
+        self.wait(2)
+
+        rule_product = MathTex("r_1 r_2", "=", "a", "\\cdot", "c")
+        rule_product.set_color_by_tex("a", color_a)
+        rule_product.set_color_by_tex("c", color_c)
+
+        rule_sum = MathTex("r_1 + r_2", "=", "b")
+        rule_sum.set_color_by_tex("b", color_b)
+
+        rule_group = VGroup(rule_product, rule_sum)
+        rule_group.arrange(DOWN, buff=0.35)
+        rule_group.next_to(parameter_map, DOWN, buff=0.5)
+        middle_group.add(rule_group)
+        self.play(Write(rule_group), run_time=0.8)
+        self.wait(2)
+
+        value_product = MathTex("r_1 r_2", "=", "1", "\\cdot", "6", "=", "6")
+        value_product.set_color_by_tex("1", color_a)
+        value_product.set_color_by_tex("6", color_c)
+
+        value_sum = MathTex("r_1 + r_2", "=", "5")
+        value_sum.set_color_by_tex("5", color_b)
+
+        value_group = VGroup(value_product, value_sum)
+        value_group.arrange(DOWN, buff=0.35)
+        value_group.next_to(parameter_map, DOWN, buff=0.5)
+
+        next_middle_group = VGroup()
+        next_middle_group.add(general_colored)
+        next_middle_group.add(example_colored)
+        next_middle_group.add(parameter_map)
+        next_middle_group.add(value_group)
+        self.play(ReplacementTransform(rule_group, value_group), run_time=0.8)
+        middle_group = next_middle_group
         self.wait(1)
 
-        factored = MathTex("(", "x", "+", "2", ")", "(", "x", "+", "3", ")", font_size=64)
-        factored.move_to(DOWN * 0.45)
-        pair_copy = row2[0].copy()
-        self.add(pair_copy)
-        self.play(
-            FadeOut(panel_group, shift=DOWN * 0.15),
-            FadeOut(table_group, shift=DOWN * 0.15),
-            FadeOut(row2_box),
-            TransformMatchingTex(pair_copy, factored),
-            run_time=1.1,
-        )
-        self.wait(1.5)
+        self.play(FadeOut(middle_group), run_time=0.8)
+        middle_group = VGroup()
+        self.wait(2)
+
+        pair_check_1 = MathTex("(1,6):\\ 1\\cdot 6=6,\\ 1+6=7")
+        pair_check_2 = MathTex("(2,3):\\ 2\\cdot 3=6,\\ 2+3=5")
+        pair_check_1.set_color(RED)
+        pair_check_2.set_color(BLUE)
+
+        pair_group = VGroup(pair_check_1, pair_check_2)
+        pair_group.arrange(DOWN, buff=0.4)
+        pair_group.move_to(UP * 0.8)
+        middle_group.add(pair_group)
+        self.play(Write(pair_group), run_time=0.8)
+        self.wait(2)
+
+        factored_middle = MathTex("(x+2)(x+3)")
+        factored_middle.next_to(pair_group, DOWN, buff=0.6)
+        middle_group.add(factored_middle)
+        self.play(TransformFromCopy(pair_check_2, factored_middle), run_time=0.8)
+        self.wait(1)
+
+        # Bottom section:
+        final_result = MathTex("x^2 + 5x + 6 = (x+2)(x+3)")
+        final_result.to_edge(DOWN)
+        final_result.set_color(GREEN)
+        bottom_group.add(final_result)
+        self.play(TransformFromCopy(factored_middle, final_result), run_time=0.8)
+        self.wait()
+
+        self.play(FadeOut(title_group), FadeOut(middle_group), FadeOut(bottom_group), run_time=0.8)
+        self.wait(1)

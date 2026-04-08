@@ -1,13 +1,13 @@
 [
   {
     "document_id": "b20f2da6-d1ca-481f-8d0f-c54f1e1603e4",
-    "title": "Plan: One-Step Equations (Balance Scale)",
+    "title": "Plan: One-Step Equations",
     "doc_type": "plan",
     "file": "plans/one_step_equations.txt"
   },
   {
     "document_id": "8f83fd5a-1585-4b3b-b182-ad9ea4e6e8ec",
-    "title": "One-Step Equations (Balance Scale)",
+    "title": "One-Step Equations",
     "doc_type": "code",
     "file": "code/001_one_step_equations.py"
   },

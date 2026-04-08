@@ -20,7 +20,6 @@ STUB_PLAN = VideoPlan(
                 "The formula is A equals pi times the radius squared. "
                 "Watch as we shade the area inside the circle."
             ),
-            template_hints="Use MathTex for the formula. Color the circle blue and shade with light blue.",
         ),
         ScenePlan(
             scene_number=2,

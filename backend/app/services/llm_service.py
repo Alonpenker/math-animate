@@ -123,16 +123,19 @@ class LLMService:
     @staticmethod
     def render_plan_prompt(user_request: UserRequest) -> tuple[str, str]:
         """Return (system_prompt, user_query) for the planning LLM call."""
-        query = (
+        request_text = (
             f"Topic: {user_request.topic}\n"
             f"Misconceptions: {', '.join(user_request.misconceptions)}\n"
             f"Constraints: {', '.join(user_request.constraints)}\n"
             f"Number of scenes: {user_request.number_of_scenes}"
         )
         with get_worker_cursor() as cursor:
-            examples = LLMService.retrieve_examples(cursor, query, KnowledgeType.PLAN)
-        system_prompt = PLAN_SYSTEM_PROMPT.format(examples=examples)
-        return system_prompt, query
+            examples = LLMService.retrieve_examples(cursor, request_text, KnowledgeType.PLAN)
+        user_query = (
+            f"Reference examples of good plans:\n{examples}\n\n"
+            f"Generate a scene plan for this request:\n{request_text}"
+        )
+        return PLAN_SYSTEM_PROMPT, user_query
 
     @staticmethod
     def render_codegen_prompt(plan: VideoPlan) -> tuple[str, str]:
