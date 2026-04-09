@@ -193,8 +193,18 @@ export async function listArtifacts(params: {
   return request<ArtifactResponse[]>(`/artifacts?${searchParams.toString()}`);
 }
 
-export function getArtifactStreamUrl(artifactId: string): string {
-  return `${BASE_URL}/artifacts/${artifactId}/stream`;
+export async function fetchArtifactBlobUrl(artifactId: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/artifacts/${artifactId}/stream`, {
+    headers: {
+      'X-API-Key': import.meta.env.VITE_X_API_KEY ?? '',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => 'Unknown error');
+    throw createApiError(res.status, text);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 

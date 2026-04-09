@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import ReactPlayer from 'react-player';
-import { ArrowLeft } from 'lucide-react';
-import { getArtifactStreamUrl } from '@/services/api';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { fetchArtifactBlobUrl, isApiError } from '@/services/api';
 import type { ScenePlan } from '@/services/api';
 
 interface ScenePlayerProps {
@@ -11,6 +12,66 @@ interface ScenePlayerProps {
 }
 
 export function ScenePlayer({ artifactId, sceneNumber, scenePlan, onBack }: ScenePlayerProps) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const activeVideoUrlRef = useRef<string | null>(null);
+
+  const revokeActiveVideoUrl = () => {
+    if (activeVideoUrlRef.current) {
+      URL.revokeObjectURL(activeVideoUrlRef.current);
+      activeVideoUrlRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      revokeActiveVideoUrl();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    revokeActiveVideoUrl();
+    setVideoUrl(null);
+    setError(null);
+    setLoading(true);
+
+    fetchArtifactBlobUrl(artifactId)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        activeVideoUrlRef.current = url;
+        setVideoUrl(url);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        const message = isApiError(err)
+          ? err.status === 401
+            ? 'Video access was denied.'
+            : 'Could not load the video.'
+          : 'Could not load the video.';
+        setError(message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      revokeActiveVideoUrl();
+    };
+  }, [artifactId]);
+
   return (
     <div className="space-y-4">
       <button
@@ -31,14 +92,25 @@ export function ScenePlayer({ artifactId, sceneNumber, scenePlan, onBack }: Scen
           </p>
         )}
       </div>
-      <div className="overflow-hidden rounded-lg bg-black">
-        <ReactPlayer
-          src={getArtifactStreamUrl(artifactId)}
-          controls
-          width="100%"
-          height="auto"
-          style={{ aspectRatio: '16/9' }}
-        />
+      <div className="overflow-hidden rounded-lg bg-black" style={{ aspectRatio: '16/9' }}>
+        {loading && (
+          <div className="flex h-full min-h-[240px] items-center justify-center text-chalk-cyan">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        )}
+        {!loading && error && (
+          <div className="flex h-full min-h-[240px] items-center justify-center px-4 text-center text-sm text-chalk-white/60">
+            {error}
+          </div>
+        )}
+        {!loading && !error && videoUrl && (
+          <ReactPlayer
+            src={videoUrl}
+            controls
+            width="100%"
+            height="100%"
+          />
+        )}
       </div>
       {scenePlan?.voice_notes && (
         <div className="mt-4">
