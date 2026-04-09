@@ -70,15 +70,21 @@ def test_extract_text_content_raises_value_error_when_list_has_no_text_blocks():
 def test_extract_token_usage_reads_values_from_usage_metadata():
     # Given
     class FakeResponse:
-        usage_metadata = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
+        usage_metadata = {
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "total_tokens": 150,
+            "output_token_details": {"reasoning": 20},
+        }
 
     # When
-    input_tok, output_tok, total_tok = LLMService._extract_token_usage(FakeResponse())
+    input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(FakeResponse())
 
     # Then
     assert input_tok == 100
     assert output_tok == 50
     assert total_tok == 150
+    assert reasoning_tok == 20
 
 
 def test_extract_token_usage_returns_zeros_when_no_metadata():
@@ -87,12 +93,13 @@ def test_extract_token_usage_returns_zeros_when_no_metadata():
         usage_metadata = None
 
     # When
-    input_tok, output_tok, total_tok = LLMService._extract_token_usage(FakeResponse())
+    input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(FakeResponse())
 
     # Then
     assert input_tok == 0
     assert output_tok == 0
     assert total_tok == 0
+    assert reasoning_tok == 0
 
 
 def test_extract_token_usage_returns_zeros_when_metadata_is_empty_dict():
@@ -101,12 +108,13 @@ def test_extract_token_usage_returns_zeros_when_metadata_is_empty_dict():
         usage_metadata = {}
 
     # When
-    input_tok, output_tok, total_tok = LLMService._extract_token_usage(FakeResponse())
+    input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(FakeResponse())
 
     # Then
     assert input_tok == 0
     assert output_tok == 0
     assert total_tok == 0
+    assert reasoning_tok == 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────

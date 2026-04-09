@@ -125,7 +125,8 @@ def generate_plan(job_request_payload: dict) -> None:
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
-    except Exception:
+    except Exception as exc:
+        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
         release_budget_on_error(call_id, reserved, total_tokens)
         logger.exception("Planning failed (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
@@ -169,7 +170,8 @@ def generate_code(job_request_payload: dict) -> None:
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
-    except Exception:
+    except Exception as exc:
+        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
         release_budget_on_error(call_id, reserved, total_tokens)
         logger.exception("Codegen failed (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
@@ -304,7 +306,8 @@ def fix_code_task(job_request_payload: dict) -> None:
         release_budget_on_error(call_id, reserved, total_tokens)
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_QUOTA_EXCEEDED)
 
-    except Exception:
+    except Exception as exc:
+        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
         release_budget_on_error(call_id, reserved, total_tokens)
         logger.exception("Fix task failed (%s)", log_context(str(job_id)))
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)

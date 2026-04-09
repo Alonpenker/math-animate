@@ -30,7 +30,8 @@ Be explicit about how each step transitions to the next:
 
 # TEXT
 
-Avoid using english text in the video plan to explain, focus on smart transitions and color marks, the text is for the title only.
+No English words or sentences are permitted anywhere in the visual plan except the title. Do not use labels, annotations, side notes, captions, or explanatory text in English. Explain only through math symbols, equations, geometric shapes, arrows, spatial arrangement, transformations, highlighting, color changes, and other non-verbal visual structure.
+Write the plan itself in plain English prose that a non-programmer can easily read. Do not use LaTeX syntax, code syntax, shorthand markup, or overly technical notation in the written description.
 
 # WHAT MAKES A GOOD STORYBOARD
 
@@ -38,6 +39,7 @@ Avoid using english text in the video plan to explain, focus on smart transition
 - For each step: what object appears or changes, where it is relative to other content, what color it is, and whether previous content stays or goes.
 - The final step places the answer in the bottom zone in green.
 - Keep each scene focused on one concept. Do not try to fit too much into one scene.
+- Output exactly the requested number of scenes. Each `scene_number` must be unique and sequential starting at 1, with no duplicates and no gaps.
 
 # VOICE NOTES
 

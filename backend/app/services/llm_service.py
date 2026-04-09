@@ -8,7 +8,7 @@ from openai import LengthFinishReasonError
 from app.configs.app_settings import settings
 from app.configs.llm_settings import (
     LLM_PLAN_MODEL, LLM_CODE_MODEL, LLM_TEMPERATURE,
-    LLM_PLAN_MAX_TOKENS, LLM_PLAN_MAX_REASONING, LLM_CODEGEN_MAX_TOKENS,
+    LLM_PLAN_MAX_TOKENS, LLM_CODEGEN_MAX_TOKENS,
     LLM_REASONING_EFFORT,
     PLAN_SYSTEM_PROMPT, CODEGEN_SYSTEM_PROMPT, CODEGEN_FIX_SYSTEM_PROMPT, RAG_SIMILARITY_TOP_K,
 )
@@ -41,7 +41,6 @@ class LLMService:
                 temperature=LLM_TEMPERATURE,
                 max_completion_tokens=LLM_PLAN_MAX_TOKENS,
                 reasoning_effort=LLM_REASONING_EFFORT,
-                model_kwargs={"max_reasoning_tokens": LLM_PLAN_MAX_REASONING},
                 api_key=settings.openai_api_key,
             )
         return cls._plan_model
@@ -53,6 +52,7 @@ class LLMService:
                 model=LLM_CODE_MODEL,
                 temperature=LLM_TEMPERATURE,
                 max_completion_tokens=LLM_CODEGEN_MAX_TOKENS,
+                reasoning_effort=LLM_REASONING_EFFORT,
                 api_key=settings.openai_api_key,
             )
         return cls._codegen_model
@@ -80,20 +80,54 @@ class LLMService:
         return "\n\n".join(parts)
 
     @staticmethod
-    def _extract_token_usage(response) -> tuple[int, int, int]:
-        """Return (input_tokens, output_tokens, total_tokens) from a LangChain response."""
-        usage = getattr(response, "usage_metadata", None) or {}
-        input_tokens = int(usage.get("input_tokens", 0))
-        output_tokens = int(usage.get("output_tokens", 0))
-        total_tokens = int(usage.get("total_tokens", 0))
-        return input_tokens, output_tokens, total_tokens
+    def _extract_token_usage(response) -> tuple[int, int, int, int]:
+        """Return (input_tokens, output_tokens, total_tokens, reasoning_tokens) from a LangChain response."""
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if usage_metadata is not None:
+            input_tokens = int(usage_metadata.get("input_tokens", 0))
+            output_tokens = int(usage_metadata.get("output_tokens", 0))
+            total_tokens = int(usage_metadata.get("total_tokens", 0))
+            output_details = usage_metadata.get("output_token_details", {})
+            reasoning_tokens = int(output_details.get("reasoning", 0))
+            return input_tokens, output_tokens, total_tokens, reasoning_tokens
+
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+            output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            total_tokens = int(getattr(usage, "total_tokens", 0) or 0)
+            completion_details = getattr(usage, "completion_tokens_details", None)
+            reasoning_tokens = int(getattr(completion_details, "reasoning_tokens", 0) or 0)
+            return input_tokens, output_tokens, total_tokens, reasoning_tokens
+
+        input_tokens = 0
+        output_tokens = 0
+        total_tokens = 0
+        reasoning_tokens = 0
+        return input_tokens, output_tokens, total_tokens, reasoning_tokens
+
+    @staticmethod
+    def _build_llm_usage_error(
+        message: str,
+        *,
+        total_tokens: int = 0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        reasoning_tokens: int = 0,
+    ) -> ValueError:
+        error = ValueError(message)
+        error.total_tokens = total_tokens
+        error.input_tokens = input_tokens
+        error.output_tokens = output_tokens
+        error.reasoning_tokens = reasoning_tokens
+        return error
 
     @staticmethod
     def _check_max_tokens(call_name: CallType, output_tokens: int, max_tokens: int) -> None:
         """Warn and raise if output tokens hit the configured max, indicating truncated output."""
         if output_tokens >= max_tokens:
             logger.warning(
-                "LLM call: call=%s output_tokens=%d reached max_tokens=%d — output is likely truncated.",
+                "LLM call: call=%s output_tokens=%d reached max_tokens=%d - output is likely truncated.",
                 call_name, output_tokens, max_tokens,
             )
             raise ValueError(
@@ -169,23 +203,38 @@ class LLMService:
                 HumanMessage(content=user_query),
             ])
         except LengthFinishReasonError as exc:
-            raise ValueError(
-                f"LLM call '{CallType.PLAN}' exhausted its token budget on reasoning before producing output. "
-                f"Total budget: {LLM_PLAN_MAX_TOKENS}, reasoning cap: {LLM_PLAN_MAX_REASONING}."
+            input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
+            logger.warning(
+                "LLM call failed: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d reasoning_tokens=%d reason=length_finish",
+                CallType.PLAN, LLM_PLAN_MODEL, input_tok, output_tok, total_tok, reasoning_tok,
+            )
+            raise LLMService._build_llm_usage_error(
+                f"LLM call '{CallType.PLAN}' exhausted its output token budget "
+                f"({LLM_PLAN_MAX_TOKENS}) before producing a usable plan.",
+                total_tokens=total_tok,
+                input_tokens=input_tok,
+                output_tokens=output_tok,
+                reasoning_tokens=reasoning_tok,
             ) from exc
         duration_ms = int((time.perf_counter() - t0) * 1000)
         if not isinstance(result, dict):
             raise ValueError("Unexpected structured output shape.")
         plan = result.get("parsed")
-        input_tok, output_tok, total_tok = LLMService._extract_token_usage(result.get("raw"))
+        input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(result.get("raw"))
         LLMService._check_max_tokens(CallType.PLAN, output_tok, LLM_PLAN_MAX_TOKENS)
         logger.info(
-            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            "LLM call finished: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
             CallType.PLAN, LLM_PLAN_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         if isinstance(plan, VideoPlan):
             return plan, total_tok
-        raise ValueError("LLM output validation failed: response is not a valid VideoPlan instance.")
+        raise LLMService._build_llm_usage_error(
+            "LLM output validation failed: response is not a valid VideoPlan instance.",
+            total_tokens=total_tok,
+            input_tokens=input_tok,
+            output_tokens=output_tok,
+            reasoning_tokens=reasoning_tok,
+        )
 
     @staticmethod
     def codegen_call(system_prompt: str, user_query: str) -> tuple[str, int]:
@@ -206,14 +255,23 @@ class LLMService:
                 HumanMessage(content=user_query),
             ])
         except LengthFinishReasonError as exc:
-            raise ValueError(
-                f"LLM call '{CallType.CODEGEN}' hit the token limit ({LLM_CODEGEN_MAX_TOKENS}) before finishing output."
+            input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
+            logger.warning(
+                "LLM call failed: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d reasoning_tokens=%d reason=length_finish",
+                CallType.CODEGEN, LLM_CODE_MODEL, input_tok, output_tok, total_tok, reasoning_tok,
+            )
+            raise LLMService._build_llm_usage_error(
+                f"LLM call '{CallType.CODEGEN}' hit the token limit ({LLM_CODEGEN_MAX_TOKENS}) before finishing output.",
+                total_tokens=total_tok,
+                input_tokens=input_tok,
+                output_tokens=output_tok,
+                reasoning_tokens=reasoning_tok,
             ) from exc
         duration_ms = int((time.perf_counter() - t0) * 1000)
-        input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        input_tok, output_tok, total_tok, _ = LLMService._extract_token_usage(response)
         LLMService._check_max_tokens(CallType.CODEGEN, output_tok, LLM_CODEGEN_MAX_TOKENS)
         logger.info(
-            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            "LLM call finished: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
             CallType.CODEGEN, LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         return LLMService.extract_text_content(response), total_tok
@@ -248,14 +306,23 @@ class LLMService:
                 HumanMessage(content=user_query),
             ])
         except LengthFinishReasonError as exc:
-            raise ValueError(
-                f"LLM call '{CallType.FIX}' hit the token limit ({LLM_CODEGEN_MAX_TOKENS}) before finishing output."
+            input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
+            logger.warning(
+                "LLM call failed: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d reasoning_tokens=%d reason=length_finish",
+                CallType.FIX, LLM_CODE_MODEL, input_tok, output_tok, total_tok, reasoning_tok,
+            )
+            raise LLMService._build_llm_usage_error(
+                f"LLM call '{CallType.FIX}' hit the token limit ({LLM_CODEGEN_MAX_TOKENS}) before finishing output.",
+                total_tokens=total_tok,
+                input_tokens=input_tok,
+                output_tokens=output_tok,
+                reasoning_tokens=reasoning_tok,
             ) from exc
         duration_ms = int((time.perf_counter() - t0) * 1000)
-        input_tok, output_tok, total_tok = LLMService._extract_token_usage(response)
+        input_tok, output_tok, total_tok, _ = LLMService._extract_token_usage(response)
         LLMService._check_max_tokens(CallType.FIX, output_tok, LLM_CODEGEN_MAX_TOKENS)
         logger.info(
-            "LLM call: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
+            "LLM call finished: call=%s model=%s input_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
             CallType.FIX, LLM_CODE_MODEL, input_tok, output_tok, total_tok, duration_ms,
         )
         return LLMService.extract_text_content(response), total_tok
