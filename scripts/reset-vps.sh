@@ -24,6 +24,3 @@ $COMPOSE down
 
 [[ "$WIPE_DB"    == true ]] && { echo "=== Removing postgres_data ==="; docker volume rm mathanimate_postgres_data || true; }
 [[ "$WIPE_MINIO" == true ]] && { echo "=== Removing minio_data ===";   docker volume rm mathanimate_minio_data    || true; }
-
-echo "=== Restarting stack ==="
-$COMPOSE up -d
