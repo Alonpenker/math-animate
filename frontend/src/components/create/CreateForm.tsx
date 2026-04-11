@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
-import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useCallback, useRef } from 'react';
+import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TagInput } from './TagInput';
 import type { UserRequest } from '@/services/api';
 
 interface CreateFormProps {
@@ -9,85 +10,55 @@ interface CreateFormProps {
   error: string | null;
 }
 
-const EXAMPLE_BRIEF: UserRequest = {
-  topic: 'The Pythagorean theorem',
-  misconceptions: ['Students think it works for all triangles, not just right triangles'],
-  constraints: ['Use only visual animations with labeled sides'],
-  examples: ['A 3-4-5 right triangle'],
-  number_of_scenes: 2,
-};
-
-function TagInput({
-  label, hint, tags, onAdd, onRemove, max,
-}: {
-  label: string; hint: string; tags: string[];
-  onAdd: (tag: string) => void; onRemove: (index: number) => void; max: number;
-}) {
-  const [input, setInput] = useState('');
-  const [charError, setCharError] = useState<string | null>(null);
-  const add = () => {
-    const trimmed = input.trim();
-    if (trimmed.length > 150) {
-      setCharError('Max 150 characters');
-      return;
-    }
-    setCharError(null);
-    if (trimmed && tags.length < max) { onAdd(trimmed); setInput(''); }
-  };
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
-
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-off-white">
-        {label}
-      </label>
-      <p className="mb-2 text-xs text-off-white/55">{hint}</p>
-      <div className="flex gap-2">
-        <Input
-          type="text"
-          value={input}
-          onChange={(e) => { setInput(e.target.value); if (charError) setCharError(null); }}
-          onKeyDown={handleKeyDown}
-          disabled={tags.length >= max}
-          placeholder={tags.length >= max ? `Maximum ${max} items` : 'Type and press Enter'}
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={add}
-          disabled={tags.length >= max || !input.trim()}
-        >
-          Add
-        </Button>
-      </div>
-      {charError && <p className="mt-1 text-xs text-red-400">{charError}</p>}
-      {tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {tags.map((tag, i) => (
-            <span
-              key={`${tag}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-off-white"
-              style={{ border: '1px solid rgba(245,240,232,0.35)', background: 'rgba(245,240,232,0.1)' }}
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                className="rounded-full p-0.5 hover:bg-off-white/10 cursor-pointer"
-                aria-label={`Remove ${tag}`}
-                style={{ background: 'none', border: 'none' }}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+const EXAMPLE_BRIEFS: UserRequest[] = [
+  {
+    topic: 'One-Step Equations',
+    misconceptions: ['Students think you can change one side without doing the same to the other'],
+    constraints: ['Use a visual balance scale', 'Show the inverse operation clearly'],
+    examples: ['x + 7 = 12', '3x = 15'],
+    number_of_scenes: 1,
+  },
+  {
+    topic: 'Order of Operations (PEMDAS)',
+    misconceptions: [
+      'Students evaluate left to right without respecting precedence',
+      'Students forget exponents come before multiplication',
+    ],
+    constraints: ['Keep a PEMDAS reference on screen throughout', 'Highlight only the step being evaluated'],
+    examples: ['4 + 2(5 - x) with x = 3', '3(2 + x)² with x = 1'],
+    number_of_scenes: 1,
+  },
+  {
+    topic: 'Two-Step Equations',
+    misconceptions: [
+      'Students undo operations in the wrong order',
+      'Students forget to apply the operation to both sides',
+    ],
+    constraints: ['Label each inverse operation step', 'Show both sides changing together'],
+    examples: ['2x + 3 = 11', 'x/4 - 1 = 2'],
+    number_of_scenes: 2,
+  },
+  {
+    topic: 'Factoring Quadratics',
+    misconceptions: [
+      'Students mix up which pairs multiply to c and add to b',
+      'Students forget sign rules for factor pairs',
+    ],
+    constraints: ['Show the product and sum conditions side by side', 'Use color to track a, b, and c'],
+    examples: ['x² + 5x + 6', 'x² - x - 6'],
+    number_of_scenes: 2,
+  },
+  {
+    topic: 'The Quadratic Formula',
+    misconceptions: [
+      'Students only divide the square root by 2a, not the whole numerator',
+      'Students make sign errors under the radical',
+    ],
+    constraints: ['Highlight each part of the formula as it gets substituted', 'Show both the positive and negative roots'],
+    examples: ['2x² + 4x - 6 = 0'],
+    number_of_scenes: 2,
+  },
+];
 
 export function CreateForm({ onSubmit, error }: CreateFormProps) {
   const [topic, setTopic] = useState('');
@@ -96,11 +67,11 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
   const [examples, setExamples] = useState<string[]>([]);
   const [numberOfScenes, setNumberOfScenes] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [tipsOpen, setTipsOpen] = useState(false);
+  const lastExampleIndex = useRef<number>(-1);
 
   const isValid = topic.trim().length > 0 && topic.length <= 200 && numberOfScenes >= 1 && numberOfScenes <= 3;
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!isValid || submitting) return;
     setSubmitting(true);
@@ -111,111 +82,121 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
     }
   }, [isValid, submitting, topic, misconceptions, constraints, examples, numberOfScenes, onSubmit]);
 
-  const fillExample = () => {
-    setTopic(EXAMPLE_BRIEF.topic);
-    setMisconceptions([...EXAMPLE_BRIEF.misconceptions]);
-    setConstraints([...EXAMPLE_BRIEF.constraints]);
-    setExamples([...EXAMPLE_BRIEF.examples]);
-    setNumberOfScenes(EXAMPLE_BRIEF.number_of_scenes);
+  const fillRandomExample = () => {
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * EXAMPLE_BRIEFS.length);
+    } while (idx === lastExampleIndex.current && EXAMPLE_BRIEFS.length > 1);
+    lastExampleIndex.current = idx;
+
+    const brief = EXAMPLE_BRIEFS[idx];
+    setTopic(brief.topic);
+    setMisconceptions([...brief.misconceptions]);
+    setConstraints([...brief.constraints]);
+    setExamples([...brief.examples]);
+    setNumberOfScenes(brief.number_of_scenes);
   };
 
   return (
     <div className="mx-auto max-w-2xl">
-      {/* Suggestions box */}
-      <div
-        className="rounded-md p-4 mb-6"
-        style={{ border: '1px solid rgba(245,240,232,0.2)', background: 'rgba(245,240,232,0.06)' }}
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setTipsOpen(!tipsOpen)}
-          className="flex w-full items-center justify-between text-sm font-medium text-off-white p-0 h-auto"
-        >
-          <span>Need inspiration? See an example brief</span>
-          {tipsOpen ? <ChevronUp className="h-4 w-4 text-off-white/60" /> : <ChevronDown className="h-4 w-4 text-off-white/60" />}
-        </Button>
-        {tipsOpen && (
-          <div className="mt-3 space-y-2 text-sm text-off-white/70">
-            <p><strong>Topic:</strong> {EXAMPLE_BRIEF.topic}</p>
-            <p><strong>Misconception:</strong> {EXAMPLE_BRIEF.misconceptions[0]}</p>
-            <p><strong>Constraint:</strong> {EXAMPLE_BRIEF.constraints[0]}</p>
-            <p><strong>Example:</strong> {EXAMPLE_BRIEF.examples[0]}</p>
-            <p><strong>Scenes:</strong> {EXAMPLE_BRIEF.number_of_scenes}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={fillExample}
-            >
-              Use this example
-            </Button>
-          </div>
-        )}
-      </div>
-
       <div className="rounded-xl shadow-lg" style={{ border: '1px solid rgba(245,240,232,0.15)', background: 'rgba(245,240,232,0.05)' }}>
         <form onSubmit={handleSubmit} className="py-10 px-10 space-y-6">
 
-      {/* Topic */}
-      <div>
-        <label htmlFor="topic" className="mb-1 block text-sm font-medium text-off-white">
-          Topic <span className="text-red-400">*</span>
-        </label>
-        <Input
-          id="topic"
-          type="text"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          maxLength={200}
-          required
-          placeholder="E.g., Solving linear equations, The Pythagorean theorem, Understanding fractions"
-        />
-        <p className="mt-1 text-xs text-off-white/40">{topic.length}/200</p>
-      </div>
+          {/* Topic */}
+          <div>
+            <label htmlFor="topic" className="mb-1 block text-sm font-medium text-off-white">
+              Topic <span className="text-red-400">*</span>
+            </label>
+            <p className="mb-2 text-xs text-off-white/55">
+              What concept should the video teach? Be as specific as you like.
+            </p>
+            <Input
+              id="topic"
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              maxLength={200}
+              required
+              placeholder="e.g. Solving linear equations, The Pythagorean theorem, Understanding fractions"
+            />
+            <p className="mt-1 text-xs text-off-white/40">{topic.length}/200</p>
+          </div>
 
-      <TagInput label="Misconceptions" hint="Common mistakes students make — e.g., Confusing numerator and denominator"
-        tags={misconceptions} onAdd={(tag) => setMisconceptions(p => [...p, tag])} onRemove={(i) => setMisconceptions(p => p.filter((_, idx) => idx !== i))} max={5} />
-      <TagInput label="Constraints" hint="Style or content rules — e.g., Use only visual animations, Avoid heavy notation"
-        tags={constraints} onAdd={(tag) => setConstraints(p => [...p, tag])} onRemove={(i) => setConstraints(p => p.filter((_, idx) => idx !== i))} max={5} />
-      <TagInput label="Examples" hint="Concrete examples to include — e.g., 2x + 3 = 7, A 3-4-5 right triangle"
-        tags={examples} onAdd={(tag) => setExamples(p => [...p, tag])} onRemove={(i) => setExamples(p => p.filter((_, idx) => idx !== i))} max={5} />
+          <TagInput
+            label="Misconceptions"
+            hint="What mistakes do students often make with this topic? This helps the video address them head-on."
+            tags={misconceptions}
+            onAdd={(tag) => setMisconceptions(p => [...p, tag])}
+            onRemove={(i) => setMisconceptions(p => p.filter((_, idx) => idx !== i))}
+            max={5}
+          />
 
-      <div>
-        <label htmlFor="scenes" className="mb-1 block text-sm font-medium text-off-white">
-          Number of Scenes <span className="text-red-400">*</span>
-        </label>
-        <p className="mb-2 text-xs text-off-white/55">
-          How many scenes to render. Each scene takes 2-3 minutes.
-        </p>
-        <Input
-          id="scenes"
-          type="number"
-          value={numberOfScenes}
-          onChange={(e) => setNumberOfScenes(Math.min(3, Math.max(1, parseInt(e.target.value) || 1)))}
-          min={1}
-          max={3}
-          className="w-20"
-        />
-      </div>
+          <TagInput
+            label="Constraints"
+            hint="Any style or content rules you want to enforce, like using only visual animations or avoiding heavy notation."
+            tags={constraints}
+            onAdd={(tag) => setConstraints(p => [...p, tag])}
+            onRemove={(i) => setConstraints(p => p.filter((_, idx) => idx !== i))}
+            max={5}
+          />
 
-      {error && (
-        <div
-          className="rounded-md p-3 text-sm text-red-400"
-          style={{ background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)' }}
-        >
-          {error}
-        </div>
-      )}
+          <TagInput
+            label="Examples"
+            hint="Specific problems or cases you want the video to walk through, like 2x + 3 = 7 or a 3-4-5 right triangle."
+            tags={examples}
+            onAdd={(tag) => setExamples(p => [...p, tag])}
+            onRemove={(i) => setExamples(p => p.filter((_, idx) => idx !== i))}
+            max={5}
+          />
 
-      <Button
-        type="submit"
-        disabled={!isValid || submitting}
-        size="lg"
-        className="bg-accent-orange hover:bg-accent-orange/80"
-      >
-        {submitting ? 'Submitting...' : 'Generate My Lesson Video \u2192'}
-      </Button>
+          {/* Number of Scenes */}
+          <div>
+            <label htmlFor="scenes" className="mb-1 block text-sm font-medium text-off-white">
+              Number of Scenes <span className="text-red-400">*</span>
+            </label>
+            <p className="mb-2 text-xs text-off-white/55">
+              Each scene takes about 1 to 2 minutes to render. Start with 1 if you're just exploring.
+            </p>
+            <Input
+              id="scenes"
+              type="number"
+              value={numberOfScenes}
+              onChange={(e) => setNumberOfScenes(Math.min(3, Math.max(1, parseInt(e.target.value) || 1)))}
+              min={1}
+              max={3}
+              className="w-20"
+            />
+          </div>
+
+          {error && (
+            <div
+              className="rounded-md p-3 text-sm text-red-400"
+              style={{ background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)' }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <Button
+              type="submit"
+              disabled={!isValid || submitting}
+              size="lg"
+              className="bg-accent-orange hover:brightness-110 text-surface-dark border-transparent"
+            >
+              {submitting ? 'Submitting...' : 'Generate My Lesson Video! \u2192'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={fillRandomExample}
+              className="bg-off-white/10 text-off-white/85 hover:bg-off-white/15 hover:text-off-white gap-1.5"
+            >
+              <Shuffle className="h-4 w-4" />
+              Try an example
+            </Button>
+          </div>
         </form>
       </div>
     </div>

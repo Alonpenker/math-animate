@@ -4,7 +4,7 @@ export function AboutSection() {
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="text-2xl font-semibold text-off-white mb-4">About MathAnimate</h2>
         <p className="text-off-white/60 leading-relaxed">
-          MathAnimate is an open-source tool that turns math lesson briefs into animated videos.
+          MathAnimate is an open-source website that turns math lesson briefs into animated videos.
           Powered by{' '}
           <a href="https://www.manim.community/" target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline">
             Manim
