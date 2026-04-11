@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: '/jobs', label: 'Jobs' },
   { to: '/lessons', label: 'Lessons' },
   { to: '/usage', label: 'Usage' },
+  { to: '/about', label: 'About' },
 ] as const;
 
 export function GlassNavbar() {
@@ -40,16 +41,17 @@ export function GlassNavbar() {
       }}
     >
       <div className="relative flex items-center px-8">
-        {/* Logo — far left */}
         <Link
           to="/"
-          className="text-lg font-bold text-chalk-white no-underline shrink-0"
-          style={{ fontFamily: 'Patrick Hand, cursive', letterSpacing: '0.01em' }}
+          className="flex items-center gap-2 text-lg font-bold text-off-white no-underline shrink-0"
+          style={{ letterSpacing: '0.01em' }}
         >
-          MathAnimate
+          <img src="/MathAnimate-Icon.png" alt="" className="h-9 w-auto" />
+          <span>
+            Math<span className="text-accent-orange">Animate</span>
+          </span>
         </Link>
 
-        {/* Desktop links — absolutely centered */}
         <div
           className="hidden md:flex items-center gap-12"
           style={{
@@ -64,24 +66,22 @@ export function GlassNavbar() {
               to={link.to}
               className={`text-base no-underline transition-colors duration-200 pb-0.5 ${
                 isActive(link.to)
-                  ? 'text-chalk-orange border-b border-chalk-orange'
-                  : 'text-chalk-white/70 hover:text-chalk-white'
+                  ? 'text-accent-orange border-b border-accent-orange'
+                  : 'text-off-white/70 hover:text-off-white'
               }`}
-              style={{ fontFamily: 'Inter, sans-serif' }}
+             
             >
               {link.label}
             </Link>
           ))}
         </div>
 
-        {/* Spacer to push hamburger to the right on mobile */}
         <div className="flex-1" />
 
-        {/* Mobile hamburger */}
         <div className="md:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
-              className="rounded p-1 text-chalk-white hover:bg-white/10"
+              className="rounded p-1 text-off-white hover:bg-white/10"
               aria-label="Open menu"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -100,10 +100,10 @@ export function GlassNavbar() {
                     onClick={() => setOpen(false)}
                     className={`block rounded-lg px-3 py-2 text-sm no-underline ${
                       isActive(link.to)
-                        ? 'bg-white/10 text-chalk-orange'
-                        : 'text-chalk-white/70 hover:bg-white/5 hover:text-chalk-white'
+                        ? 'bg-white/10 text-accent-orange'
+                        : 'text-off-white/70 hover:bg-white/5 hover:text-off-white'
                     }`}
-                    style={{ fontFamily: 'Inter, sans-serif' }}
+                   
                   >
                     {link.label}
                   </Link>

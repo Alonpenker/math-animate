@@ -5,20 +5,17 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Chalk palette */
-  --color-chalk-white:    #F5F0E8;
-  --color-chalk-yellow:   #F5D76E;
-  --color-chalk-cyan:     #7EC8C8;
-  --color-chalk-green:    #7DBF8E;
-  --color-chalk-orange:   #E8924A;
-  --color-chalk-pink:     #E88FA0;
-  --color-board-dark:     #1A2326;
-  --color-board-mid:      #243028;
-  --color-notebook-bg:    #F9F6EE;
-  --color-notebook-line:  #B8CCE0;
-  --color-notebook-margin:#E8A0A0;
+  /* Color palette */
+  --color-off-white:       #F5F0E8;
+  --color-accent-yellow:   #F5D76E;
+  --color-accent-cyan:     #7EC8C8;
+  --color-accent-green:    #7DBF8E;
+  --color-accent-orange:   #E8924A;
+  --color-accent-pink:     #E88FA0;
+  --color-surface-dark:    #1A2326;
+  --color-surface-mid:     #243028;
 
-  /* shadcn overrides mapped to chalkboard theme */
+  /* shadcn overrides */
   --background: #1A2326;
   --foreground: #F5F0E8;
   --card: #243028;
@@ -40,7 +37,6 @@
   --radius: 0.625rem;
 
   /* Font families */
-  --font-chalk: "Patrick Hand", cursive;
   --font-ui:    "Inter", sans-serif;
   --font-sans:  "Inter", sans-serif;
 }
@@ -89,64 +85,4 @@
   html {
     font-family: var(--font-ui);
   }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-chalk);
-  }
-}
-
-/* Chalkboard surface utility — pure black default */
-.chalkboard-surface {
-  background-color: #000000;
-}
-
-
-/* Chalk frame utility */
-.chalk-frame {
-  border: 2px solid rgba(245, 240, 232, 0.75);
-  border-radius: 10px;
-  background: transparent;
-}
-
-/* Chalk rough frame - slight roughness via box-shadow */
-.chalk-frame-rough {
-  border: 2px solid rgba(245, 240, 232, 0.7);
-  border-radius: 10px;
-  background: transparent;
-  box-shadow: 0 0 0 1px rgba(245,240,232,0.08), inset 0 0 0 1px rgba(245,240,232,0.05);
-}
-
-/* Chalk underline input */
-.chalk-input {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid rgba(245, 240, 232, 0.6);
-  border-radius: 0;
-  color: #1A2326;
-  outline: none;
-  padding: 4px 0;
-  width: 100%;
-}
-.chalk-input:focus {
-  border-bottom-color: #E8924A;
-}
-.chalk-input::placeholder {
-  color: rgba(26, 35, 38, 0.45);
-}
-
-/* Chalk input on dark (chalkboard) */
-.chalk-input-dark {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid rgba(245, 240, 232, 0.5);
-  border-radius: 0;
-  color: #F5F0E8;
-  outline: none;
-  padding: 4px 0;
-  width: 100%;
-}
-.chalk-input-dark:focus {
-  border-bottom-color: #E8924A;
-}
-.chalk-input-dark::placeholder {
-  color: rgba(245, 240, 232, 0.35);
 }
