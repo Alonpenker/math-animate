@@ -6,6 +6,7 @@ import { CreatePage } from '@/pages/CreatePage';
 import { JobsPage } from '@/pages/JobsPage';
 import { LessonsPage } from '@/pages/LessonsPage';
 import { UsagePage } from '@/pages/UsagePage';
+import { AboutPage } from '@/pages/AboutPage';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/lessons" element={<LessonsPage />} />
               <Route path="/usage" element={<UsagePage />} />
+              <Route path="/about" element={<AboutPage />} />
             </Routes>
           </main>
           <Footer />

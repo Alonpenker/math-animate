@@ -212,5 +212,26 @@ export async function getTokenUsage(): Promise<TokenUsageResponse> {
   return request<TokenUsageResponse>('/usage');
 }
 
+export async function fetchArtifactText(artifactId: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/artifacts/${artifactId}/download`, {
+    headers: {
+      'X-API-Key': import.meta.env.VITE_X_API_KEY ?? '',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => 'Unknown error');
+    throw createApiError(res.status, text);
+  }
+  return res.text();
+}
+
+export interface SystemPromptResponse {
+  codegen_prompt: string;
+}
+
+export async function getSystemPrompt(): Promise<SystemPromptResponse> {
+  return request<SystemPromptResponse>('/knowledge/system-prompt');
+}
+
 export { isApiError };
 export type { ApiError };
