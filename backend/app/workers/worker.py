@@ -117,6 +117,15 @@ def generate_plan(job_request_payload: dict) -> None:
 
         with get_worker_cursor() as cursor:
             PlansRepository.create_plan(cursor, job_id, plan)
+
+        for scene in plan.scenes:
+            if scene.scene_number == -1:
+                logger.warning("Plan rejected: non-math topic detected: %s",
+                                scene.learning_objective,
+                                )
+                transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+                return
+
         transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
         logger.info("Planning completed (%s)", log_context(str(job_id)))
 

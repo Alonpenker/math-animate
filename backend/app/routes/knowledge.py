@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.configs.limiter_config import LimitConfig
+from app.configs.llm_settings import CODEGEN_SYSTEM_PROMPT
 from app.dependencies.db import get_cursor
 from app.dependencies.limiter import limiter
 from app.repositories.knowledge_repository import KnowledgeRepository
@@ -31,6 +32,12 @@ def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
 def seed_knowledge(request: Request) -> dict:
     WorkerRunner.handle_seed()
     return {"message": "Knowledge seeding queued."}
+
+
+@router.get("/system-prompt")
+@limiter.limit(LimitConfig.NORMAL)
+def get_system_prompt(request: Request) -> dict:
+    return {"codegen_prompt": CODEGEN_SYSTEM_PROMPT}
 
 
 @router.get("/{document_id}")

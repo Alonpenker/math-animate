@@ -48,7 +48,7 @@ class DockerCommands:
     def manim_command(code_path: str | Path, media_dir: str | Path):
         return (
             "manim",
-            "-qh",
+            "-qm",
             "-a",
             "--media_dir",
             f"{media_dir}",

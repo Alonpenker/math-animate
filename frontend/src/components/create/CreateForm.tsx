@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import type { UserRequest } from '@/services/api';
 
 interface CreateFormProps {
@@ -22,52 +24,58 @@ function TagInput({
   onAdd: (tag: string) => void; onRemove: (index: number) => void; max: number;
 }) {
   const [input, setInput] = useState('');
+  const [charError, setCharError] = useState<string | null>(null);
   const add = () => {
     const trimmed = input.trim();
+    if (trimmed.length > 150) {
+      setCharError('Max 150 characters');
+      return;
+    }
+    setCharError(null);
     if (trimmed && tags.length < max) { onAdd(trimmed); setInput(''); }
   };
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-chalk-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <label className="mb-1 block text-sm font-medium text-off-white">
         {label}
       </label>
-      <p className="mb-2 text-xs text-chalk-white/55" style={{ fontFamily: 'Inter, sans-serif' }}>{hint}</p>
+      <p className="mb-2 text-xs text-off-white/55">{hint}</p>
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); if (charError) setCharError(null); }}
           onKeyDown={handleKeyDown}
           disabled={tags.length >= max}
           placeholder={tags.length >= max ? `Maximum ${max} items` : 'Type and press Enter'}
-          className="chalk-input-dark flex-1"
-          style={{ fontFamily: 'Inter, sans-serif' }}
+          className="flex-1"
         />
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={add}
           disabled={tags.length >= max || !input.trim()}
-          className="rounded-md border border-chalk-white/30 px-3 py-1 text-sm text-chalk-white transition-colors hover:bg-chalk-white/10 disabled:opacity-40 cursor-pointer"
-          style={{ fontFamily: 'Inter, sans-serif', background: 'transparent' }}
         >
           Add
-        </button>
+        </Button>
       </div>
+      {charError && <p className="mt-1 text-xs text-red-400">{charError}</p>}
       {tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {tags.map((tag, i) => (
             <span
               key={`${tag}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-chalk-white"
-              style={{ border: '1px solid rgba(245,240,232,0.35)', background: 'rgba(245,240,232,0.1)', fontFamily: 'Inter, sans-serif' }}
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-off-white"
+              style={{ border: '1px solid rgba(245,240,232,0.35)', background: 'rgba(245,240,232,0.1)' }}
             >
               {tag}
               <button
                 type="button"
                 onClick={() => onRemove(i)}
-                className="rounded-full p-0.5 hover:bg-chalk-white/10 cursor-pointer"
+                className="rounded-full p-0.5 hover:bg-off-white/10 cursor-pointer"
                 aria-label={`Remove ${tag}`}
                 style={{ background: 'none', border: 'none' }}
               >
@@ -113,35 +121,35 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
 
   return (
     <div className="mx-auto max-w-2xl">
-      {/* Suggestions box — outside the form / notebook paper */}
+      {/* Suggestions box */}
       <div
         className="rounded-md p-4 mb-6"
         style={{ border: '1px solid rgba(245,240,232,0.2)', background: 'rgba(245,240,232,0.06)' }}
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setTipsOpen(!tipsOpen)}
-          className="flex w-full items-center justify-between text-sm font-medium text-chalk-white cursor-pointer"
-          style={{ fontFamily: 'Inter, sans-serif', background: 'none', border: 'none' }}
+          className="flex w-full items-center justify-between text-sm font-medium text-off-white p-0 h-auto"
         >
           <span>Need inspiration? See an example brief</span>
-          {tipsOpen ? <ChevronUp className="h-4 w-4 text-chalk-white/60" /> : <ChevronDown className="h-4 w-4 text-chalk-white/60" />}
-        </button>
+          {tipsOpen ? <ChevronUp className="h-4 w-4 text-off-white/60" /> : <ChevronDown className="h-4 w-4 text-off-white/60" />}
+        </Button>
         {tipsOpen && (
-          <div className="mt-3 space-y-2 text-sm text-chalk-white/70" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <div className="mt-3 space-y-2 text-sm text-off-white/70">
             <p><strong>Topic:</strong> {EXAMPLE_BRIEF.topic}</p>
             <p><strong>Misconception:</strong> {EXAMPLE_BRIEF.misconceptions[0]}</p>
             <p><strong>Constraint:</strong> {EXAMPLE_BRIEF.constraints[0]}</p>
             <p><strong>Example:</strong> {EXAMPLE_BRIEF.examples[0]}</p>
             <p><strong>Scenes:</strong> {EXAMPLE_BRIEF.number_of_scenes}</p>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={fillExample}
-              className="mt-2 rounded-md border border-chalk-white/30 px-3 py-1 text-sm text-chalk-white hover:bg-chalk-white/10 cursor-pointer"
-              style={{ fontFamily: 'Inter, sans-serif', background: 'transparent' }}
             >
               Use this example
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -151,10 +159,10 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
 
       {/* Topic */}
       <div>
-        <label htmlFor="topic" className="mb-1 block text-sm font-medium text-chalk-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <label htmlFor="topic" className="mb-1 block text-sm font-medium text-off-white">
           Topic <span className="text-red-400">*</span>
         </label>
-        <input
+        <Input
           id="topic"
           type="text"
           value={topic}
@@ -162,10 +170,8 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
           maxLength={200}
           required
           placeholder="E.g., Solving linear equations, The Pythagorean theorem, Understanding fractions"
-          className="chalk-input-dark"
-          style={{ fontFamily: 'Inter, sans-serif' }}
         />
-        <p className="mt-1 text-xs text-chalk-white/40">{topic.length}/200</p>
+        <p className="mt-1 text-xs text-off-white/40">{topic.length}/200</p>
       </div>
 
       <TagInput label="Misconceptions" hint="Common mistakes students make — e.g., Confusing numerator and denominator"
@@ -176,41 +182,40 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
         tags={examples} onAdd={(tag) => setExamples(p => [...p, tag])} onRemove={(i) => setExamples(p => p.filter((_, idx) => idx !== i))} max={5} />
 
       <div>
-        <label htmlFor="scenes" className="mb-1 block text-sm font-medium text-chalk-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <label htmlFor="scenes" className="mb-1 block text-sm font-medium text-off-white">
           Number of Scenes <span className="text-red-400">*</span>
         </label>
-        <p className="mb-2 text-xs text-chalk-white/55" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <p className="mb-2 text-xs text-off-white/55">
           How many scenes to render. Each scene takes 2-3 minutes.
         </p>
-        <input
+        <Input
           id="scenes"
           type="number"
           value={numberOfScenes}
           onChange={(e) => setNumberOfScenes(Math.min(3, Math.max(1, parseInt(e.target.value) || 1)))}
           min={1}
           max={3}
-          className="chalk-input-dark"
-          style={{ width: 80, fontFamily: 'Inter, sans-serif' }}
+          className="w-20"
         />
       </div>
 
       {error && (
         <div
           className="rounded-md p-3 text-sm text-red-400"
-          style={{ background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)', fontFamily: 'Inter, sans-serif' }}
+          style={{ background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)' }}
         >
           {error}
         </div>
       )}
 
-      <button
+      <Button
         type="submit"
         disabled={!isValid || submitting}
-        className="rounded-[10px] border-2 border-chalk-orange text-chalk-orange px-8 py-3 text-lg transition-all hover:bg-chalk-orange hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        style={{ fontFamily: 'Patrick Hand, cursive' }}
+        size="lg"
+        className="bg-accent-orange hover:bg-accent-orange/80"
       >
         {submitting ? 'Submitting...' : 'Generate My Lesson Video \u2192'}
-      </button>
+      </Button>
         </form>
       </div>
     </div>
