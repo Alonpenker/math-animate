@@ -76,30 +76,30 @@ export function ScenePlayer({ artifactId, sceneNumber, scenePlan, onBack }: Scen
     <div className="space-y-4">
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-sm text-chalk-white/50 hover:text-chalk-white transition-colors cursor-pointer"
-        style={{ fontFamily: 'Inter, sans-serif', background: 'none', border: 'none', padding: 0 }}
+        className="flex items-center gap-1 text-sm text-off-white/50 hover:text-off-white transition-colors cursor-pointer"
+        style={{ background: 'none', border: 'none', padding: 0 }}
       >
         <ArrowLeft className="h-4 w-4" />
         Back to scenes
       </button>
       <div>
-        <h3 className="text-lg text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>
+        <h3 className="text-lg text-off-white">
           Scene {sceneNumber}
         </h3>
         {scenePlan && (
-          <p className="mt-1 text-sm text-chalk-white/60" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="mt-1 text-sm text-off-white/60">
             {scenePlan.learning_objective}
           </p>
         )}
       </div>
       <div className="overflow-hidden rounded-lg bg-black" style={{ aspectRatio: '16/9' }}>
         {loading && (
-          <div className="flex h-full min-h-[240px] items-center justify-center text-chalk-cyan">
+          <div className="flex h-full min-h-[240px] items-center justify-center text-accent-cyan">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         )}
         {!loading && error && (
-          <div className="flex h-full min-h-[240px] items-center justify-center px-4 text-center text-sm text-chalk-white/60">
+          <div className="flex h-full min-h-[240px] items-center justify-center px-4 text-center text-sm text-off-white/60">
             {error}
           </div>
         )}
@@ -114,10 +114,10 @@ export function ScenePlayer({ artifactId, sceneNumber, scenePlan, onBack }: Scen
       </div>
       {scenePlan?.voice_notes && (
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-chalk-white/40" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-off-white/40">
             Voice Notes
           </p>
-          <p className="mt-1 text-sm text-chalk-white/70" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="mt-1 text-sm text-off-white/70">
             {scenePlan.voice_notes}
           </p>
         </div>

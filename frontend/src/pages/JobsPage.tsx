@@ -20,12 +20,12 @@ export function JobsPage() {
       >
         <div className="mb-8">
           <h1
-            className="text-4xl text-chalk-white"
-            style={{ fontFamily: 'Patrick Hand, cursive' }}
+            className="text-4xl text-off-white"
+           
           >
             Job History
           </h1>
-          <p className="mt-2 text-chalk-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <p className="mt-2 text-off-white/50">
             All lesson generation jobs.
           </p>
         </div>

@@ -4,7 +4,10 @@ import { CreateForm } from '@/components/create/CreateForm';
 import { DynamicLoader } from '@/components/create/DynamicLoader';
 import { PlanReview } from '@/components/create/PlanReview';
 import { TerminalState } from '@/components/create/TerminalState';
+import { JobStateDiagram } from '@/components/create/JobStateDiagram';
+import { Button } from '@/components/ui/button';
 import { useCreateFlow } from '@/hooks/useCreateFlow';
+import type { JobStatus } from '@/services/api';
 
 export function CreatePage() {
   const {
@@ -36,10 +39,10 @@ export function CreatePage() {
         {state.phase === 'form' && (
           <>
             <div className="mb-8 text-center">
-              <h1 className="text-4xl text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>
+              <h1 className="text-4xl text-off-white">
                 Create a Lesson Video
               </h1>
-              <p className="mt-2 text-chalk-white/60" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <p className="mt-2 text-off-white/60">
                 Fill in the brief below and our AI will plan and render your lesson.
               </p>
             </div>
@@ -47,8 +50,11 @@ export function CreatePage() {
           </>
         )}
 
-        {state.phase === 'loading_planning' && (
-          <DynamicLoader status={pollingStatus} connectionError={pollingError} />
+        {(state.phase === 'loading_planning' || state.phase === 'loading_rendering') && (
+          <>
+            <DynamicLoader status={pollingStatus} connectionError={pollingError} />
+            <JobStateDiagram currentStatus={pollingStatus as JobStatus} mode="live" />
+          </>
         )}
 
         {state.phase === 'plan_review' && state.plan && (
@@ -62,28 +68,23 @@ export function CreatePage() {
 
         {state.phase === 'plan_review' && !state.plan && state.error && (
           <div className="py-16 text-center">
-            <p className="text-chalk-white/60">{state.error}</p>
+            <p className="text-off-white/60">{state.error}</p>
           </div>
-        )}
-
-        {state.phase === 'loading_rendering' && (
-          <DynamicLoader status={pollingStatus} connectionError={pollingError} />
         )}
 
         {state.phase === 'rejected' && (
           <div className="flex flex-col items-center py-16 text-center">
-            <h2 className="text-2xl text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>No problem.</h2>
-            <p className="mt-2 text-chalk-white/60" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <h2 className="text-2xl text-off-white">No problem.</h2>
+            <p className="mt-2 text-off-white/60">
               Your plan has been cancelled. Ready to try a different approach? Head back to the form.
             </p>
-            <motion.button
+            <Button
               onClick={resetToForm}
-              className="mt-6 rounded-lg border-2 border-chalk-orange px-8 py-3 text-lg text-chalk-orange hover:bg-chalk-orange hover:text-white transition-all cursor-pointer"
-              style={{ fontFamily: 'Patrick Hand, cursive', background: 'none' }}
-              whileHover={{ scale: 1.03 }}
+              size="lg"
+              className="mt-6 bg-accent-orange hover:bg-accent-orange/80"
             >
               Create a New Lesson
-            </motion.button>
+            </Button>
           </div>
         )}
 

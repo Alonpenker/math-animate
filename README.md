@@ -2,9 +2,25 @@
   <img src="assets/MathAnimate-Wordmark.png" alt="MathAnimate" width="100%"/>
 </p>
 
-> AI-assisted lesson-to-video pipeline: submit a math lesson brief, review an AI-generated scene plan, and get a rendered Manim animation.
+<p align="center">
+  <em>"AI-assisted lesson-to-video pipeline: submit a math lesson brief, review an AI-generated scene plan, and get a rendered Manim animation."</em>
+</p>
 
-[🌐 mathanimate.com](https://mathanimate.com) [![CI](https://github.com/Alonpenker/math-animate/actions/workflows/ci.yml/badge.svg)](https://github.com/Alonpenker/math-animate/actions/workflows/ci.yml) [![IaC: Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?logo=terraform)](infrastructure/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/Alonpenker/math-animate/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/Alonpenker/math-animate/actions/workflows/ci.yml/badge.svg" />
+  </a>
+  <a href="infrastructure/">
+    <img alt="IaC: Terraform" src="https://img.shields.io/badge/IaC-Terraform-7B42BC?logo=terraform" />
+  </a>
+  <a href="LICENSE">
+    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://mathanimate.com">🌐mathanimate.com</a>
+</p>
 
 ---
 

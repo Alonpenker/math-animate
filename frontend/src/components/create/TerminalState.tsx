@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Code2, ShieldAlert, VideoOff, Gauge, XCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { JobStatus } from '@/services/api';
 
 interface TerminalStateProps {
@@ -33,12 +34,12 @@ const FAILURE_MAP: Record<string, { icon: React.ReactNode; heading: string; expl
     explanation: 'The rendering process encountered an unexpected error. Please try submitting your request again.',
   },
   FAILED_QUOTA_EXCEEDED: {
-    icon: <Gauge className="h-16 w-16 text-chalk-orange" />,
+    icon: <Gauge className="h-16 w-16 text-accent-orange" />,
     heading: 'Daily Token Limit Reached',
     explanation: 'The shared daily token budget has been exhausted. Please try again after midnight UTC.',
   },
   CANCELLED: {
-    icon: <XCircle className="h-16 w-16 text-chalk-orange" />,
+    icon: <XCircle className="h-16 w-16 text-accent-orange" />,
     heading: 'Job Cancelled',
     explanation: 'This job was cancelled before it completed.',
   },
@@ -55,20 +56,20 @@ export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
       >
-        <CheckCircle2 className="h-16 w-16 text-chalk-green" />
-        <h2 className="mt-6 text-3xl text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>
+        <CheckCircle2 className="h-16 w-16 text-accent-green" />
+        <h2 className="mt-6 text-3xl text-off-white">
           Your Lesson Videos Are Ready!
         </h2>
-        <p className="mt-2 text-chalk-white/55 max-w-md" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <p className="mt-2 text-off-white/55 max-w-md">
           All scenes have been rendered successfully. Head to the Lessons library to watch them.
         </p>
-        <button
+        <Button
           onClick={() => navigate(`/lessons?job_id=${jobId}`)}
-          className="mt-8 rounded-lg border-2 border-chalk-orange text-chalk-orange px-8 py-3 text-lg transition-all hover:bg-chalk-orange hover:text-white cursor-pointer"
-          style={{ fontFamily: 'Patrick Hand, cursive', background: 'none' }}
+          size="lg"
+          className="mt-8 bg-accent-orange hover:bg-accent-orange/80"
         >
           Watch My Videos →
-        </button>
+        </Button>
       </motion.div>
     );
   }
@@ -77,11 +78,11 @@ export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
   if (!info) {
     return (
       <div className="flex flex-col items-center py-20 text-center">
-        <AlertCircle className="h-16 w-16 text-chalk-white/30" />
-        <h2 className="mt-6 text-2xl text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>Unknown Status</h2>
-        <button onClick={onReset} className="mt-6 rounded-lg border-2 border-chalk-white/40 text-chalk-white/70 px-5 py-2 hover:bg-white/5 cursor-pointer" style={{ fontFamily: 'Inter, sans-serif', background: 'none' }}>
+        <AlertCircle className="h-16 w-16 text-off-white/30" />
+        <h2 className="mt-6 text-2xl text-off-white">Unknown Status</h2>
+        <Button variant="outline" onClick={onReset} className="mt-6">
           Try Again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -94,19 +95,19 @@ export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
       transition={{ duration: 0.5 }}
     >
       {info.icon}
-      <h2 className="mt-6 text-3xl text-chalk-white" style={{ fontFamily: 'Patrick Hand, cursive' }}>
+      <h2 className="mt-6 text-3xl text-off-white">
         {info.heading}
       </h2>
-      <p className="mx-auto mt-2 max-w-md text-chalk-white/55" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <p className="mx-auto mt-2 max-w-md text-off-white/55">
         {info.explanation}
       </p>
-      <button
+      <Button
         onClick={onReset}
-        className="mt-8 rounded-lg border-2 border-chalk-orange text-chalk-orange px-8 py-3 text-lg transition-all hover:bg-chalk-orange hover:text-white cursor-pointer"
-        style={{ fontFamily: 'Patrick Hand, cursive', background: 'none' }}
+        size="lg"
+        className="mt-8 bg-accent-orange hover:bg-accent-orange/80"
       >
         Try Again
-      </button>
+      </Button>
     </motion.div>
   );
 }

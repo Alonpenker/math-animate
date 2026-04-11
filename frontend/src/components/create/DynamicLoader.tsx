@@ -56,21 +56,21 @@ export function DynamicLoader({ status, connectionError }: DynamicLoaderProps) {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.4 }}
-        className="mt-6 text-xl text-chalk-white"
-        style={{ fontFamily: 'Patrick Hand, cursive' }}
+        className="mt-6 text-xl text-off-white"
+       
       >
         <TextType text={displayMessage} cursorCharacter="|" />
       </motion.p>
       {status && status !== 'TIMEOUT' && (
-        <p className="mt-2 text-xs text-chalk-white/35" style={{ fontFamily: 'Inter, sans-serif' }}>{status}</p>
+        <p className="mt-2 text-xs text-off-white/35">{status}</p>
       )}
       {connectionError && (
-        <p className="mt-4 text-sm text-chalk-orange" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <p className="mt-4 text-sm text-accent-orange">
           Connection lost. Retrying...
         </p>
       )}
       {status === 'TIMEOUT' && (
-        <p className="mt-4 text-sm text-red-400" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <p className="mt-4 text-sm text-red-400">
           This is taking longer than expected. Please try refreshing the page.
         </p>
       )}

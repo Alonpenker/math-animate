@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getJobStatus } from '@/services/api';
 import type { JobStatus } from '@/services/api';
 
-const POLL_INTERVAL = 2000;
+const PLANNING_POLL_INTERVAL = 3000;
+const RENDERING_POLL_INTERVAL = 5000;
 const TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 
@@ -84,7 +85,8 @@ export function useJobPolling(
     };
 
     void poll();
-    intervalRef.current = setInterval(() => void poll(), POLL_INTERVAL);
+    const interval = phase === 'planning' ? PLANNING_POLL_INTERVAL : RENDERING_POLL_INTERVAL;
+    intervalRef.current = setInterval(() => void poll(), interval);
 
     return () => {
       mountedRef.current = false;

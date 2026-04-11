@@ -10,7 +10,7 @@ React + TypeScript SPA for the **math-animate** project, built with Vite.
 - **Styling:** Tailwind CSS 4, shadcn/ui (Base UI), `tw-animate-css`
 - **Animation:** Framer Motion 12, GSAP 3, OGL (WebGL)
 - **Icons:** Lucide React, React Icons
-- **Fonts:** Geist (variable), Inter, Patrick Hand
+- **Fonts:** Geist (variable), Inter
 - **Video:** React Player
 - **Linting:** ESLint 9 + typescript-eslint
 - **Testing:** Playwright
@@ -24,7 +24,6 @@ frontend/
 │   ├── App.tsx           # Router setup
 │   ├── index.css         # Global styles
 │   ├── components/       # Shared/reusable components
-│   │   ├── chalk/
 │   │   ├── create/
 │   │   ├── home/
 │   │   ├── jobs/
@@ -33,6 +32,7 @@ frontend/
 │   │   ├── ui/
 │   │   └── usage/
 │   ├── pages/            # Route-level page components
+│   │   ├── AboutPage.tsx
 │   │   ├── CreatePage.tsx
 │   │   ├── HomePage.tsx
 │   │   ├── JobsPage.tsx

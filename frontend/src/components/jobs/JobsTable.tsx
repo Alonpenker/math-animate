@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ChalkButton } from '@/components/chalk/ChalkButton';
+import { Button } from '@/components/ui/button';
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge';
 import { formatDate, truncateId } from '@/utils/formatters';
 import type { JobListItem, JobStatus } from '@/services/api';
@@ -33,7 +33,6 @@ function getClickRoute(job: JobListItem): string | null {
 const cellStyle: React.CSSProperties = {
   padding: '12px 16px',
   borderBottom: '1px solid rgba(245,240,232,0.1)',
-  fontFamily: 'Inter, sans-serif',
   fontSize: '14px',
   color: '#F5F0E8',
 };
@@ -54,8 +53,8 @@ export function JobsTable({ jobs, total, page, pageSize, loading, error, onPageC
   if (error) {
     return (
       <div className="flex flex-col items-center py-16 text-center">
-        <p className="text-chalk-white/50">Could not load jobs.</p>
-        <ChalkButton variant="default" className="mt-4" onClick={onRetry}>Retry</ChalkButton>
+        <p className="text-off-white/50">Could not load jobs.</p>
+        <Button variant="outline" className="mt-4" onClick={onRetry}>Retry</Button>
       </div>
     );
   }
@@ -63,11 +62,11 @@ export function JobsTable({ jobs, total, page, pageSize, loading, error, onPageC
   if (!loading && jobs.length === 0) {
     return (
       <div className="flex flex-col items-center py-16 text-center">
-        <Inbox className="h-12 w-12 text-chalk-white/30" />
-        <p className="mt-4 text-chalk-white/50">No jobs yet. Go create the first lesson video!</p>
-        <ChalkButton variant="orange" className="mt-4" onClick={() => navigate('/create')}>
+        <Inbox className="h-12 w-12 text-off-white/30" />
+        <p className="mt-4 text-off-white/50">No jobs yet. Go create the first lesson video!</p>
+        <Button className="mt-4 bg-accent-orange hover:bg-accent-orange/80" onClick={() => navigate('/create')}>
           Create a Lesson
-        </ChalkButton>
+        </Button>
       </div>
     );
   }
@@ -128,15 +127,15 @@ export function JobsTable({ jobs, total, page, pageSize, loading, error, onPageC
 
       {totalPages > 1 && (
         <div className="mt-5 flex items-center justify-center gap-5">
-          <ChalkButton variant="default" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
             Previous
-          </ChalkButton>
-          <span className="text-sm text-chalk-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+          </Button>
+          <span className="text-sm text-off-white/50">
             Page {page} of {totalPages}
           </span>
-          <ChalkButton variant="default" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
             Next
-          </ChalkButton>
+          </Button>
         </div>
       )}
     </div>

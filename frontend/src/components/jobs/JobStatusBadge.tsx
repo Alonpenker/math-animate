@@ -4,7 +4,7 @@ import {
   AlertCircle, XSquare, ShieldAlert, VideoOff, Gauge, Ban, HelpCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { ChalkBadge } from '@/components/chalk/ChalkBadge';
+import { Badge } from '@/components/ui/badge';
 import type { JobStatus } from '@/services/api';
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -41,15 +41,32 @@ const STATUS_DEFS: Record<JobStatus, StatusDef> = {
   CANCELLED:          { icon: 'Ban',           color: 'muted',   label: 'Cancelled' },
 };
 
+function colorToVariantAndClass(color: BadgeColor): { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string } {
+  switch (color) {
+    case 'white':
+    case 'muted':
+      return { variant: 'secondary' };
+    case 'green':
+      return { variant: 'outline', className: 'border-accent-green text-accent-green' };
+    case 'red':
+      return { variant: 'destructive' };
+    case 'orange':
+      return { variant: 'outline', className: 'border-accent-orange text-accent-orange' };
+    case 'cyan':
+      return { variant: 'outline', className: 'border-accent-cyan text-accent-cyan' };
+  }
+}
+
 interface JobStatusBadgeProps { status: JobStatus; }
 
 export function JobStatusBadge({ status }: JobStatusBadgeProps) {
   const def = STATUS_DEFS[status] ?? { icon: 'HelpCircle', color: 'muted' as BadgeColor, label: status };
   const Icon = ICON_MAP[def.icon] ?? HelpCircle;
+  const { variant, className } = colorToVariantAndClass(def.color);
   return (
-    <ChalkBadge color={def.color}>
+    <Badge variant={variant} className={className}>
       <Icon className="h-3 w-3" />
       {def.label}
-    </ChalkBadge>
+    </Badge>
   );
 }
