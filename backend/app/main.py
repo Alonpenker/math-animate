@@ -64,7 +64,7 @@ async def health_check(cursor = Depends(get_cursor),
     try:
         storage.bucket_exists(settings.storage_bucket)
     except Exception as e:
-        raise HTTPException(status_code=503,detail=f"MinIO is down: {e}")
+        raise HTTPException(status_code=503,detail=f"Storage is down: {e}")
     return {"message":"application healthy"}
 
 api_router = APIRouter(prefix=ROUTER_PREFIX, dependencies=[Depends(verify_api_key)])
