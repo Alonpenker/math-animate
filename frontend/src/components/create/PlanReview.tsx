@@ -78,7 +78,7 @@ export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps
           disabled={loading}
           variant="default"
           size="lg"
-          className="bg-accent-orange hover:bg-accent-orange/80 px-6 text-base"
+          className="h-10 min-w-33 bg-accent-orange px-6 text-base hover:brightness-110"
         >
           {loading ? 'Processing...' : 'Approve'}
         </Button>
@@ -86,8 +86,7 @@ export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps
         <AlertDialog>
           <AlertDialogTrigger
             disabled={loading}
-            className="rounded-lg border-2 border-red-600 px-6 py-2 text-base text-red-600 transition-all hover:bg-red-600 hover:text-white disabled:opacity-40 cursor-pointer"
-            style={{ background: 'none' }}
+            className="inline-flex h-10 min-w-33 cursor-pointer items-center justify-center rounded-lg border-2 border-red-600 bg-transparent px-6 text-base text-red-600 transition-all hover:bg-red-600 hover:text-white disabled:opacity-40"
           >
             Reject
           </AlertDialogTrigger>
