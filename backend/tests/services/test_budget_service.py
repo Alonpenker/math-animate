@@ -2,7 +2,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.configs.llm_settings import DAILY_TOKEN_LIMIT, PLANNING_OUTPUT_BUFFER, CODEGEN_OUTPUT_BUFFER
+from app.configs.llm_settings import (
+    DAILY_TOKEN_LIMIT,
+    LLM_PLAN_OUTPUT_MAX_TOKENS,
+    LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+    TOKEN_OUTPUT_BUFFER,
+)
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.services.budget_service import BudgetService
 
@@ -52,8 +57,8 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
     # Then — operations run in the correct order
     assert call_order == ["lock", "total", "reserve"]
 
-    # Reservation includes input tokens + planning output buffer
-    assert reserved_tokens == 123 + PLANNING_OUTPUT_BUFFER
+    # Reservation includes input tokens + max completion tokens + shared output buffer
+    assert reserved_tokens == 123 + LLM_PLAN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
 
     # All required fields passed to the ledger
     kwargs = captured["kwargs"]
@@ -65,7 +70,7 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
     assert kwargs["reserved_tokens"] == reserved_tokens
 
 
-def test_reserve_uses_codegen_output_buffer_for_non_planning_stages(
+def test_reserve_uses_codegen_output_allowance_for_non_planning_stages(
     monkeypatch: pytest.MonkeyPatch,
 ):
     # Given
@@ -95,7 +100,7 @@ def test_reserve_uses_codegen_output_buffer_for_non_planning_stages(
     )
 
     # Then
-    assert reserved == 100 + CODEGEN_OUTPUT_BUFFER
+    assert reserved == 100 + LLM_CODEGEN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
     assert captured["reserved"] == reserved
 
 

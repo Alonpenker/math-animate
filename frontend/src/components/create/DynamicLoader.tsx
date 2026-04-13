@@ -45,7 +45,7 @@ export function DynamicLoader({ status, connectionError }: DynamicLoaderProps) {
         style={{
           width: 56, height: 56,
           border: '3px solid rgba(245,240,232,0.15)',
-          borderTopColor: '#7EC8C8',
+          borderTopColor: 'var(--color-accent-orange)',
         }}
         animate={{ rotate: 360 }}
         transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}

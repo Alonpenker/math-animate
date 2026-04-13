@@ -117,7 +117,7 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
               onChange={(e) => setTopic(e.target.value)}
               maxLength={200}
               required
-              placeholder="e.g. Solving linear equations, The Pythagorean theorem, Understanding fractions"
+              placeholder="e.g. Solving linear equations, Understanding fractions"
             />
             <p className="mt-1 text-xs text-off-white/40">{topic.length}/200</p>
           </div>

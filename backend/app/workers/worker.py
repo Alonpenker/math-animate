@@ -13,15 +13,14 @@ from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOU
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.redis_client import init_redis_pool, close_redis_pool
 from app.dependencies.storage import init_storage
-from app.domain.job_state import JobStatus, require_transition
+from app.domain.job_state import JobStatus
+from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
-from app.repositories.jobs_repository import JobsRepository
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
 from app.schemas.artifact import ArtifactType
-from app.schemas.video_plan import VideoPlan
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
 import psycopg2
@@ -61,7 +60,7 @@ if settings.environment == "prod":
 logger = get_logger(__name__)
 
 if IS_E2E_MODE:
-    logger.warning("E2E mode enabled — LLM calls will be stubbed. No real API calls will be made.")
+    logger.warning("E2E mode enabled - LLM calls will be stubbed. No real API calls will be made.")
 
 
 @worker_process_init.connect
@@ -102,42 +101,38 @@ def generate_plan(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
-        logger.info("Planning started (%s)", log_context(str(job_id)))
+        logger.info("Planning started (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
 
         system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
         reserved = reserve_budget(
-            call_id, job_id, JobStatus.PLANNING.value, LLM_PLAN_MODEL,
+            call_id, job_id, JobStatus.PLANNING, LLM_PLAN_MODEL,
             f"{system_prompt}\n{user_query}",
         )
 
-        logger.info("LLM planning call started (%s)", log_context(str(job_id)))
         plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
         reconcile_budget(call_id, total_tokens)
 
         with get_worker_cursor() as cursor:
             PlansRepository.create_plan(cursor, job_id, plan)
 
-        for scene in plan.scenes:
-            if scene.scene_number == -1:
-                logger.warning("Plan rejected: non-math topic detected: %s",
-                                scene.learning_objective,
-                                )
-                transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
-                return
-
         transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
-        logger.info("Planning completed (%s)", log_context(str(job_id)))
+        logger.info("Planning completed (%s)", log_context(str(job_id), str(call_id)))
 
     except QuotaExceededError:
-        logger.exception("Planning quota exceeded (%s)", log_context(str(job_id)))
+        logger.exception("Planning quota exceeded (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
+    except LLMUsageException as exc:
+        reconcile_budget(call_id, exc.total_tokens)
+        logger.exception("Planning failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        raise
+
     except Exception as exc:
-        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
         release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Planning failed (%s)", log_context(str(job_id)))
+        logger.exception("Planning failed due to unexpected error (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         raise
 
@@ -156,33 +151,38 @@ def generate_code(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
+        logger.info("Codegen started (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, job_request.job.status, JobStatus.CODEGEN)
 
         system_prompt, user_query = LLMService.render_codegen_prompt(job_request.plan)
         reserved = reserve_budget(
-            call_id, job_id, JobStatus.CODEGEN.value, LLM_CODE_MODEL,
+            call_id, job_id, JobStatus.CODEGEN, LLM_CODE_MODEL,
             f"{system_prompt}\n{user_query}",
         )
 
-        logger.info("Codegen LLM call started (%s)", log_context(str(job_id)))
         code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
         reconcile_budget(call_id, total_tokens)
 
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
-        logger.info("Codegen completed; verification enqueued (%s)", log_context(str(job_id)))
+        logger.info("Codegen completed; verification enqueued (%s)", log_context(str(job_id), str(call_id)))
         verify_code_task.delay(
             JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code, is_retry=False).model_dump(mode="json")
         )
 
     except QuotaExceededError:
-        logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id)))
+        logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED)
         raise
 
-    except Exception as exc:
-        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
+    except LLMUsageException as exc:
+        reconcile_budget(call_id, exc.total_tokens)
+        logger.exception("Codegen failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        raise
+
+    except Exception:
         release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Codegen failed (%s)", log_context(str(job_id)))
+        logger.exception("Codegen failed (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
         raise
 
@@ -291,17 +291,18 @@ def fix_code_task(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
+        logger.info("Fix started (%s)", log_context(str(job_id), str(call_id)))
+        
         system_prompt, user_query = LLMService.render_fix_prompt(job_request.code, job_request.error_context)
         reserved = reserve_budget(
-            call_id, job_id, JobStatus.FIXING.value, LLM_CODE_MODEL,
+            call_id, job_id, JobStatus.FIXING, LLM_CODE_MODEL,
             f"{system_prompt}\n{user_query}",
         )
 
-        logger.info("Fix LLM call started (%s)", log_context(str(job_id)))
         fixed_code, total_tokens = LLMService.fix_call(system_prompt, user_query)
         reconcile_budget(call_id, total_tokens)
 
-        logger.info("Fix completed; re-verification enqueued (%s)", log_context(str(job_id)))
+        logger.info("Fix completed; re-verification enqueued (%s)", log_context(str(job_id), str(call_id)))
         verify_code_task.delay(
             JobCodeRequest(
                 job=Job(job_id=job_id, status=JobStatus.FIXING),
@@ -311,14 +312,19 @@ def fix_code_task(job_request_payload: dict) -> None:
         )
 
     except QuotaExceededError:
-        logger.exception("Fix quota exceeded (%s)", log_context(str(job_id)))
+        logger.exception("Fix quota exceeded (%s)", log_context(str(job_id), str(call_id)))
         release_budget_on_error(call_id, reserved, total_tokens)
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_QUOTA_EXCEEDED)
 
-    except Exception as exc:
-        total_tokens = max(total_tokens, int(getattr(exc, "total_tokens", 0) or 0))
+    except LLMUsageException as exc:
+        reconcile_budget(call_id, exc.total_tokens)
+        logger.exception("Fix task failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+        raise
+
+    except Exception:
         release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Fix task failed (%s)", log_context(str(job_id)))
+        logger.exception("Fix task failed (%s)", log_context(str(job_id), str(call_id)))
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
         raise
 

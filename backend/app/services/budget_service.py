@@ -5,14 +5,21 @@ import tiktoken
 
 from app.configs.llm_settings import (
     DAILY_TOKEN_LIMIT,
-    PLANNING_OUTPUT_BUFFER,
-    CODEGEN_OUTPUT_BUFFER,
+    LLM_PLAN_OUTPUT_MAX_TOKENS,
+    LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+    TOKEN_OUTPUT_BUFFER,
 )
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.token_repository import TokenLedgerRepository
 
 
 class BudgetService:
+    
+    @staticmethod
+    def _reserved_output_tokens(stage: str) -> int:
+        if stage == "planning":
+            return LLM_PLAN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
+        return LLM_CODEGEN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
 
     @staticmethod
     def _count_tokens(text: str, model_name: str) -> int:
@@ -33,13 +40,7 @@ class BudgetService:
         prompt_text: str,
     ) -> int:
         input_tokens = BudgetService._count_tokens(prompt_text, model)
-
-        if stage == "planning":
-            output_buffer = PLANNING_OUTPUT_BUFFER
-        else:
-            output_buffer = CODEGEN_OUTPUT_BUFFER
-
-        reserved_tokens = input_tokens + output_buffer
+        reserved_tokens = input_tokens + BudgetService._reserved_output_tokens(stage)
 
         TokenLedgerRepository.acquire_daily_lock(cursor)
 

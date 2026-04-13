@@ -23,7 +23,7 @@ class PathNames:
     OUTPUT_FOLDER = 'output'
     MEDIA_FOLDER = 'media'
     VIDEOS_FOLDER = 'videos'
-    RESOLUTION_FOLDER = '1080p60'
+    RESOLUTION_FOLDER = '720p30'
     PARTIAL_MOVIE_FILES_FOLDER = 'partial_movie_files'
     
 class DockerCommands:

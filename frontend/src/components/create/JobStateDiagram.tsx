@@ -47,15 +47,15 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
 
           let nodeClass = 'rounded-full px-3 py-1 text-xs font-medium border transition-all ';
           if (mode === 'static') {
-            nodeClass += 'bg-off-white/5 border-off-white/20 text-off-white/50';
+            nodeClass += 'bg-accent-orange/5 border-accent-orange/20 text-off-white/50';
           } else if (isCurrentHappy) {
-            nodeClass += 'bg-accent-cyan border-accent-cyan text-surface-dark animate-pulse';
+            nodeClass += 'bg-accent-orange border-accent-orange text-surface-dark animate-pulse';
           } else if (isPast) {
-            nodeClass += 'bg-off-white/10 border-off-white/20 text-off-white/40';
+            nodeClass += 'bg-accent-orange/10 border-accent-orange/30 text-accent-orange';
           } else if (isFuture) {
-            nodeClass += 'bg-off-white/5 border-off-white/10 text-off-white/30';
+            nodeClass += 'bg-accent-orange/5 border-accent-orange/15 text-off-white/35';
           } else {
-            nodeClass += 'bg-off-white/5 border-off-white/10 text-off-white/30';
+            nodeClass += 'bg-accent-orange/5 border-accent-orange/15 text-off-white/35';
           }
 
           const label = STATUS_LABELS[status] ?? status;
