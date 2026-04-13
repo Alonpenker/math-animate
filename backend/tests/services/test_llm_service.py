@@ -87,19 +87,14 @@ def test_extract_token_usage_reads_values_from_usage_metadata():
     assert reasoning_tok == 20
 
 
-def test_extract_token_usage_returns_zeros_when_no_metadata():
+def test_extract_token_usage_raises_runtime_error_when_no_usage_data_exists():
     # Given
     class FakeResponse:
         usage_metadata = None
 
     # When
-    input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(FakeResponse())
-
-    # Then
-    assert input_tok == 0
-    assert output_tok == 0
-    assert total_tok == 0
-    assert reasoning_tok == 0
+    with pytest.raises(RuntimeError, match="Could not extract token usage"):
+        LLMService._extract_token_usage(FakeResponse())
 
 
 def test_extract_token_usage_returns_zeros_when_metadata_is_empty_dict():

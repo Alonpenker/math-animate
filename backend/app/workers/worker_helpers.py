@@ -27,7 +27,7 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def log_context(job_id: Optional[str] = None) -> str:
+def log_context(job_id: Optional[str] = None, call_id: Optional[str] = None) -> str:
     parts: list[str] = [f"pid={os.getpid()}"]
     if current_task is not None and getattr(current_task, "request", None) is not None:
         hostname = getattr(current_task.request, "hostname", None)
@@ -35,6 +35,8 @@ def log_context(job_id: Optional[str] = None) -> str:
             parts.append(f"worker={hostname}")
     if job_id:
         parts.append(f"job_id={job_id}")
+    if call_id:
+        parts.append(f"call_id={call_id}")
     return " ".join(parts)
 
 
@@ -46,10 +48,10 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
         JobRequestsRepository.update_status(cursor, job_id, to_status)
 
 
-def reserve_budget(call_id, job_id, stage: str, model: str, prompt_text: str) -> int:
+def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str) -> int:
     with get_worker_cursor() as cursor:
         return BudgetService.reserve(
-            cursor, call_id, job_id, stage, LLM_PROVIDER, model, prompt_text
+            cursor, call_id, job_id, stage.value, LLM_PROVIDER, model, prompt_text
         )
 
 
@@ -61,7 +63,7 @@ def reconcile_budget(call_id, total_tokens: int) -> None:
 def release_budget_on_error(call_id, reserved: int, total_tokens: int) -> None:
     if reserved:
         with get_worker_cursor() as cursor:
-            BudgetService.release_on_error(cursor, call_id, max(reserved, total_tokens))
+            BudgetService.reconcile(cursor, call_id, max(reserved, total_tokens))
 
 
 def get_storage() -> FilesStorageService:
