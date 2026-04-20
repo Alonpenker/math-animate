@@ -1,5 +1,7 @@
 .claude
+.codex
 settings.json
 
 PLAN.*md
+SPEC.md
 TODOS
