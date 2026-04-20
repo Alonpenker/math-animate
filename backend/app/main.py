@@ -11,7 +11,9 @@ from app.dependencies.storage import init_storage, get_storage_client
 from app.exceptions.exception_handler import handle_exceptions
 from app.routes.jobs import router as jobs_router
 from app.routes.artifacts import router as artifacts_router
+from app.routes.artifacts import internal_router as artifacts_internal_router
 from app.routes.knowledge import router as knowledge_router
+from app.routes.knowledge import internal_router as knowledge_internal_router
 from app.routes.usage import router as usage_router
 
 
@@ -72,5 +74,9 @@ api_router.include_router(jobs_router)
 api_router.include_router(artifacts_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(usage_router)
-
 app.include_router(api_router)
+
+internal_api_router = APIRouter(prefix=INTERNAL_ROUTER_PREFIX, dependencies=[Depends(verify_api_key)])
+internal_api_router.include_router(artifacts_internal_router)
+internal_api_router.include_router(knowledge_internal_router)
+app.include_router(internal_api_router)

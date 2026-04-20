@@ -11,6 +11,7 @@ while the system handles the heavy lifting."""
 APP_VERSION = "0.0.2"
 
 ROUTER_PREFIX = "/api/v1"
+INTERNAL_ROUTER_PREFIX = "/internal"
 
 class Settings(BaseSettings):
     x_api_key: SecretStr

@@ -69,7 +69,7 @@ class LLMService:
             logger.warning(
                 "No knowledge examples were retrieved for doc_type=%s. "
                 "This is unexpected in a seeded environment. "
-                "Load the bundled examples by calling POST /api/v1/knowledge/seed.",
+                "Load the bundled examples manually by calling POST /internal/knowledge/seed.",
                 doc_type.value,
             )
             return "(No examples available.)"

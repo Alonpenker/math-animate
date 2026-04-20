@@ -8,6 +8,7 @@ from uuid import UUID
 
 from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
+from app.utils.logging import get_logger
 from app.dependencies.limiter import limiter
 from app.dependencies.storage import get_storage_service
 from app.repositories.artifacts_repository import ArtifactsRepository
@@ -16,6 +17,9 @@ from app.services.files_storage_service import FilesStorageService
 from app.utils.video_streaming import build_video_stream_response
 
 router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
+internal_router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
+
+logger = get_logger(__name__)
 
 
 @router.get("", response_model=List[ArtifactResponse])
@@ -99,7 +103,7 @@ def download_artifact(
     )
 
 
-@router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
+@internal_router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(LimitConfig.STRICT)
 def delete_artifact(
     request: Request,
@@ -117,7 +121,7 @@ def delete_artifact(
     try:
         storage.delete_artifact(artifact.path)
     except Exception:
-        pass
+        logger.warning("Storage delete failed for artifact_id=%s", artifact_id, exc_info=True)
 
     ArtifactsRepository.delete_artifact(cursor, artifact_id)
 

@@ -32,5 +32,10 @@
     }
     abort @not_cloudflare
 
+    @internal {
+        path /internal /internal/*
+    }
+    respond @internal 404
+
     reverse_proxy api:8000
 }
