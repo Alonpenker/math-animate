@@ -6,7 +6,7 @@ services:
       context: ./backend
     ports:
       - "127.0.0.1:8000:8000"
-    command: ["uv","run","gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "--bind", "0.0.0.0:8000"]
+    command: ["uv","run","gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "--bind", "0.0.0.0:8000", "--access-logfile", "-"]
     depends_on:
       postgres:
         condition: service_healthy

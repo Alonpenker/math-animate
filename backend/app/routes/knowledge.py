@@ -16,8 +16,9 @@ from app.schemas.knowledge import (
 from app.workers.runner import WorkerRunner
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
+internal_router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
 
-@router.post("", status_code=status.HTTP_202_ACCEPTED)
+@internal_router.post("", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(LimitConfig.STRICT)
 def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
     document_id = uuid4()
@@ -27,7 +28,7 @@ def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
     return {"document_id": str(document_id), "message": "Document creation queued."}
 
 
-@router.post("/seed", status_code=status.HTTP_202_ACCEPTED)
+@internal_router.post("/seed", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(LimitConfig.STRICT)
 def seed_knowledge(request: Request) -> dict:
     WorkerRunner.handle_seed()
@@ -64,7 +65,7 @@ def get_documents(
     return KnowledgeDocumentsListResponse(documents=docs)
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@internal_router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(LimitConfig.STRICT)
 def delete_document(request: Request,
                     document_id: UUID,

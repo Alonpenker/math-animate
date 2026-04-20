@@ -94,8 +94,7 @@ case "$CMD" in
     api GET "$path" ;;
 
   rm_artifact)
-    $COMPOSE exec -T api curl -s -X DELETE "$API/artifacts/$ARTIFACT_ID" \
-      -H "X-API-Key: ${X_API_KEY}" | pretty ;;
+    api DELETE "/internal/artifacts/$ARTIFACT_ID" ;;
 
   list_jobs)
     path="/api/v1/jobs?"
@@ -108,8 +107,7 @@ case "$CMD" in
     api GET "/api/v1/knowledge?doc_type=$TYPE" ;;
 
   rm_knowledge)
-    $COMPOSE exec -T api curl -s -X DELETE "$API/knowledge/$DOC_ID" \
-      -H "X-API-Key: ${X_API_KEY}" | pretty ;;
+    api DELETE "/internal/knowledge/$DOC_ID" ;;
 
   create_knowledge)
     [[ -z "$TYPE" || -z "$TITLE" || -z "$CONTENT" ]] && {
@@ -118,10 +116,10 @@ case "$CMD" in
 import json, sys
 print(json.dumps({'doc_type': sys.argv[1], 'title': sys.argv[2], 'content': sys.argv[3]}))" \
       "$TYPE" "$TITLE" "$CONTENT")
-    api POST /api/v1/knowledge "$payload" ;;
+    api POST /internal/knowledge "$payload" ;;
 
   seed_knowledge)
-    api POST /api/v1/knowledge/seed ;;
+    api POST /internal/knowledge/seed ;;
 
   raw_get)    api GET    "$RAW_PATH" ;;
   raw_post)   api POST   "$RAW_PATH" "$RAW_DATA" ;;

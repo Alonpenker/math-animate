@@ -181,7 +181,7 @@ The frontend (full stack only) is available at **http://localhost:80**.
 Pre-prepared plan and code examples are bundled in `app/examples/`. Seed them once after first boot:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/knowledge/seed
+scripts/admin.sh --seed-knowledge
 ```
 
 ### E2E mode (no LLM calls)
