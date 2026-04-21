@@ -28,11 +28,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center p-4 text-center">
           <div>
-            <h1 className="text-2xl font-bold text-brand-text">Something went wrong.</h1>
-            <p className="mt-2 text-brand-muted">Refresh the page to try again.</p>
+            <h1 className="text-2xl font-bold text-off-white">Something went wrong.</h1>
+            <p className="mt-2 text-off-white/50">Refresh the page to try again.</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-4 rounded-md bg-brand px-4 py-2 text-white hover:bg-brand/90"
+              className="mt-4 rounded-md bg-accent-orange px-4 py-2 text-surface-dark hover:bg-accent-orange/80"
             >
               Refresh
             </button>
