@@ -18,12 +18,12 @@ const FEATURES: Feature[] = [
   {
     icon: Brain,
     title: 'AI Plans Your Video',
-    description: 'Our AI generates a structured scene-by-scene video plan for 8th-grade learners.',
+    description: 'Our AI generates a structured scene-by-scene video plan for math learners.',
   },
   {
     icon: CheckCircle,
     title: 'You Stay in Control',
-    description: 'Review the plan before rendering. Approve it or start fresh — your choice.',
+    description: 'Review the plan before rendering. Approve it or start fresh - your choice.',
   },
   {
     icon: Code,
