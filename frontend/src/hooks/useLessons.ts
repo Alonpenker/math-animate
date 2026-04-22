@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { listJobs } from '@/services/api';
-import type { JobListItem } from '@/services/api';
 
 interface UseLessonsParams {
   topicQuery?: string;
@@ -9,42 +8,31 @@ interface UseLessonsParams {
   page?: number;
 }
 
-export function useLessons(params: UseLessonsParams) {
-  const [debouncedTopic] = useDebounce(params.topicQuery ?? '', 400);
-  const [jobs, setJobs] = useState<JobListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(params.page ?? 1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+export function useLessons({ topicQuery, jobId, page = 1 }: UseLessonsParams) {
+  const [debouncedTopic] = useDebounce(topicQuery ?? '', 400);
+  const query = useQuery({
+    queryKey: ['lessons', { topic: debouncedTopic, jobId, page }],
+    queryFn: () =>
+      listJobs({
+        status: 'RENDERED',
+        topic: debouncedTopic || undefined,
+        job_id: jobId,
+        page,
+        page_size: PAGE_SIZE,
+      }),
+  });
 
-    listJobs({
-      status: 'RENDERED',
-      topic: debouncedTopic || undefined,
-      job_id: params.jobId,
-      page: params.page ?? 1,
-      page_size: 20,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        setJobs(res.jobs);
-        setTotal(res.total);
-        setPage(res.page);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err : new Error('Failed to load lessons'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+  const total = query.data?.total ?? 0;
 
-    return () => { cancelled = true; };
-  }, [debouncedTopic, params.jobId, params.page]);
-
-  return { jobs, total, page, loading, error };
+  return {
+    lessons: query.data?.jobs ?? [],
+    total,
+    page: query.data?.page ?? page,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }
