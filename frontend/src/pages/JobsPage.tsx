@@ -19,10 +19,7 @@ export function JobsPage() {
         transition={{ duration: 0.5 }}
       >
         <div className="mb-8">
-          <h1
-            className="text-4xl text-off-white"
-           
-          >
+          <h1 className="text-4xl text-off-white">
             Job History
           </h1>
           <p className="mt-2 text-off-white/50">

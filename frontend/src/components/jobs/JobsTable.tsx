@@ -74,7 +74,7 @@ export function JobsTable({ jobs, total, page, pageSize, loading, error, onPageC
   return (
     <div>
       <div
-        className="overflow-x-auto rounded-[10px]"
+        className="overflow-x-auto rounded-lg"
         style={{ border: '1px solid rgba(245,240,232,0.2)', background: 'rgba(0,0,0,0.25)' }}
       >
         <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
