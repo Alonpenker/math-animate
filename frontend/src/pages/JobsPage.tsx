@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { JobsTable } from '@/components/jobs/JobsTable';
-import { useJobsList } from '@/hooks/useJobsList';
+import { useJobsList } from '@/hooks/jobs/useJobsList';
 
 const PAGE_SIZE = 20;
 

@@ -8,9 +8,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { LessonCodeTab } from '@/components/lessons/LessonCodeTab';
 import { LessonVideosTab } from '@/components/lessons/LessonVideosTab';
-import { useLessonCode } from '@/hooks/useLessonCode';
-import { useLessonScenes } from '@/hooks/useLessonScenes';
-import type { LessonScene } from '@/hooks/useLessonScenes';
+import { useLessonCode } from '@/hooks/lessons/useLessonCode';
+import { useLessonScenes } from '@/hooks/lessons/useLessonScenes';
+import type { LessonScene } from '@/hooks/lessons/useLessonScenes';
 
 interface LessonDialogProps {
   onClose: () => void;

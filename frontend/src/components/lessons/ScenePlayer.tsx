@@ -1,6 +1,6 @@
 import ReactPlayer from 'react-player';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { useArtifactVideoUrl } from '@/hooks/useArtifactVideoUrl';
+import { useArtifactVideoUrl } from '@/hooks/lessons/useArtifactVideoUrl';
 import type { ScenePlan } from '@/services/api';
 
 interface ScenePlayerProps {

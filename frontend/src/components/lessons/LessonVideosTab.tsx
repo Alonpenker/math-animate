@@ -2,7 +2,7 @@ import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScenePlayer } from '@/components/lessons/ScenePlayer';
-import type { LessonScene } from '@/hooks/useLessonScenes';
+import type { LessonScene } from '@/hooks/lessons/useLessonScenes';
 
 interface LessonVideosTabProps {
   scenes: LessonScene[];

@@ -9,11 +9,11 @@ import {
   loadCreatePlan,
   PLAN_NOT_FOUND_ERROR,
   type CreateFlowState,
-} from '@/hooks/createFlowState';
-import { useJobPolling } from '@/hooks/useJobPolling';
-import { useResumeCreateJob } from '@/hooks/useResumeCreateJob';
+} from '@/hooks/create/createFlowState';
+import { useJobPolling } from '@/hooks/create/useJobPolling';
+import { useResumeCreateJob } from '@/hooks/create/useResumeCreateJob';
 
-export type { CreateFlowState, CreateUiState } from '@/hooks/createFlowState';
+export type { CreateFlowState, CreateUiState } from '@/hooks/create/createFlowState';
 
 export interface UseCreateFlowReturn {
   state: CreateFlowState;

@@ -5,13 +5,13 @@ import { DynamicLoader } from '@/components/create/DynamicLoader';
 import { PlanReview } from '@/components/create/PlanReview';
 import { TerminalState } from '@/components/create/TerminalState';
 import { JobStateDiagram } from '@/components/create/JobStateDiagram';
-import { useCreateFlow } from '@/hooks/useCreateFlow';
+import { useCreateFlow } from '@/hooks/create/useCreateFlow';
 import {
   isFailureState,
   isPlanningState,
   isRenderingState,
   isTerminalState,
-} from '@/hooks/createFlowState';
+} from '@/hooks/create/createFlowState';
 
 export function CreatePage() {
   const {

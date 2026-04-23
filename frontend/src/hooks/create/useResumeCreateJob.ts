@@ -4,7 +4,7 @@ import {
   loadCreatePlan,
   PLAN_NOT_FOUND_ERROR,
   type CreateFlowState,
-} from '@/hooks/createFlowState';
+} from '@/hooks/create/createFlowState';
 
 async function fetchResumedCreateJob(jobId: string): Promise<CreateFlowState> {
   const res = await getJobStatus(jobId);

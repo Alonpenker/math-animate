@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
-import { useLessons } from '@/hooks/useLessons';
+import { useLessons } from '@/hooks/lessons/useLessons';
 import { LessonSection } from '@/components/lessons/LessonSection';
 
 export function LessonsPage() {
