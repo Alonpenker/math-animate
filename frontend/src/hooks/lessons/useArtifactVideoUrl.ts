@@ -16,9 +16,17 @@ function getVideoErrorMessage(err: unknown) {
 }
 
 export function useArtifactVideoUrl(artifactId: string): UseArtifactVideoUrlResult {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [videoState, setVideoState] = useState<{
+    artifactId: string;
+    videoUrl: string | null;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    artifactId,
+    videoUrl: null,
+    isLoading: true,
+    error: null,
+  });
   const activeVideoUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -29,10 +37,6 @@ export function useArtifactVideoUrl(artifactId: string): UseArtifactVideoUrlResu
       activeVideoUrlRef.current = null;
     }
 
-    setVideoUrl(null);
-    setError(null);
-    setIsLoading(true);
-
     fetchArtifactBlobUrl(artifactId)
       .then((url) => {
         if (cancelled) {
@@ -41,16 +45,21 @@ export function useArtifactVideoUrl(artifactId: string): UseArtifactVideoUrlResu
         }
 
         activeVideoUrlRef.current = url;
-        setVideoUrl(url);
+        setVideoState({
+          artifactId,
+          videoUrl: url,
+          isLoading: false,
+          error: null,
+        });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(getVideoErrorMessage(err));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
+          setVideoState({
+            artifactId,
+            videoUrl: null,
+            isLoading: false,
+            error: getVideoErrorMessage(err),
+          });
         }
       });
 
@@ -64,5 +73,11 @@ export function useArtifactVideoUrl(artifactId: string): UseArtifactVideoUrlResu
     };
   }, [artifactId]);
 
-  return { videoUrl, isLoading, error };
+  const isCurrentArtifact = videoState.artifactId === artifactId;
+
+  return {
+    videoUrl: isCurrentArtifact ? videoState.videoUrl : null,
+    isLoading: isCurrentArtifact ? videoState.isLoading : true,
+    error: isCurrentArtifact ? videoState.error : null,
+  };
 }

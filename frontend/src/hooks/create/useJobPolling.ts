@@ -20,8 +20,17 @@ export function useJobPolling(
   jobId: string | null,
   phase: 'planning' | 'rendering' | null,
 ) {
-  const [status, setStatus] = useState<JobStatus | 'TIMEOUT' | null>(null);
-  const [error, setError] = useState<Error | null>(null);
+  const [pollingState, setPollingState] = useState<{
+    jobId: string | null;
+    phase: 'planning' | 'rendering' | null;
+    status: JobStatus | 'TIMEOUT' | null;
+    error: Error | null;
+  }>({
+    jobId,
+    phase,
+    status: null,
+    error: null,
+  });
   const failureCountRef = useRef(0);
   const stoppedRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -36,8 +45,6 @@ export function useJobPolling(
     let cancelled = false;
     stoppedRef.current = false;
     failureCountRef.current = 0;
-    setError(null);
-    setStatus(null);
 
     if (!jobId || !phase) return;
 
@@ -58,7 +65,12 @@ export function useJobPolling(
 
       if (Date.now() - startTime > TIMEOUT_MS) {
         stoppedRef.current = true;
-        setStatus('TIMEOUT');
+        setPollingState({
+          jobId,
+          phase,
+          status: 'TIMEOUT',
+          error: null,
+        });
         clearPoll();
         return;
       }
@@ -67,8 +79,12 @@ export function useJobPolling(
         const res = await getJobStatus(jobId);
         if (cancelled) return;
         failureCountRef.current = 0;
-        setError(null);
-        setStatus(res.job.status);
+        setPollingState({
+          jobId,
+          phase,
+          status: res.job.status,
+          error: null,
+        });
 
         if (shouldStop(res.job.status)) {
           stoppedRef.current = true;
@@ -78,7 +94,12 @@ export function useJobPolling(
         if (cancelled) return;
         failureCountRef.current += 1;
         if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
-          setError(err instanceof Error ? err : new Error('Network error'));
+          setPollingState((prev) => ({
+            jobId,
+            phase,
+            status: prev.jobId === jobId && prev.phase === phase ? prev.status : null,
+            error: err instanceof Error ? err : new Error('Network error'),
+          }));
         }
       }
     };
@@ -93,5 +114,10 @@ export function useJobPolling(
     };
   }, [jobId, phase, shouldStop]);
 
-  return { status, error };
+  const isCurrentRun = pollingState.jobId === jobId && pollingState.phase === phase;
+
+  return {
+    status: isCurrentRun ? pollingState.status : null,
+    error: isCurrentRun ? pollingState.error : null,
+  };
 }
