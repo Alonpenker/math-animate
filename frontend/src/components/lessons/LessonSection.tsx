@@ -13,13 +13,14 @@ interface LessonSectionProps{
     lessons: JobListItem[]
     isLoading: boolean
     error: Error | null
+    hasActiveFilter: boolean
     page: number
     totalPages: number
     onSetPage: Dispatch<SetStateAction<number>>
 }
 
 
-export function LessonSection({ lessons, isLoading, error, page, totalPages, onSetPage }: LessonSectionProps) {
+export function LessonSection({ lessons, isLoading, error, hasActiveFilter, page, totalPages, onSetPage }: LessonSectionProps) {
     const navigate = useNavigate();
     const [selectedJob, setSelectedJob] = useState<JobListItem | null>(null);
     let content;
@@ -45,10 +46,14 @@ export function LessonSection({ lessons, isLoading, error, page, totalPages, onS
         content = (
             <div className="flex flex-col items-center py-16 text-center">
             <BookOpen className="h-12 w-12 text-off-white/30" />
-            <p className="mt-4 text-off-white/50">No rendered videos yet. Create your first lesson!</p>
-            <Button className="mt-4 bg-accent-orange hover:bg-accent-orange/80" onClick={() => navigate('/create')}>
-              Create a Lesson
-            </Button>
+            <p className="mt-4 text-off-white/50">
+              {hasActiveFilter ? 'No lessons found for this search.' : 'No rendered videos yet. Create your first lesson!'}
+            </p>
+            {!hasActiveFilter && (
+              <Button className="mt-4 bg-accent-orange hover:bg-accent-orange/80" onClick={() => navigate('/create')}>
+                Create a Lesson
+              </Button>
+            )}
           </div>
         )
     }

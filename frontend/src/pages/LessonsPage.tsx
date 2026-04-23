@@ -1,19 +1,14 @@
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { useLessons } from '@/hooks/lessons/useLessons';
+import { useLessonsSearch } from '@/hooks/lessons/useLessonsSearch';
 import { LessonSection } from '@/components/lessons/LessonSection';
 
 export function LessonsPage() {
+  const { jobIdFilter, topicQuery, page, setPage, handleTopicChange } = useLessonsSearch();
   
-  const [searchParams] = useSearchParams();
-  const jobIdFilter = searchParams.get('job_id') ?? undefined;
-  const [topicQuery, setTopicQuery] = useState('');
-  const [page, setPage] = useState(1);
-  
-  const { lessons, totalPages, isLoading, error } = useLessons({ topicQuery, jobId: jobIdFilter, page });
+  const { lessons, totalPages, isLoading, error, hasActiveFilter } = useLessons({ topicQuery, jobId: jobIdFilter, page });
 
   return (
     <div className="px-4 py-12">
@@ -37,13 +32,13 @@ export function LessonsPage() {
           <Input
             type="text"
             value={topicQuery}
-            onChange={(e) => { setTopicQuery(e.target.value); setPage(1); }}
+            onChange={(e) => handleTopicChange(e.target.value)}
             placeholder="Search by topic..."
             className="pl-10"
           />
         </div>
         
-        <LessonSection lessons={lessons} isLoading={isLoading} error={error} page={page} totalPages={totalPages} onSetPage={setPage}/>
+        <LessonSection lessons={lessons} isLoading={isLoading} error={error} hasActiveFilter={hasActiveFilter} page={page} totalPages={totalPages} onSetPage={setPage}/>
         </motion.div>
     </div>
   );

@@ -12,13 +12,15 @@ const PAGE_SIZE = 20;
 
 export function useLessons({ topicQuery, jobId, page = 1 }: UseLessonsParams) {
   const [debouncedTopic] = useDebounce(topicQuery ?? '', 400);
+  const effectiveTopic = debouncedTopic.trim() || undefined;
+  const effectiveJobId = effectiveTopic ? undefined : jobId;
   const query = useQuery({
-    queryKey: ['lessons', { topic: debouncedTopic, jobId, page }],
+    queryKey: ['lessons', { topic: effectiveTopic, jobId: effectiveJobId, page }],
     queryFn: () =>
       listJobs({
         status: 'RENDERED',
-        topic: debouncedTopic || undefined,
-        job_id: jobId,
+        topic: effectiveTopic,
+        job_id: effectiveJobId,
         page,
         page_size: PAGE_SIZE,
       }),
@@ -33,6 +35,7 @@ export function useLessons({ topicQuery, jobId, page = 1 }: UseLessonsParams) {
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
     isLoading: query.isLoading,
     error: query.error,
+    hasActiveFilter: Boolean(effectiveTopic || effectiveJobId),
     refetch: query.refetch,
   };
 }
