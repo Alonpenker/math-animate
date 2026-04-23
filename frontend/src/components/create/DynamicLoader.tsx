@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { JobStatus } from '@/services/api';
 import { TextType } from '@/components/ui/TextType';
 
-const MESSAGES: Partial<Record<JobStatus | string, string[]>> = {
+const MESSAGES: Partial<Record<JobStatus, string[]>> = {
   CREATED: ['Initializing your lesson...', 'Setting up the workspace...', 'Sharpening the chalk and clearing the board...', 'Getting everything ready for a smooth start...'],
   PLANNING: ['Crafting your video plan...', 'Consulting the curriculum...', 'Designing scenes for maximum clarity...', 'Mapping out the visual journey...', 'Sketching the lesson one step at a time...', 'Lining up the concepts for a clean explanation...'],
   APPROVED: ['Plan approved! Preparing code generation...', 'Green light received. Translating the plan into motion...', 'Turning the blueprint into animation instructions...'],
@@ -16,7 +16,7 @@ const MESSAGES: Partial<Record<JobStatus | string, string[]>> = {
 };
 
 interface DynamicLoaderProps {
-  status: JobStatus | 'TIMEOUT' | null;
+  status: JobStatus | null;
   connectionError: Error | null;
   onCancel?: () => void;
 }
@@ -24,7 +24,7 @@ interface DynamicLoaderProps {
 export function DynamicLoader({ status, connectionError }: DynamicLoaderProps) {
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const currentMessages = status && status !== 'TIMEOUT' ? MESSAGES[status] ?? [] : [];
+  const currentMessages = status ? MESSAGES[status] ?? [] : [];
   const displayMessage = currentMessages[messageIndex % Math.max(1, currentMessages.length)] ?? 'Working...';
 
   useEffect(() => { setMessageIndex(0); }, [status]);
@@ -61,17 +61,12 @@ export function DynamicLoader({ status, connectionError }: DynamicLoaderProps) {
       >
         <TextType text={displayMessage} cursorCharacter="|" />
       </motion.p>
-      {status && status !== 'TIMEOUT' && (
+      {status && (
         <p className="mt-2 text-xs text-off-white/35">{status}</p>
       )}
       {connectionError && (
         <p className="mt-4 text-sm text-accent-orange">
           Connection lost. Retrying...
-        </p>
-      )}
-      {status === 'TIMEOUT' && (
-        <p className="mt-4 text-sm text-red-400">
-          This is taking longer than expected. Please try refreshing the page.
         </p>
       )}
     </div>

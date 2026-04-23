@@ -24,6 +24,7 @@ frontend/
 │   ├── App.tsx           # Router setup
 │   ├── index.css         # Global styles
 │   ├── components/       # Shared/reusable components
+│   │   ├── about/
 │   │   ├── create/
 │   │   ├── home/
 │   │   ├── jobs/
@@ -38,8 +39,10 @@ frontend/
 │   │   ├── JobsPage.tsx
 │   │   ├── LessonsPage.tsx
 │   │   └── UsagePage.tsx
-│   ├── context/          # React context providers
 │   ├── hooks/            # Custom hooks
+│   │   ├── create/
+│   │   ├── jobs/
+│   │   └── lessons/
 │   ├── lib/              # Utility libraries / helpers
 │   ├── services/         # API client / service layer
 │   └── utils/            # Pure utility functions

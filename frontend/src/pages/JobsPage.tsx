@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { JobsTable } from '@/components/jobs/JobsTable';
-import { useJobsList } from '@/hooks/useJobsList';
+import { useJobsList } from '@/hooks/jobs/useJobsList';
 
 const PAGE_SIZE = 20;
 
@@ -19,10 +19,7 @@ export function JobsPage() {
         transition={{ duration: 0.5 }}
       >
         <div className="mb-8">
-          <h1
-            className="text-4xl text-off-white"
-           
-          >
+          <h1 className="text-4xl text-off-white">
             Job History
           </h1>
           <p className="mt-2 text-off-white/50">
