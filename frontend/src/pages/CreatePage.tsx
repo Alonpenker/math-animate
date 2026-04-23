@@ -16,18 +16,12 @@ import {
 export function CreatePage() {
   const {
     state,
-    pollingStatus,
     pollingError,
     submit,
     approvePlan,
     rejectPlan,
     resetToForm,
   } = useCreateFlow();
-  const liveBackendState =
-    isPlanningState(state.currentState) || isRenderingState(state.currentState)
-      ? state.currentState
-      : null;
-  const isLiveState = liveBackendState !== null || pollingStatus === 'TIMEOUT';
   let content;
 
   if (state.currentState === 'NOT_FOUND') {
@@ -36,6 +30,10 @@ export function CreatePage() {
 
   if (state.currentState === 'RESUME_ERROR') {
     content = (<CreateErrorState title="Connection Error" error={state.error} onStartFresh={resetToForm} />);
+  }
+
+  if (state.currentState === 'TIMEOUT') {
+    content = (<CreateErrorState title="Connection Timed Out" error={state.error} onStartFresh={resetToForm} />);
   }
 
   if (state.currentState === 'FORM') {
@@ -52,13 +50,13 @@ export function CreatePage() {
     </>);
   }
 
-  if (isLiveState) {
+  if (isPlanningState(state.currentState) || isRenderingState(state.currentState)) {
     content = (<>
       <DynamicLoader
-        status={pollingStatus === 'TIMEOUT' ? 'TIMEOUT' : liveBackendState}
+        status={state.currentState}
         connectionError={pollingError}
       />
-      <JobStateDiagram currentStatus={liveBackendState} mode="live" />
+      <JobStateDiagram currentStatus={state.currentState} mode="live" />
     </>);
   }
 

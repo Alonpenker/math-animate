@@ -1,7 +1,7 @@
 import { extractVideoPlan, getJobPlan } from '@/services/api';
 import type { JobStatus, VideoPlan } from '@/services/api';
 
-export type CreateUiState = 'FORM' | 'NOT_FOUND' | 'RESUME_ERROR' | JobStatus;
+export type CreateUiState = 'FORM' | 'NOT_FOUND' | 'RESUME_ERROR' | 'TIMEOUT' | JobStatus;
 
 export interface CreateFlowState {
   currentState: CreateUiState;
@@ -12,7 +12,7 @@ export interface CreateFlowState {
 
 export const PLAN_NOT_FOUND_ERROR = 'Plan not found for this job. It may have expired.';
 
-const FRONTEND_ONLY_STATES: Set<CreateUiState> = new Set(['FORM', 'NOT_FOUND', 'RESUME_ERROR']);
+const FRONTEND_ONLY_STATES: Set<CreateUiState> = new Set(['FORM', 'NOT_FOUND', 'RESUME_ERROR', 'TIMEOUT']);
 const PLANNING_STATES: Set<JobStatus> = new Set(['CREATED', 'PLANNING']);
 const RENDERING_STATES: Set<JobStatus> = new Set([
   'APPROVED', 'CODEGEN', 'CODED', 'VERIFYING', 'FIXING', 'VERIFIED', 'RENDERING',

@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { approveJob, createJob, isApiError } from '@/services/api';
-import type { JobStatus, UserRequest } from '@/services/api';
+import type { UserRequest } from '@/services/api';
 import {
   createInitialCreateFlowState,
   getCreatePollingMode,
   isPlanningState,
+  isRenderingState,
   loadCreatePlan,
   PLAN_NOT_FOUND_ERROR,
   type CreateFlowState,
@@ -17,13 +18,15 @@ export type { CreateFlowState, CreateUiState } from '@/hooks/create/createFlowSt
 
 export interface UseCreateFlowReturn {
   state: CreateFlowState;
-  pollingStatus: JobStatus | 'TIMEOUT' | null;
   pollingError: Error | null;
   submit: (request: UserRequest) => Promise<void>;
   approvePlan: () => Promise<void>;
   rejectPlan: () => Promise<void>;
   resetToForm: () => void;
 }
+
+const TIMEOUT_ERROR =
+  'We could not reconnect for a while. Please refresh the page or start fresh.';
 
 export function useCreateFlow(): UseCreateFlowReturn {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,7 +64,20 @@ export function useCreateFlow(): UseCreateFlowReturn {
   }, [resumeJobId, resumedState]);
 
   useEffect(() => {
-    if (!pollingStatus || pollingStatus === 'TIMEOUT') {
+    if (!pollingStatus) {
+      return;
+    }
+
+    if (pollingStatus === 'TIMEOUT') {
+      setState((prev) => (
+        (isPlanningState(prev.currentState) || isRenderingState(prev.currentState))
+          ? {
+            ...prev,
+            currentState: 'TIMEOUT',
+            error: TIMEOUT_ERROR,
+          }
+          : prev
+      ));
       return;
     }
 
@@ -180,7 +196,6 @@ export function useCreateFlow(): UseCreateFlowReturn {
 
   return {
     state,
-    pollingStatus,
     pollingError,
     submit,
     approvePlan,
