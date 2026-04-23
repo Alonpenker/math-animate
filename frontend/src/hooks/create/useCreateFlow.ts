@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { approveJob, createJob, isApiError } from '@/services/api';
 import type { JobStatus, UserRequest } from '@/services/api';
@@ -30,6 +30,7 @@ export function useCreateFlow(): UseCreateFlowReturn {
   const jobIdParam = searchParams.get('job_id');
   const [resumeJobId, setResumeJobId] = useState(jobIdParam);
   const [state, setState] = useState<CreateFlowState>(createInitialCreateFlowState);
+  const previousJobIdParamRef = useRef(jobIdParam);
   const resumedState = useResumeCreateJob(resumeJobId);
   const { status: pollingStatus, error: pollingError } = useJobPolling(
     state.jobId,
@@ -37,10 +38,19 @@ export function useCreateFlow(): UseCreateFlowReturn {
   );
 
   useEffect(() => {
-    if (jobIdParam !== resumeJobId) {
-      setResumeJobId(jobIdParam);
+    if (previousJobIdParamRef.current === jobIdParam) {
+      return;
     }
-  }, [jobIdParam, resumeJobId]);
+
+    previousJobIdParamRef.current = jobIdParam;
+
+    if (jobIdParam && jobIdParam === state.jobId) {
+      setResumeJobId(null);
+      return;
+    }
+
+    setResumeJobId(jobIdParam);
+  }, [jobIdParam, state.jobId]);
 
   useEffect(() => {
     if (!resumeJobId || !resumedState) {
@@ -56,22 +66,32 @@ export function useCreateFlow(): UseCreateFlowReturn {
     }
 
     if (pollingStatus === 'PLANNED' && state.jobId && isPlanningState(state.currentState)) {
+      const jobId = state.jobId;
+
       void loadCreatePlan(state.jobId)
         .then((plan) => {
-          setState((prev) => ({
-            ...prev,
-            currentState: 'PLANNED',
-            plan,
-            error: null,
-          }));
+          setState((prev) => (
+            prev.jobId === jobId && isPlanningState(prev.currentState)
+              ? {
+                ...prev,
+                currentState: 'PLANNED',
+                plan,
+                error: null,
+              }
+              : prev
+          ));
         })
         .catch(() => {
-          setState((prev) => ({
-            ...prev,
-            currentState: 'PLANNED',
-            plan: null,
-            error: PLAN_NOT_FOUND_ERROR,
-          }));
+          setState((prev) => (
+            prev.jobId === jobId && isPlanningState(prev.currentState)
+              ? {
+                ...prev,
+                currentState: 'PLANNED',
+                plan: null,
+                error: PLAN_NOT_FOUND_ERROR,
+              }
+              : prev
+          ));
         });
       return;
     }
