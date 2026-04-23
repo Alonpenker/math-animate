@@ -38,7 +38,6 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
 
   return (
     <div className="w-full p-4 rounded-lg bg-surface-dark/50 border border-off-white/10">
-      {/* Happy path nodes */}
       <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start">
         {HAPPY_PATH.map((status, i) => {
           const isCurrentHappy = mode === 'live' && currentStatus === status;
@@ -71,12 +70,10 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
         })}
       </div>
 
-      {/* FIXING loop note */}
       <div className="mt-2 text-xs text-off-white/30 text-center sm:text-left">
         Note: Verifying {'<->'} Fixing loop may repeat up to 2 times
       </div>
 
-      {/* Show failure state if current */}
       {mode === 'live' && isFailure && currentStatus && (
         <div className="mt-3 flex items-center gap-2">
           <span className="rounded-full px-3 py-1 text-xs font-medium border bg-red-500/20 border-red-400 text-red-400">
@@ -85,7 +82,6 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
         </div>
       )}
 
-      {/* Static mode: show failure branches */}
       {mode === 'static' && (
         <div className="mt-3 flex flex-wrap gap-2">
           {Object.entries(FAILURE_STATES).map(([key, val]) => (

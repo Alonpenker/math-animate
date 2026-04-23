@@ -22,7 +22,6 @@ export function useJobPolling(
 ) {
   const [status, setStatus] = useState<JobStatus | 'TIMEOUT' | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const mountedRef = useRef(true);
   const failureCountRef = useRef(0);
   const stoppedRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -34,7 +33,7 @@ export function useJobPolling(
   }, [phase]);
 
   useEffect(() => {
-    mountedRef.current = true;
+    let cancelled = false;
     stoppedRef.current = false;
     failureCountRef.current = 0;
     setError(null);
@@ -52,7 +51,7 @@ export function useJobPolling(
     };
 
     const poll = async () => {
-      if (!mountedRef.current || stoppedRef.current) {
+      if (cancelled || stoppedRef.current) {
         clearPoll();
         return;
       }
@@ -66,7 +65,7 @@ export function useJobPolling(
 
       try {
         const res = await getJobStatus(jobId);
-        if (!mountedRef.current) return;
+        if (cancelled) return;
         failureCountRef.current = 0;
         setError(null);
         setStatus(res.job.status);
@@ -76,7 +75,7 @@ export function useJobPolling(
           clearPoll();
         }
       } catch (err) {
-        if (!mountedRef.current) return;
+        if (cancelled) return;
         failureCountRef.current += 1;
         if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
           setError(err instanceof Error ? err : new Error('Network error'));
@@ -89,7 +88,7 @@ export function useJobPolling(
     intervalRef.current = setInterval(() => void poll(), interval);
 
     return () => {
-      mountedRef.current = false;
+      cancelled = true;
       clearPoll();
     };
   }, [jobId, phase, shouldStop]);
