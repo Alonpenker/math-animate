@@ -8,7 +8,7 @@ The system turns a lesson idea into a reviewed scene plan, generates visual anim
 renders the video in an isolated environment, and stores the final artifacts for download. 
 Built for reliability, reproducibility, and human-in-the-loop control—so teachers stay in charge 
 while the system handles the heavy lifting."""
-APP_VERSION = "0.0.2"
+APP_VERSION = "0.1.5"
 
 ROUTER_PREFIX = "/api/v1"
 INTERNAL_ROUTER_PREFIX = "/internal"

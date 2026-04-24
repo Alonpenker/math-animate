@@ -28,17 +28,13 @@ docker compose build api worker
 
 # --- Backend-only stack (no frontend) ---
 # Start (API available at http://localhost:8000)
-scripts/dev.sh
+bash scripts/dev.sh
 
-# With stubbed LLM calls (bash)
-E2E=true scripts/dev.sh
-
-# With stubbed LLM calls (PowerShell)
-$env:E2E="true"; scripts/dev.sh
-Remove-Item Env:E2E
+# With stubbed LLM calls
+bash -lc 'E2E=true scripts/dev.sh'
 
 # --- Full stack (backend + frontend) ---
-# Frontend served by NGINX at http://localhost:8080, proxies /api/ to the backend
+# Frontend served by Vite at http://localhost:5174, proxies /api/ to the backend
 scripts/dev-full.sh
 
 # Rebuild images after a code change (run from repo root)
@@ -70,7 +66,8 @@ CREATED → PLANNING → PLANNED → APPROVED → CODEGEN → CODED → RENDERIN
            FAILED_PLANNING      FAILED_CODEGEN  FAILED_RENDER
 ```
 
-All terminal states plus `RENDERED` can transition to `CANCELLED`.
+Only `PLANNED` can transition to `CANCELLED`; this happens when a user rejects the generated plan.
+LLM reasoning/response-budget exhaustion uses `FAILED_LLM_USAGE`, not the generic stage failure states.
 
 ### Worker Pipeline
 
@@ -123,7 +120,7 @@ Compose files live alongside their code. Stack them for the full environment:
 # Backend only
 scripts/dev.sh
 
-# Full stack
+# Full stack dev flow (frontend via Vite at http://localhost:5174)
 scripts/dev-full.sh
 ```
 
@@ -137,7 +134,7 @@ scripts/dev-full.sh
 | rabbitmq | backend/docker-compose.yml | Celery broker | 5672 |
 | minio | backend/docker-compose.yml | Artifact storage (S3-compatible) | 9000 |
 | ollama | backend/docker-compose.yml | Local embedding model | 11434 |
-| frontend | frontend/docker-compose.yml | NGINX serving React build, proxies /api/ | 8080 |
+| frontend | frontend/docker-compose.yml | NGINX serving React build, proxies /api/ for production-like compose runs | 8080 |
 
 ## Critical Constraints
 

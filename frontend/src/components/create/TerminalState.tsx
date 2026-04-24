@@ -2,8 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2, AlertCircle, Code2, ShieldAlert, VideoOff, Gauge, XCircle,
+  BrainCircuit,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { JOB_STATUS_DEFS } from '@/domain/jobStatus';
 import type { JobStatus } from '@/services/api';
 
 interface TerminalStateProps {
@@ -12,37 +15,14 @@ interface TerminalStateProps {
   onReset: () => void;
 }
 
-const FAILURE_MAP: Record<string, { icon: React.ReactNode; heading: string; explanation: string }> = {
-  FAILED_PLANNING: {
-    icon: <AlertCircle className="h-16 w-16 text-red-400" />,
-    heading: "Couldn't Generate a Plan",
-    explanation: 'The AI was unable to create a plan for this topic. Try rephrasing the topic or loosening the constraints.',
-  },
-  FAILED_CODEGEN: {
-    icon: <Code2 className="h-16 w-16 text-red-400" />,
-    heading: 'Code Generation Failed',
-    explanation: "The animation code couldn't be produced after multiple attempts. Simplifying the constraints may help.",
-  },
-  FAILED_VERIFICATION: {
-    icon: <ShieldAlert className="h-16 w-16 text-red-400" />,
-    heading: 'Code Verification Failed',
-    explanation: "The generated code didn't pass our quality checks. Please try submitting again.",
-  },
-  FAILED_RENDER: {
-    icon: <VideoOff className="h-16 w-16 text-red-400" />,
-    heading: 'Rendering Failed',
-    explanation: 'The rendering process encountered an unexpected error. Please try submitting your request again.',
-  },
-  FAILED_QUOTA_EXCEEDED: {
-    icon: <Gauge className="h-16 w-16 text-accent-orange" />,
-    heading: 'Daily Token Limit Reached',
-    explanation: 'The shared daily token budget has been exhausted. Please try again after midnight UTC.',
-  },
-  CANCELLED: {
-    icon: <XCircle className="h-16 w-16 text-accent-orange" />,
-    heading: 'Job Cancelled',
-    explanation: 'This job was cancelled before it completed.',
-  },
+const ICON_MAP: Record<string, LucideIcon> = {
+  AlertCircle,
+  BrainCircuit,
+  Code2,
+  Gauge,
+  ShieldAlert,
+  VideoOff,
+  XCircle,
 };
 
 export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
@@ -74,18 +54,27 @@ export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
     );
   }
 
-  const info = status ? FAILURE_MAP[status] : null;
+  const statusDef = status ? JOB_STATUS_DEFS[status] : null;
+  const info = statusDef?.terminal;
   if (!info) {
     return (
       <div className="flex flex-col items-center py-20 text-center">
         <AlertCircle className="h-16 w-16 text-off-white/30" />
-        <h2 className="mt-6 text-2xl text-off-white">Unknown Status</h2>
+        <h2 className="mt-6 text-2xl text-off-white">Unknown Terminal Status</h2>
+        <p className="mx-auto mt-2 max-w-md text-off-white/55">
+          This job reached a state the interface does not recognize. Please try again.
+        </p>
         <Button variant="outline" onClick={onReset} className="mt-6">
           Try Again
         </Button>
       </div>
     );
   }
+
+  const Icon = ICON_MAP[info.icon] ?? AlertCircle;
+  const iconColorClass = statusDef?.color === 'orange' || statusDef?.kind === 'cancelled'
+    ? 'text-accent-orange'
+    : 'text-red-400';
 
   return (
     <motion.div
@@ -94,7 +83,7 @@ export function TerminalState({ status, jobId, onReset }: TerminalStateProps) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {info.icon}
+      <Icon className={`h-16 w-16 ${iconColorClass}`} />
       <h2 className="mt-6 text-3xl text-off-white">
         {info.heading}
       </h2>

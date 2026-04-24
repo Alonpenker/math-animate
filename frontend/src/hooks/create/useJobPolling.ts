@@ -1,20 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getJobStatus } from '@/services/api';
+import {
+  PLANNING_TERMINAL_STATUSES,
+  RENDERING_TERMINAL_STATUSES,
+  isJobStatus,
+} from '@/domain/jobStatus';
 import type { JobStatus } from '@/services/api';
 
-const PLANNING_POLL_INTERVAL = 3000;
-const RENDERING_POLL_INTERVAL = 5000;
+const PLANNING_POLL_INTERVAL = 5000;
+const RENDERING_POLL_INTERVAL = 10000;
 const TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_CONSECUTIVE_FAILURES = 3;
-
-const PLANNING_TERMINAL: Set<string> = new Set([
-  'PLANNED', 'FAILED_PLANNING', 'FAILED_QUOTA_EXCEEDED', 'CANCELLED',
-]);
-
-const RENDERING_TERMINAL: Set<string> = new Set([
-  'RENDERED', 'FAILED_CODEGEN', 'FAILED_VERIFICATION', 'FAILED_RENDER',
-  'FAILED_QUOTA_EXCEEDED', 'CANCELLED',
-]);
 
 export function useJobPolling(
   jobId: string | null,
@@ -36,8 +32,9 @@ export function useJobPolling(
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const shouldStop = useCallback((s: string): boolean => {
-    if (phase === 'planning') return PLANNING_TERMINAL.has(s);
-    if (phase === 'rendering') return RENDERING_TERMINAL.has(s);
+    if (!isJobStatus(s)) return false;
+    if (phase === 'planning') return PLANNING_TERMINAL_STATUSES.has(s);
+    if (phase === 'rendering') return RENDERING_TERMINAL_STATUSES.has(s);
     return false;
   }, [phase]);
 
@@ -48,7 +45,8 @@ export function useJobPolling(
 
     if (!jobId || !phase) return;
 
-    const startTime = Date.now();
+    // This effect restarts when phase changes, so plan review time does not count as pooling time.
+    const phaseStartTime = Date.now();
 
     const clearPoll = () => {
       if (intervalRef.current !== null) {
@@ -63,7 +61,7 @@ export function useJobPolling(
         return;
       }
 
-      if (Date.now() - startTime > TIMEOUT_MS) {
+      if (Date.now() - phaseStartTime > TIMEOUT_MS) {
         stoppedRef.current = true;
         setPollingState({
           jobId,
