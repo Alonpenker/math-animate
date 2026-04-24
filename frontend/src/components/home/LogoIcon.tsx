@@ -18,7 +18,7 @@ type LogoIconProps = {
 function LogoIcon({ Icon, label }: LogoIconProps): React.ReactElement {
     return (
         <Tooltip>
-            <TooltipTrigger render={<span style={{ display: 'inline-flex', cursor: 'default' }} />}>
+            <TooltipTrigger delay={0} render={<span style={{ display: 'inline-flex', cursor: 'default' }} />}>
                 <Icon
                     style={{
                         fontSize: 48,
