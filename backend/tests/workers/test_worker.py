@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.jobs import Job, JobCodeRequest, JobFixRequest, JobPlanRequest, JobRequest, JobUserRequest
@@ -463,6 +464,40 @@ def test_generate_plan_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
 
 
+def test_generate_plan_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_budget,
+    sample_user_request,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_plan_prompt",
+        staticmethod(lambda user_request: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.LLMService, "plan_call",
+        staticmethod(lambda system_prompt, user_query: (_ for _ in ()).throw(
+            LLMUsageException("reasoning limit reached", total_tokens=123)
+        )),
+    )
+
+    job = Job(status=JobStatus.CREATED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobUserRequest(job=job, user_request=sample_user_request).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="reasoning limit reached"):
+        worker_module.generate_plan(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # generate_code
 # ─────────────────────────────────────────────────────────────────────────────
@@ -562,6 +597,40 @@ def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
+
+
+def test_generate_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_budget,
+    sample_video_plan,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_codegen_prompt",
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.LLMService, "codegen_call",
+        staticmethod(lambda sp, uq: (_ for _ in ()).throw(
+            LLMUsageException("reasoning limit reached", total_tokens=456)
+        )),
+    )
+
+    job = Job(status=JobStatus.APPROVED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobPlanRequest(job=job, plan=sample_video_plan).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="reasoning limit reached"):
+        worker_module.generate_code(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -914,6 +983,43 @@ def test_fix_code_task_sets_failed_quota_exceeded_on_quota_error(
     # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
+
+
+def test_fix_code_task_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_budget,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService, "render_fix_prompt",
+        staticmethod(lambda code, error_context: ("fix-system-prompt", "fix-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.LLMService, "fix_call",
+        staticmethod(lambda sp, uq: (_ for _ in ()).throw(
+            LLMUsageException("reasoning limit reached", total_tokens=789)
+        )),
+    )
+
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobFixRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code="from manim import *\n",
+        error_context="some error",
+    ).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="reasoning limit reached"):
+        worker_module.fix_code_task(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ class JobStatus(str, Enum):
     FAILED_CODEGEN = "FAILED_CODEGEN"
     FAILED_RENDER = "FAILED_RENDER"
     FAILED_QUOTA_EXCEEDED = "FAILED_QUOTA_EXCEEDED"
+    FAILED_LLM_USAGE = "FAILED_LLM_USAGE"
     VERIFYING = "VERIFYING"
     VERIFIED = "VERIFIED"
     FIXING = "FIXING"
@@ -24,34 +25,38 @@ class JobStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
-    JobStatus.CREATED: frozenset({JobStatus.PLANNING, JobStatus.CANCELLED}),
+    JobStatus.CREATED: frozenset({JobStatus.PLANNING}),
     JobStatus.PLANNING: frozenset({
         JobStatus.PLANNED,
         JobStatus.FAILED_PLANNING,
         JobStatus.FAILED_QUOTA_EXCEEDED,
+        JobStatus.FAILED_LLM_USAGE,
     }),
     JobStatus.PLANNED: frozenset({JobStatus.APPROVED, JobStatus.CANCELLED}),
-    JobStatus.APPROVED: frozenset({JobStatus.CODEGEN, JobStatus.CANCELLED}),
+    JobStatus.APPROVED: frozenset({JobStatus.CODEGEN}),
     JobStatus.CODEGEN: frozenset({
         JobStatus.CODED,
         JobStatus.FAILED_CODEGEN,
         JobStatus.FAILED_QUOTA_EXCEEDED,
+        JobStatus.FAILED_LLM_USAGE,
     }),
-    JobStatus.CODED: frozenset({JobStatus.VERIFYING, JobStatus.CANCELLED}),
+    JobStatus.CODED: frozenset({JobStatus.VERIFYING}),
     JobStatus.VERIFYING: frozenset({JobStatus.VERIFIED, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION}),
-    JobStatus.VERIFIED: frozenset({JobStatus.RENDERING, JobStatus.CANCELLED}),
+    JobStatus.VERIFIED: frozenset({JobStatus.RENDERING}),
     JobStatus.FIXING: frozenset({
         JobStatus.VERIFYING,
         JobStatus.FAILED_VERIFICATION,
         JobStatus.FAILED_QUOTA_EXCEEDED,
+        JobStatus.FAILED_LLM_USAGE,
     }),
     JobStatus.RENDERING: frozenset({JobStatus.RENDERED, JobStatus.FAILED_RENDER}),
-    JobStatus.RENDERED: frozenset({JobStatus.CANCELLED}),
-    JobStatus.FAILED_PLANNING: frozenset({JobStatus.CANCELLED}),
-    JobStatus.FAILED_CODEGEN: frozenset({JobStatus.CANCELLED}),
-    JobStatus.FAILED_RENDER: frozenset({JobStatus.CANCELLED}),
-    JobStatus.FAILED_QUOTA_EXCEEDED: frozenset({JobStatus.CANCELLED}),
-    JobStatus.FAILED_VERIFICATION: frozenset({JobStatus.CANCELLED}),
+    JobStatus.RENDERED: frozenset(),
+    JobStatus.FAILED_PLANNING: frozenset(),
+    JobStatus.FAILED_CODEGEN: frozenset(),
+    JobStatus.FAILED_RENDER: frozenset(),
+    JobStatus.FAILED_QUOTA_EXCEEDED: frozenset(),
+    JobStatus.FAILED_LLM_USAGE: frozenset(),
+    JobStatus.FAILED_VERIFICATION: frozenset(),
     JobStatus.CANCELLED: frozenset()
 }
 

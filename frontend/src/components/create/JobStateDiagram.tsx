@@ -1,3 +1,9 @@
+import {
+  FAILURE_STATUSES,
+  HAPPY_PATH,
+  JOB_STATUS_DEFS,
+  isFailureJobStatus,
+} from '@/domain/jobStatus';
 import type { JobStatus } from '@/services/api';
 
 interface JobStateDiagramProps {
@@ -5,36 +11,26 @@ interface JobStateDiagramProps {
   mode: 'live' | 'static';
 }
 
-const HAPPY_PATH: JobStatus[] = [
-  'CREATED', 'PLANNING', 'PLANNED', 'APPROVED', 'CODEGEN', 'CODED',
-  'VERIFYING', 'FIXING', 'VERIFIED', 'RENDERING', 'RENDERED',
-];
+function failureClassName(status: JobStatus, isCurrent: boolean): string {
+  const isOrange = JOB_STATUS_DEFS[status].color === 'orange';
+  let nodeClass = 'rounded-full px-3 py-1 text-xs font-medium border ';
 
-const FAILURE_STATES: Record<string, { label: string }> = {
-  FAILED_PLANNING: { label: 'Failed Planning' },
-  FAILED_CODEGEN: { label: 'Failed Codegen' },
-  FAILED_VERIFICATION: { label: 'Failed Verification' },
-  FAILED_RENDER: { label: 'Failed Render' },
-  FAILED_QUOTA_EXCEEDED: { label: 'Quota Exceeded' },
-};
+  if (isOrange && isCurrent) {
+    nodeClass += 'bg-accent-orange/20 border-accent-orange text-accent-orange';
+  } else if (isOrange) {
+    nodeClass += 'bg-accent-orange/10 border-accent-orange/30 text-accent-orange/70';
+  } else if (isCurrent) {
+    nodeClass += 'bg-red-500/20 border-red-400 text-red-400';
+  } else {
+    nodeClass += 'bg-red-500/10 border-red-400/30 text-red-400/60';
+  }
 
-const STATUS_LABELS: Partial<Record<string, string>> = {
-  CREATED: 'Created',
-  PLANNING: 'Planning',
-  PLANNED: 'Planned',
-  APPROVED: 'Approved',
-  CODEGEN: 'Codegen',
-  CODED: 'Coded',
-  VERIFYING: 'Verifying',
-  FIXING: 'Fixing',
-  VERIFIED: 'Verified',
-  RENDERING: 'Rendering',
-  RENDERED: 'Rendered',
-};
+  return nodeClass;
+}
 
 export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
   const currentIndex = currentStatus ? HAPPY_PATH.indexOf(currentStatus) : -1;
-  const isFailure = currentStatus ? currentStatus.toString().startsWith('FAILED') : false;
+  const isFailure = currentStatus ? isFailureJobStatus(currentStatus) : false;
 
   return (
     <div className="w-full p-4 rounded-lg bg-surface-dark/50 border border-off-white/10">
@@ -57,7 +53,7 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
             nodeClass += 'bg-accent-orange/5 border-accent-orange/15 text-off-white/35';
           }
 
-          const label = STATUS_LABELS[status] ?? status;
+          const label = JOB_STATUS_DEFS[status].diagramLabel;
 
           return (
             <div key={status} className="flex items-center gap-1">
@@ -76,17 +72,17 @@ export function JobStateDiagram({ currentStatus, mode }: JobStateDiagramProps) {
 
       {mode === 'live' && isFailure && currentStatus && (
         <div className="mt-3 flex items-center gap-2">
-          <span className="rounded-full px-3 py-1 text-xs font-medium border bg-red-500/20 border-red-400 text-red-400">
-            {FAILURE_STATES[currentStatus]?.label ?? STATUS_LABELS[currentStatus] ?? currentStatus}
+          <span className={failureClassName(currentStatus, true)}>
+            {JOB_STATUS_DEFS[currentStatus].diagramLabel}
           </span>
         </div>
       )}
 
       {mode === 'static' && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {Object.entries(FAILURE_STATES).map(([key, val]) => (
-            <span key={key} className="rounded-full px-3 py-1 text-xs font-medium border bg-red-500/10 border-red-400/30 text-red-400/60">
-              {val.label}
+          {FAILURE_STATUSES.map((status) => (
+            <span key={status} className={failureClassName(status, false)}>
+              {JOB_STATUS_DEFS[status].diagramLabel}
             </span>
           ))}
         </div>

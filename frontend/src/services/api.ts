@@ -1,11 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+import type { JobStatus } from '@/domain/jobStatus';
+export type { JobStatus } from '@/domain/jobStatus';
 
-export type JobStatus =
-  | 'CREATED' | 'PLANNING' | 'PLANNED' | 'APPROVED'
-  | 'CODEGEN' | 'CODED' | 'VERIFYING' | 'VERIFIED' | 'FIXING'
-  | 'RENDERING' | 'RENDERED'
-  | 'FAILED_PLANNING' | 'FAILED_CODEGEN' | 'FAILED_VERIFICATION' | 'FAILED_RENDER' | 'FAILED_QUOTA_EXCEEDED'
-  | 'CANCELLED';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export interface Job {
   job_id: string;

@@ -127,7 +127,7 @@ def generate_plan(job_request_payload: dict) -> None:
     except LLMUsageException as exc:
         reconcile_budget(call_id, exc.total_tokens)
         logger.exception("Planning failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_LLM_USAGE)
         raise
 
     except Exception as exc:
@@ -177,7 +177,7 @@ def generate_code(job_request_payload: dict) -> None:
     except LLMUsageException as exc:
         reconcile_budget(call_id, exc.total_tokens)
         logger.exception("Codegen failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE)
         raise
 
     except Exception:
@@ -319,7 +319,7 @@ def fix_code_task(job_request_payload: dict) -> None:
     except LLMUsageException as exc:
         reconcile_budget(call_id, exc.total_tokens)
         logger.exception("Fix task failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_LLM_USAGE)
         raise
 
     except Exception:

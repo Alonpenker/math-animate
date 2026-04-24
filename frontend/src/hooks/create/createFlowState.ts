@@ -1,4 +1,10 @@
 import { extractVideoPlan, getJobPlan } from '@/services/api';
+import {
+  PLANNING_ACTIVE_STATUSES,
+  RENDERING_ACTIVE_STATUSES,
+  isFailureJobStatus,
+  isJobStatus,
+} from '@/domain/jobStatus';
 import type { JobStatus, VideoPlan } from '@/services/api';
 
 export type CreateUiState = 'FORM' | 'NOT_FOUND' | 'RESUME_ERROR' | 'TIMEOUT' | JobStatus;
@@ -13,10 +19,6 @@ export interface CreateFlowState {
 export const PLAN_NOT_FOUND_ERROR = 'Plan not found for this job. It may have expired.';
 
 const FRONTEND_ONLY_STATES: Set<CreateUiState> = new Set(['FORM', 'NOT_FOUND', 'RESUME_ERROR', 'TIMEOUT']);
-const PLANNING_STATES: Set<JobStatus> = new Set(['CREATED', 'PLANNING']);
-const RENDERING_STATES: Set<JobStatus> = new Set([
-  'APPROVED', 'CODEGEN', 'CODED', 'VERIFYING', 'FIXING', 'VERIFIED', 'RENDERING',
-]);
 
 export function createInitialCreateFlowState(): CreateFlowState {
   return {
@@ -28,15 +30,15 @@ export function createInitialCreateFlowState(): CreateFlowState {
 }
 
 export function isPlanningState(state: CreateUiState): state is JobStatus {
-  return PLANNING_STATES.has(state as JobStatus);
+  return isJobStatus(state) && PLANNING_ACTIVE_STATUSES.has(state);
 }
 
 export function isRenderingState(state: CreateUiState): state is JobStatus {
-  return RENDERING_STATES.has(state as JobStatus);
+  return isJobStatus(state) && RENDERING_ACTIVE_STATUSES.has(state);
 }
 
 export function isFailureState(state: CreateUiState): state is JobStatus {
-  return !FRONTEND_ONLY_STATES.has(state) && state.startsWith('FAILED_');
+  return !FRONTEND_ONLY_STATES.has(state) && isJobStatus(state) && isFailureJobStatus(state);
 }
 
 export function isTerminalState(state: CreateUiState): boolean {
