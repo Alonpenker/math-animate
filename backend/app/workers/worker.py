@@ -1,11 +1,13 @@
 from celery import Celery
-from celery.signals import worker_process_init, worker_process_shutdown, worker_ready
+from celery.signals import worker_process_init, worker_process_shutdown, worker_ready, setup_logging
 from pathlib import Path
 from uuid import UUID, uuid4
 import json
 import tempfile
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from psycopg2.errors import UniqueViolation
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
@@ -21,11 +23,10 @@ from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
 from app.schemas.artifact import ArtifactType
+from app.schemas.knowledge import KnowledgeDocument
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
-import psycopg2
 from app.workers.worker_helpers import (
-    log_context,
     transition_job,
     reserve_budget,
     reconcile_budget,
@@ -36,7 +37,8 @@ from app.workers.worker_helpers import (
     dry_run_docker,
 )
 from app.utils.llm_stubs import IS_E2E_MODE
-from app.utils.logging import get_logger
+from app.utils.logging import Logger, WorkerLog
+from app.utils.seq_processor import SeqProcessor
 
 app = Celery('mathanimate-worker',
              broker=settings.broker_url,
@@ -57,14 +59,23 @@ if settings.environment == "prod":
         task_default_queue='celery',
     )
 
-logger = get_logger(__name__)
+logger = Logger.get_logger("worker")
 
 if IS_E2E_MODE:
-    logger.warning("E2E mode enabled - LLM calls will be stubbed. No real API calls will be made.")
+    logger.warning(WorkerLog(
+        operation="e2e_mode",
+        event="E2E mode enabled - LLM calls will be stubbed",
+    ))
+
+
+@setup_logging.connect
+def _suppress_celery_logging(**kwargs):
+    pass  # prevent Celery from overwriting our structlog configuration
 
 
 @worker_process_init.connect
 def init_worker(**kwargs) -> None:
+    SeqProcessor._executor = ThreadPoolExecutor(max_workers=1)
     init_storage()
     init_db_pool()
     init_redis_pool()
@@ -76,7 +87,10 @@ def on_worker_ready(**kwargs) -> None:
     try:
         seed_knowledge_task()
     except Exception:
-        logger.warning("Knowledge auto-seed on startup failed; worker will continue.", exc_info=True)
+        logger.warning(WorkerLog(
+            operation="seed_knowledge",
+            event="Knowledge auto-seed on startup failed; worker will continue",
+        ), exc_info=True)
     finally:
         close_db_pool()
 
@@ -91,8 +105,12 @@ def shutdown_worker(**kwargs) -> None:
 def generate_plan(job_request_payload: dict) -> None:
     try:
         job_request = JobUserRequest(**job_request_payload)
-    except Exception:
-        logger.exception("Invalid user request payload (%s)", log_context())
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_plan",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     job_id = job_request.job.job_id
@@ -101,39 +119,68 @@ def generate_plan(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
-        logger.info("Planning started (%s)", log_context(str(job_id), str(call_id)))
+        logger.info(WorkerLog(
+            operation="generate_plan",
+            event="Planning started",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
         transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
 
         system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
         reserved = reserve_budget(
             call_id, job_id, JobStatus.PLANNING, LLM_PLAN_MODEL,
             f"{system_prompt}\n{user_query}",
+            operation="generate_plan",
         )
 
         plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
-        reconcile_budget(call_id, total_tokens)
+        reconcile_budget(call_id, total_tokens, reserved, operation="generate_plan")
 
         with get_worker_cursor() as cursor:
             PlansRepository.create_plan(cursor, job_id, plan)
 
         transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
-        logger.info("Planning completed (%s)", log_context(str(job_id), str(call_id)))
+        logger.info(WorkerLog(
+            operation="generate_plan",
+            event="Planning completed",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
 
-    except QuotaExceededError:
-        logger.exception("Planning quota exceeded (%s)", log_context(str(job_id), str(call_id)))
+    except QuotaExceededError as exc:
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
+        logger.error(WorkerLog(
+            operation="generate_plan",
+            event="Planning quota exceeded",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens)
-        logger.exception("Planning failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
+        reconcile_budget(call_id, exc.total_tokens, reserved, operation="generate_plan")
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_LLM_USAGE)
+        logger.error(WorkerLog(
+            operation="generate_plan",
+            event="Planning failed due to LLM usage error",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     except Exception as exc:
-        release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Planning failed due to unexpected error (%s)", log_context(str(job_id), str(call_id)))
+        release_budget_on_error(call_id, reserved, total_tokens, operation="generate_plan")
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        logger.error(WorkerLog(
+            operation="generate_plan",
+            event="Planning failed due to unexpected error",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
 
@@ -141,8 +188,12 @@ def generate_plan(job_request_payload: dict) -> None:
 def generate_code(job_request_payload: dict) -> None:
     try:
         job_request = JobPlanRequest(**job_request_payload)
-    except Exception:
-        logger.exception("Invalid plan request payload (%s)", log_context())
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_code",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     job_id = job_request.job.job_id
@@ -151,39 +202,68 @@ def generate_code(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
-        logger.info("Codegen started (%s)", log_context(str(job_id), str(call_id)))
+        logger.info(WorkerLog(
+            operation="generate_code",
+            event="Codegen started",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
         transition_job(job_id, job_request.job.status, JobStatus.CODEGEN)
 
         system_prompt, user_query = LLMService.render_codegen_prompt(job_request.plan)
         reserved = reserve_budget(
             call_id, job_id, JobStatus.CODEGEN, LLM_CODE_MODEL,
             f"{system_prompt}\n{user_query}",
+            operation="generate_code",
         )
 
         code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
-        reconcile_budget(call_id, total_tokens)
+        reconcile_budget(call_id, total_tokens, reserved, operation="generate_code")
 
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
-        logger.info("Codegen completed; verification enqueued (%s)", log_context(str(job_id), str(call_id)))
+        logger.info(WorkerLog(
+            operation="generate_code",
+            event="Codegen completed",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
         verify_code_task.delay(
             JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code, is_retry=False).model_dump(mode="json")
         )
 
-    except QuotaExceededError:
-        logger.exception("Codegen quota exceeded (%s)", log_context(str(job_id), str(call_id)))
+    except QuotaExceededError as exc:
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED)
+        logger.error(WorkerLog(
+            operation="generate_code",
+            event="Codegen quota exceeded",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens)
-        logger.exception("Codegen failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
+        reconcile_budget(call_id, exc.total_tokens, reserved, operation="generate_code")
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE)
+        logger.error(WorkerLog(
+            operation="generate_code",
+            event="Codegen failed due to LLM usage error",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
-    except Exception:
-        release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Codegen failed (%s)", log_context(str(job_id), str(call_id)))
+    except Exception as exc:
+        release_budget_on_error(call_id, reserved, total_tokens, operation="generate_code")
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        logger.error(WorkerLog(
+            operation="generate_code",
+            event="Codegen failed",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
 
@@ -191,8 +271,12 @@ def generate_code(job_request_payload: dict) -> None:
 def verify_code_task(job_request_payload: dict) -> None:
     try:
         job_request = JobCodeRequest(**job_request_payload)
-    except Exception:
-        logger.exception("Invalid code request payload (%s)", log_context())
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="verify_code",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     job_id = job_request.job.job_id
@@ -207,7 +291,12 @@ def verify_code_task(job_request_payload: dict) -> None:
 
     try:
         transition_job(job_id, job_request.job.status, JobStatus.VERIFYING)
-        logger.info("Verification started (is_retry=%s) (%s)", is_retry, log_context(str(job_id)))
+        logger.info(WorkerLog(
+            operation="verify_code",
+            event="Verification started",
+            job_id=str(job_id),
+            context={"is_retry": is_retry},
+        ))
 
         from app.workers.worker_helpers import verify_code as static_verify
         failure: str | None = static_verify(code, code_path)
@@ -219,10 +308,12 @@ def verify_code_task(job_request_payload: dict) -> None:
             passed, error_output, is_fixable = dry_run_docker(code_path, media_dir)
             if not passed:
                 if not is_fixable:
-                    logger.error(
-                        "Dry-run aborted due to infrastructure error (is_retry=%s) (%s): %s",
-                        is_retry, log_context(str(job_id)), error_output,
-                    )
+                    logger.error(WorkerLog(
+                        operation="verify_code",
+                        event="Dry-run aborted due to infrastructure error",
+                        job_id=str(job_id),
+                        context={"is_retry": is_retry, "error_output": error_output},
+                    ))
                     transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
                     return
                 failure = f"Dry-run failed:\n{error_output}"
@@ -246,21 +337,38 @@ def verify_code_task(job_request_payload: dict) -> None:
                     shutil.rmtree(job_dir, ignore_errors=True)
 
             transition_job(job_id, JobStatus.VERIFYING, JobStatus.VERIFIED)
-            logger.info("Verification passed; render enqueued (%s)", log_context(str(job_id)))
+            logger.info(WorkerLog(
+                operation="verify_code",
+                event="Verification passed",
+                job_id=str(job_id),
+            ))
             generate_render.delay(
                 JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
             )
         else:
             failure_summary = failure.strip().splitlines()[-1] if failure.strip() else failure
-            logger.warning("Verification failed (is_retry=%s) (%s): %s", is_retry, log_context(str(job_id)), failure_summary)
+            logger.warning(WorkerLog(
+                operation="verify_code",
+                event="Verification failed",
+                job_id=str(job_id),
+                context={"is_retry": is_retry, "failure_summary": failure_summary},
+            ))
 
             if is_retry:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
-                logger.error("Verification exhausted; job failed (%s)", log_context(str(job_id)))
+                logger.error(WorkerLog(
+                    operation="verify_code",
+                    event="Verification exhausted; job failed",
+                    job_id=str(job_id),
+                ))
             else:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FIXING)
-                logger.info("Fix enqueued (%s)", log_context(str(job_id)))
-                fix_code_task.delay(
+                logger.info(WorkerLog(
+                    operation="verify_code",
+                    event="Fix enqueued",
+                    job_id=str(job_id),
+                ))
+                fix_code.delay(
                     JobFixRequest(
                         job=Job(job_id=job_id, status=JobStatus.FIXING),
                         code=code,
@@ -268,9 +376,14 @@ def verify_code_task(job_request_payload: dict) -> None:
                     ).model_dump(mode="json")
                 )
 
-    except Exception:
-        logger.exception("Verification task failed unexpectedly (%s)", log_context(str(job_id)))
+    except Exception as exc:
         transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+        logger.error(WorkerLog(
+            operation="verify_code",
+            event="Verification task failed unexpectedly",
+            job_id=str(job_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     finally:
@@ -278,11 +391,15 @@ def verify_code_task(job_request_payload: dict) -> None:
 
 
 @app.task()
-def fix_code_task(job_request_payload: dict) -> None:
+def fix_code(job_request_payload: dict) -> None:
     try:
         job_request = JobFixRequest(**job_request_payload)
-    except Exception:
-        logger.exception("Invalid fix request payload (%s)", log_context())
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="fix_code",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     job_id = job_request.job.job_id
@@ -291,18 +408,29 @@ def fix_code_task(job_request_payload: dict) -> None:
     total_tokens = 0
 
     try:
-        logger.info("Fix started (%s)", log_context(str(job_id), str(call_id)))
-        
+        logger.info(WorkerLog(
+            operation="fix_code",
+            event="Fix started",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
+
         system_prompt, user_query = LLMService.render_fix_prompt(job_request.code, job_request.error_context)
         reserved = reserve_budget(
             call_id, job_id, JobStatus.FIXING, LLM_CODE_MODEL,
             f"{system_prompt}\n{user_query}",
+            operation="fix_code",
         )
 
         fixed_code, total_tokens = LLMService.fix_call(system_prompt, user_query)
-        reconcile_budget(call_id, total_tokens)
+        reconcile_budget(call_id, total_tokens, reserved, operation="fix_code")
 
-        logger.info("Fix completed; re-verification enqueued (%s)", log_context(str(job_id), str(call_id)))
+        logger.info(WorkerLog(
+            operation="fix_code",
+            event="Fix completed",
+            job_id=str(job_id),
+            call_id=str(call_id),
+        ))
         verify_code_task.delay(
             JobCodeRequest(
                 job=Job(job_id=job_id, status=JobStatus.FIXING),
@@ -311,21 +439,40 @@ def fix_code_task(job_request_payload: dict) -> None:
             ).model_dump(mode="json")
         )
 
-    except QuotaExceededError:
-        logger.exception("Fix quota exceeded (%s)", log_context(str(job_id), str(call_id)))
-        release_budget_on_error(call_id, reserved, total_tokens)
+    except QuotaExceededError as exc:
+        release_budget_on_error(call_id, reserved, total_tokens, operation="fix_code")
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_QUOTA_EXCEEDED)
-
-    except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens)
-        logger.exception("Fix task failed due to LLM usage error (%s)", log_context(str(job_id), str(call_id)))
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_LLM_USAGE)
+        logger.error(WorkerLog(
+            operation="fix_code",
+            event="Fix quota exceeded",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
-    except Exception:
-        release_budget_on_error(call_id, reserved, total_tokens)
-        logger.exception("Fix task failed (%s)", log_context(str(job_id), str(call_id)))
+    except LLMUsageException as exc:
+        reconcile_budget(call_id, exc.total_tokens, reserved, operation="fix_code")
+        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_LLM_USAGE)
+        logger.error(WorkerLog(
+            operation="fix_code",
+            event="Fix failed due to LLM usage error",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    except Exception as exc:
+        release_budget_on_error(call_id, reserved, total_tokens, operation="fix_code")
         transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+        logger.error(WorkerLog(
+            operation="fix_code",
+            event="Fix task failed",
+            job_id=str(job_id),
+            call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
 
@@ -333,8 +480,12 @@ def fix_code_task(job_request_payload: dict) -> None:
 def generate_render(job_request_payload: dict) -> None:
     try:
         job_request = JobRequest(**job_request_payload)
-    except Exception:
-        logger.exception("Invalid job request payload (%s)", log_context())
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_render",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     job_id = job_request.job.job_id
@@ -343,7 +494,11 @@ def generate_render(job_request_payload: dict) -> None:
 
     try:
         transition_job(job_id, job_request.job.status, JobStatus.RENDERING)
-        logger.info("Render started (%s)", log_context(str(job_id)))
+        logger.info(WorkerLog(
+            operation="generate_render",
+            event="Render started",
+            job_id=str(job_id),
+        ))
 
         storage = get_storage()
 
@@ -370,7 +525,7 @@ def generate_render(job_request_payload: dict) -> None:
         python_artifact = python_artifacts[0]
         code_path = input_dir / Path(python_artifact.path).name
         storage.download_artifact(python_artifact.path, str(code_path))
-        
+
         media_dir = input_dir / PathNames.MEDIA_FOLDER
         media_dir.mkdir(parents=True, exist_ok=True)
         media_dir.chmod(0o777)
@@ -403,7 +558,12 @@ def generate_render(job_request_payload: dict) -> None:
         store_render_logs(storage, job_id, render_stdout, render_stderr)
 
         if render_failed is not None:
-            logger.error("Docker render failed (%s): %s", log_context(str(job_id)), render_failed)
+            logger.error(WorkerLog(
+                operation="generate_render",
+                event="Docker render failed",
+                job_id=str(job_id),
+                error=Logger.serialize_error(render_failed),
+            ))
             raise render_failed
 
         videos_dir = media_dir / PathNames.VIDEOS_FOLDER / code_path.stem / PathNames.RESOLUTION_FOLDER
@@ -421,11 +581,20 @@ def generate_render(job_request_payload: dict) -> None:
             save_artifact_to_storage(job_id, output_file, ArtifactType.from_path(output_file), storage)
 
         transition_job(job_id, JobStatus.RENDERING, JobStatus.RENDERED)
-        logger.info("Render completed (%s)", log_context(str(job_id)))
+        logger.info(WorkerLog(
+            operation="generate_render",
+            event="Render completed",
+            job_id=str(job_id),
+        ))
 
-    except Exception:
-        logger.exception("Render failed (%s)", log_context(str(job_id)))
+    except Exception as exc:
         transition_job(job_id, JobStatus.RENDERING, JobStatus.FAILED_RENDER)
+        logger.error(WorkerLog(
+            operation="generate_render",
+            event="Render failed",
+            job_id=str(job_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
         raise
 
     finally:
@@ -452,18 +621,43 @@ def seed_knowledge_task() -> None:
                     cursor, document_id, content, entry["doc_type"], entry["title"], embedding
                 )
             inserted += 1
-        except psycopg2.errors.UniqueViolation:
+        except UniqueViolation:
             skipped += 1
-    logger.info("Seed complete: inserted=%d skipped=%d", inserted, skipped)
+    logger.info(WorkerLog(
+        operation="seed_knowledge",
+        event="Seed complete",
+        context={"inserted": inserted, "skipped": skipped},
+    ))
 
 
 @app.task()
 def create_knowledge_document_task(payload: dict) -> None:
-    document_id = UUID(payload["document_id"])
-    content = payload["content"]
-    doc_type = payload["doc_type"]
-    title = payload["title"]
-    embedding = RAGService.embed_text(content)
-    with get_worker_cursor() as cursor:
-        KnowledgeRepository.create_document(cursor, document_id, content, doc_type, title, embedding)
-    logger.info("Knowledge document created: document_id=%s", document_id)
+    try:
+        doc = KnowledgeDocument(**payload)
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="create_knowledge_document",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    try:
+        embedding = RAGService.embed_text(doc.content)
+        with get_worker_cursor() as cursor:
+            KnowledgeRepository.create_document(
+                cursor, doc.document_id, doc.content, doc.doc_type.value, doc.title, embedding
+            )
+        logger.info(WorkerLog(
+            operation="create_knowledge_document",
+            event="Knowledge document created",
+            context={"document_id": str(doc.document_id)},
+        ))
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="create_knowledge_document",
+            event="Knowledge document creation failed",
+            context={"document_id": str(doc.document_id)},
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise

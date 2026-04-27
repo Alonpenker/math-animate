@@ -1,11 +1,27 @@
 name: mathanimate
 
 services:
+  seq:
+    image: datalust/seq
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORDHASH: "${SEQ_ADMIN_PASSWORD_HASH}"
+      SEQ_API_CANONICALURI: "${SEQ_API_CANONICALURI:-https://api.mathanimate.com/seq}"
+    volumes:
+      - seq_data:/data
+
   api:
     restart: unless-stopped
+    depends_on:
+      seq:
+        condition: service_started
 
   worker:
     restart: unless-stopped
+    depends_on:
+      seq:
+        condition: service_started
 
   redis:
     restart: unless-stopped
@@ -34,3 +50,6 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - api
+
+volumes:
+  seq_data:

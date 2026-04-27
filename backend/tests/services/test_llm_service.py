@@ -158,7 +158,7 @@ def test_render_plan_prompt_injects_rag_examples_into_user_query(
     monkeypatch.setattr(llm_module, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(
         llm_module.LLMService, "retrieve_examples",
-        staticmethod(lambda cursor, query, doc_type: "example plan content"),
+        staticmethod(lambda cursor, query, doc_type, operation: "example plan content"),
     )
 
     # When
@@ -184,7 +184,7 @@ def test_render_plan_prompt_includes_all_user_request_fields_in_query(
     monkeypatch.setattr(llm_module, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(
         llm_module.LLMService, "retrieve_examples",
-        staticmethod(lambda cursor, query, doc_type: "(No examples available.)"),
+        staticmethod(lambda cursor, query, doc_type, operation: "(No examples available.)"),
     )
 
     # When

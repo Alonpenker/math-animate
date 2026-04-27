@@ -20,9 +20,9 @@ from app.schemas.user_request import UserRequest
 from app.schemas.video_plan import VideoPlan
 from app.services.rag_service import RAGService
 from app.utils.llm_stubs import IS_E2E_MODE, STUB_PLAN, STUB_BROKEN_CODE, STUB_FIXED_CODE
-from app.utils.logging import get_logger
+from app.utils.logging import Logger, WorkerLog, WorkerOperation
 
-logger = get_logger(__name__)
+logger = Logger.get_logger("worker")
 
 class CallType(StrEnum):
     PLAN = "plan"
@@ -59,22 +59,24 @@ class LLMService:
         return cls._codegen_model
 
     @classmethod
-    def retrieve_examples(cls, cursor, query: str, doc_type: KnowledgeType) -> str:
+    def retrieve_examples(cls, cursor, query: str, doc_type: KnowledgeType, operation: WorkerOperation) -> str:
         embedding = RAGService.embed_text(query)
         docs = KnowledgeRepository.search_similar(
             cursor, embedding, doc_type.value, limit=RAG_SIMILARITY_TOP_K
         )
         if not docs:
-            logger.info("RAG retrieval: doc_type=%s count=0", doc_type.value)
-            logger.warning(
-                "No knowledge examples were retrieved for doc_type=%s. "
-                "This is unexpected in a seeded environment. "
-                "Load the bundled examples manually by calling POST /internal/knowledge/seed.",
-                doc_type.value,
-            )
+            logger.warning(WorkerLog(
+                operation=operation,
+                event="No knowledge examples retrieved",
+                context={"doc_type": doc_type.value},
+            ))
             return "(No examples available.)"
         titles = [doc.title for doc in docs]
-        logger.info("RAG retrieval: doc_type=%s count=%d titles=%s", doc_type.value, len(titles), titles)
+        logger.info(WorkerLog(
+            operation=operation,
+            event="RAG retrieval completed",
+            context={"doc_type": doc_type.value, "count": len(titles), "titles": titles},
+        ))
         parts = []
         for i, doc in enumerate(docs, 1):
             parts.append(f"--- Example {i} ---\n{doc.content}")
@@ -109,6 +111,7 @@ class LLMService:
     @staticmethod
     def _check_max_tokens(
         call_name: CallType,
+        operation: WorkerOperation,
         *,
         input_tokens: int,
         reasoning_tokens: int,
@@ -118,10 +121,18 @@ class LLMService:
     ) -> None:
         """Warn and raise if output tokens hit the configured max, indicating truncated output."""
         if output_tokens >= max_tokens:
-            logger.warning(
-                "LLM call failed: call=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d max_tokens=%d reason=max_tokens_reached",
-                call_name, input_tokens, reasoning_tokens, output_tokens, total_tokens, max_tokens,
-            )
+            logger.warning(WorkerLog(
+                operation=operation,
+                event="LLM call hit max token limit",
+                context={
+                    "call": call_name,
+                    "input_tokens": input_tokens,
+                    "reasoning_tokens": reasoning_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                    "max_tokens": max_tokens,
+                },
+            ))
             raise LLMUsageException(
                 f"LLM call '{call_name}' hit the max token limit ({max_tokens}). "
                 "Output is likely truncated and unusable.",
@@ -157,7 +168,7 @@ class LLMService:
             f"Number of scenes: {user_request.number_of_scenes}"
         )
         with get_worker_cursor() as cursor:
-            examples = LLMService.retrieve_examples(cursor, request_text, KnowledgeType.PLAN)
+            examples = LLMService.retrieve_examples(cursor, request_text, KnowledgeType.PLAN, "generate_plan")
         user_query = (
             f"Reference examples of good plans:\n{examples}\n\n"
             f"Generate a scene plan for this request:\n{request_text}"
@@ -169,7 +180,7 @@ class LLMService:
         """Return (system_prompt, user_query) for the codegen LLM call."""
         plan_text = plan.model_dump_json(indent=2)
         with get_worker_cursor() as cursor:
-            examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE)
+            examples = LLMService.retrieve_examples(cursor, plan_text, KnowledgeType.CODE, "generate_code")
         user_query = (
             f"Reference examples of good Manim code:\n{examples}\n\n"
             f"Generate Manim code for this plan:\n{plan_text}"
@@ -181,10 +192,15 @@ class LLMService:
         if IS_E2E_MODE:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.info(
-                "LLM call finished [E2E MODE]: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                CallType.PLAN, LLM_PLAN_MODEL, 0, 0, 0, 0, duration_ms,
-            )
+            logger.info(WorkerLog(
+                operation="generate_plan",
+                event="LLM call finished [E2E MODE]",
+                context={
+                    "call": CallType.PLAN, "model": LLM_PLAN_MODEL,
+                    "input_tokens": 0, "reasoning_tokens": 0,
+                    "output_tokens": 0, "total_tokens": 0, "duration_ms": duration_ms,
+                },
+            ))
             return STUB_PLAN, 0
 
         model = LLMService._get_plan_model()
@@ -198,10 +214,16 @@ class LLMService:
         except LengthFinishReasonError as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
             input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
-            logger.warning(
-                "LLM call failed: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d reason=length_finish_reason",
-                CallType.PLAN, LLM_PLAN_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-            )
+            logger.warning(WorkerLog(
+                operation="generate_plan",
+                event="LLM call failed: length finish reason",
+                context={
+                    "call": CallType.PLAN, "model": LLM_PLAN_MODEL,
+                    "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                    "output_tokens": output_tok, "total_tokens": total_tok,
+                    "duration_ms": duration_ms, "reason": "length_finish_reason",
+                },
+            ))
             raise LLMUsageException(
                 f"LLM call '{CallType.PLAN}' exhausted its output token budget "
                 f"({LLM_PLAN_OUTPUT_MAX_TOKENS}) before producing a usable plan.",
@@ -209,10 +231,14 @@ class LLMService:
             ) from exc
         except Exception as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.warning(
-                "LLM call failed: call=%s model=%s duration_ms=%d reason=%s",
-                CallType.PLAN, LLM_PLAN_MODEL, duration_ms, type(exc).__name__,
-            )
+            logger.warning(WorkerLog(
+                operation="generate_plan",
+                event="LLM call failed",
+                context={
+                    "call": CallType.PLAN, "model": LLM_PLAN_MODEL,
+                    "duration_ms": duration_ms, "reason": type(exc).__name__,
+                },
+            ))
             raise RuntimeError(
                 f"LLM call '{CallType.PLAN}' failed before producing a usable plan: {type(exc).__name__}",
             ) from exc
@@ -221,43 +247,54 @@ class LLMService:
         input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(raw_response)
         LLMService._check_max_tokens(
             CallType.PLAN,
+            "generate_plan",
             input_tokens=input_tok,
             reasoning_tokens=reasoning_tok,
             output_tokens=output_tok,
             total_tokens=total_tok,
             max_tokens=LLM_PLAN_OUTPUT_MAX_TOKENS,
         )
-        logger.info(
-            "LLM call finished: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            CallType.PLAN, LLM_PLAN_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-        )
+        logger.info(WorkerLog(
+            operation="generate_plan",
+            event="LLM call finished",
+            context={
+                "call": CallType.PLAN, "model": LLM_PLAN_MODEL,
+                "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                "output_tokens": output_tok, "total_tokens": total_tok,
+                "duration_ms": duration_ms,
+            },
+        ))
         if not isinstance(result, dict):
-            logger.warning(
-                "LLM output validation failed: structured response has an unexpected shape (response_type=%s, expected dict).",
-                type(result).__name__,
-            )
+            logger.warning(WorkerLog(
+                operation="generate_plan",
+                event="LLM output validation failed: unexpected response shape",
+                context={"response_type": type(result).__name__},
+            ))
             raise LLMUsageException(
                 f"LLM output validation failed: structured response has an unexpected shape (response_type={type(result).__name__}, expected dict).",
                 total_tokens=total_tok,
             )
-        
+
         plan = result.get("parsed")
         if isinstance(plan, VideoPlan):
             for scene in plan.scenes:
                 if scene.scene_number == -1:
-                    logger.warning("LLM output validation failed: non-math topic detected (%s).",
-                                    scene.learning_objective,
-                                    )
+                    logger.warning(WorkerLog(
+                        operation="generate_plan",
+                        event="LLM output validation failed: non-math topic detected",
+                        context={"learning_objective": scene.learning_objective},
+                    ))
                     raise LLMUsageException(
                         f"LLM output validation failed: non-math topic detected ({scene.learning_objective})",
                         total_tokens=total_tok,
                     )
             return plan, total_tok
-        
-        logger.warning(
-            "LLM output validation failed: response is not a valid instance (parsed_type=%s, expected VideoPlan).",
-            type(plan).__name__,
-        )
+
+        logger.warning(WorkerLog(
+            operation="generate_plan",
+            event="LLM output validation failed: response is not a valid instance",
+            context={"parsed_type": type(plan).__name__},
+        ))
         raise LLMUsageException(
             f"LLM output validation failed: response is not a valid instance (parsed_type={type(plan).__name__}, expected VideoPlan).",
             total_tokens=total_tok,
@@ -268,10 +305,15 @@ class LLMService:
         if IS_E2E_MODE:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.info(
-                "LLM call finished [E2E MODE]: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                CallType.CODEGEN, LLM_CODE_MODEL, 0, 0, 0, 0, duration_ms,
-            )
+            logger.info(WorkerLog(
+                operation="generate_code",
+                event="LLM call finished [E2E MODE]",
+                context={
+                    "call": CallType.CODEGEN, "model": LLM_CODE_MODEL,
+                    "input_tokens": 0, "reasoning_tokens": 0,
+                    "output_tokens": 0, "total_tokens": 0, "duration_ms": duration_ms,
+                },
+            ))
             return STUB_BROKEN_CODE, 0
 
         model = LLMService._get_codegen_model()
@@ -284,20 +326,30 @@ class LLMService:
         except LengthFinishReasonError as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
             input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
-            logger.warning(
-                "LLM call failed: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d reason=length_finish",
-                CallType.CODEGEN, LLM_CODE_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-            )
+            logger.warning(WorkerLog(
+                operation="generate_code",
+                event="LLM call failed: length finish reason",
+                context={
+                    "call": CallType.CODEGEN, "model": LLM_CODE_MODEL,
+                    "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                    "output_tokens": output_tok, "total_tokens": total_tok,
+                    "duration_ms": duration_ms, "reason": "length_finish",
+                },
+            ))
             raise LLMUsageException(
                 f"LLM call '{CallType.CODEGEN}' hit the token limit ({LLM_CODEGEN_OUTPUT_MAX_TOKENS}) before finishing output.",
                 total_tokens=total_tok,
             ) from exc
         except Exception as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.warning(
-                "LLM call failed: call=%s model=%s duration_ms=%d reason=%s",
-                CallType.CODEGEN, LLM_CODE_MODEL, duration_ms, type(exc).__name__,
-            )
+            logger.warning(WorkerLog(
+                operation="generate_code",
+                event="LLM call failed",
+                context={
+                    "call": CallType.CODEGEN, "model": LLM_CODE_MODEL,
+                    "duration_ms": duration_ms, "reason": type(exc).__name__,
+                },
+            ))
             raise RuntimeError(
                 f"LLM call '{CallType.CODEGEN}' failed before producing code: {type(exc).__name__}",
             ) from exc
@@ -305,22 +357,30 @@ class LLMService:
         input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(response)
         LLMService._check_max_tokens(
             CallType.CODEGEN,
+            "generate_code",
             input_tokens=input_tok,
             reasoning_tokens=reasoning_tok,
             output_tokens=output_tok,
             total_tokens=total_tok,
             max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
         )
-        logger.info(
-            "LLM call finished: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            CallType.CODEGEN, LLM_CODE_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-        )
+        logger.info(WorkerLog(
+            operation="generate_code",
+            event="LLM call finished",
+            context={
+                "call": CallType.CODEGEN, "model": LLM_CODE_MODEL,
+                "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                "output_tokens": output_tok, "total_tokens": total_tok,
+                "duration_ms": duration_ms,
+            },
+        ))
         try:
             return LLMService.extract_text_content(response), total_tok
         except ValueError as exc:
-            logger.warning(
-                "LLM output validation failed: codegen response did not contain plain text content.",
-            )
+            logger.warning(WorkerLog(
+                operation="generate_code",
+                event="LLM output validation failed: no plain text content",
+            ))
             raise LLMUsageException(
                 "LLM output validation failed: codegen response did not contain plain text content.",
                 total_tokens=total_tok,
@@ -342,10 +402,15 @@ class LLMService:
         if IS_E2E_MODE:
             t0 = time.perf_counter()
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.info(
-                "LLM call finished [E2E MODE]: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-                CallType.FIX, LLM_CODE_MODEL, 0, 0, 0, 0, duration_ms,
-            )
+            logger.info(WorkerLog(
+                operation="fix_code",
+                event="LLM call finished [E2E MODE]",
+                context={
+                    "call": CallType.FIX, "model": LLM_CODE_MODEL,
+                    "input_tokens": 0, "reasoning_tokens": 0,
+                    "output_tokens": 0, "total_tokens": 0, "duration_ms": duration_ms,
+                },
+            ))
             return STUB_FIXED_CODE, 0
 
         model = LLMService._get_codegen_model()
@@ -358,20 +423,30 @@ class LLMService:
         except LengthFinishReasonError as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
             input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(exc.completion)
-            logger.warning(
-                "LLM call failed: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d reason=length_finish",
-                CallType.FIX, LLM_CODE_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-            )
+            logger.warning(WorkerLog(
+                operation="fix_code",
+                event="LLM call failed: length finish reason",
+                context={
+                    "call": CallType.FIX, "model": LLM_CODE_MODEL,
+                    "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                    "output_tokens": output_tok, "total_tokens": total_tok,
+                    "duration_ms": duration_ms, "reason": "length_finish",
+                },
+            ))
             raise LLMUsageException(
                 f"LLM call '{CallType.FIX}' hit the token limit ({LLM_CODEGEN_OUTPUT_MAX_TOKENS}) before finishing output.",
                 total_tokens=total_tok,
             ) from exc
         except Exception as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
-            logger.warning(
-                "LLM call failed: call=%s model=%s duration_ms=%d reason=%s",
-                CallType.FIX, LLM_CODE_MODEL, duration_ms, type(exc).__name__,
-            )
+            logger.warning(WorkerLog(
+                operation="fix_code",
+                event="LLM call failed",
+                context={
+                    "call": CallType.FIX, "model": LLM_CODE_MODEL,
+                    "duration_ms": duration_ms, "reason": type(exc).__name__,
+                },
+            ))
             raise RuntimeError(
                 f"LLM call '{CallType.FIX}' failed before producing fixed code: {type(exc).__name__}",
             ) from exc
@@ -379,22 +454,30 @@ class LLMService:
         input_tok, output_tok, total_tok, reasoning_tok = LLMService._extract_token_usage(response)
         LLMService._check_max_tokens(
             CallType.FIX,
+            "fix_code",
             input_tokens=input_tok,
             reasoning_tokens=reasoning_tok,
             output_tokens=output_tok,
             total_tokens=total_tok,
             max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
         )
-        logger.info(
-            "LLM call finished: call=%s model=%s input_tokens=%d reasoning_tokens=%d output_tokens=%d total_tokens=%d duration_ms=%d",
-            CallType.FIX, LLM_CODE_MODEL, input_tok, reasoning_tok, output_tok, total_tok, duration_ms,
-        )
+        logger.info(WorkerLog(
+            operation="fix_code",
+            event="LLM call finished",
+            context={
+                "call": CallType.FIX, "model": LLM_CODE_MODEL,
+                "input_tokens": input_tok, "reasoning_tokens": reasoning_tok,
+                "output_tokens": output_tok, "total_tokens": total_tok,
+                "duration_ms": duration_ms,
+            },
+        ))
         try:
             return LLMService.extract_text_content(response), total_tok
         except ValueError as exc:
-            logger.warning(
-                "LLM output validation failed: fix response did not contain plain text content.",
-            )
+            logger.warning(WorkerLog(
+                operation="fix_code",
+                event="LLM output validation failed: no plain text content",
+            ))
             raise LLMUsageException(
                 "LLM output validation failed: fix response did not contain plain text content.",
                 total_tokens=total_tok,
