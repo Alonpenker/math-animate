@@ -40,7 +40,6 @@ def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> 
     monkeypatch.setattr(worker_module, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_redis", fake_redis_ctx)
-    monkeypatch.setattr(worker_helpers, "current_task", None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

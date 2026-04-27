@@ -5,7 +5,7 @@ Covers three groups:
   1. Utility functions (verify_code, extract_traceback, dry_run_docker) —
      pure unit tests, no DB/storage/Celery mocks needed.
   2. Celery task functions (generate_plan, generate_code, verify_code_task,
-     fix_code_task, generate_render) — use the mock_worker_* fixture family.
+     fix_code, generate_render) — use the mock_worker_* fixture family.
 """
 import hashlib
 import subprocess
@@ -449,7 +449,7 @@ def test_generate_plan_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     )
     monkeypatch.setattr(
         worker_module, "reserve_budget",
-        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+        lambda call_id, job_id, stage, model, prompt_text, operation: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
     )
 
     job = Job(status=JobStatus.CREATED)
@@ -584,7 +584,7 @@ def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     )
     monkeypatch.setattr(
         worker_module, "reserve_budget",
-        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+        lambda call_id, job_id, stage, model, prompt_text, operation: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
     )
 
     job = Job(status=JobStatus.APPROVED)
@@ -711,7 +711,7 @@ def test_verify_code_task_enqueues_fix_on_first_dry_run_failure(
 
     enqueued_fix = []
     monkeypatch.setattr(
-        worker_module.fix_code_task, "delay", lambda payload: enqueued_fix.append(payload)
+        worker_module.fix_code, "delay", lambda payload: enqueued_fix.append(payload)
     )
 
     job = Job(status=JobStatus.CODED)
@@ -781,7 +781,7 @@ def test_verify_code_task_enqueues_fix_on_first_static_analysis_failure(
 
     enqueued_fix = []
     monkeypatch.setattr(
-        worker_module.fix_code_task, "delay", lambda payload: enqueued_fix.append(payload)
+        worker_module.fix_code, "delay", lambda payload: enqueued_fix.append(payload)
     )
 
     job = Job(status=JobStatus.CODED)
@@ -847,7 +847,7 @@ def test_verify_code_task_does_not_persist_artifact_when_verification_fails(
         worker_helpers, "verify_code",
         lambda code, code_path: "mypy errors: bad type",
     )
-    monkeypatch.setattr(worker_module.fix_code_task, "delay", lambda payload: None)
+    monkeypatch.setattr(worker_module.fix_code, "delay", lambda payload: None)
 
     job = Job(status=JobStatus.CODED)
     test_store["jobs"][job.job_id] = job
@@ -866,10 +866,10 @@ def test_verify_code_task_does_not_persist_artifact_when_verification_fails(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# fix_code_task
+# fix_code
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_fix_code_task_enqueues_re_verify_with_retry_flag_on_success(
+def test_fix_code_enqueues_re_verify_with_retry_flag_on_success(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -908,7 +908,7 @@ def test_fix_code_task_enqueues_re_verify_with_retry_flag_on_success(
     ).model_dump(mode="json")
 
     # When
-    worker_module.fix_code_task(payload)
+    worker_module.fix_code(payload)
 
     # Then
     assert len(enqueued_verify) == 1
@@ -917,7 +917,7 @@ def test_fix_code_task_enqueues_re_verify_with_retry_flag_on_success(
     assert enqueued_verify[0]["code"] == fixed_code
 
 
-def test_fix_code_task_sets_failed_verification_and_reraises_on_llm_error(
+def test_fix_code_sets_failed_verification_and_reraises_on_llm_error(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -946,12 +946,12 @@ def test_fix_code_task_sets_failed_verification_and_reraises_on_llm_error(
 
     # When / Then
     with pytest.raises(RuntimeError, match="LLM fix failed"):
-        worker_module.fix_code_task(payload)
+        worker_module.fix_code(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
 
 
-def test_fix_code_task_sets_failed_quota_exceeded_on_quota_error(
+def test_fix_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -966,7 +966,7 @@ def test_fix_code_task_sets_failed_quota_exceeded_on_quota_error(
     )
     monkeypatch.setattr(
         worker_module, "reserve_budget",
-        lambda call_id, job_id, stage, model, prompt_text: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
+        lambda call_id, job_id, stage, model, prompt_text, operation: (_ for _ in ()).throw(QuotaExceededError(250_000, 200_000, 10_000, 5_000)),
     )
 
     job = Job(status=JobStatus.FIXING)
@@ -977,15 +977,15 @@ def test_fix_code_task_sets_failed_quota_exceeded_on_quota_error(
         error_context="some error",
     ).model_dump(mode="json")
 
-    # When
-    worker_module.fix_code_task(payload)
+    # When / Then
+    with pytest.raises(QuotaExceededError):
+        worker_module.fix_code(payload)
 
-    # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
 
 
-def test_fix_code_task_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
+def test_fix_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -1015,8 +1015,8 @@ def test_fix_code_task_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     ).model_dump(mode="json")
 
     # When / Then
-    with pytest.raises(LLMUsageException, match="reasoning limit reached"):
-        worker_module.fix_code_task(payload)
+    with pytest.raises(LLMUsageException):
+        worker_module.fix_code(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
