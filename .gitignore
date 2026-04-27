@@ -2,6 +2,8 @@
 .codex
 settings.json
 
+.env
+
 PLAN.*md
 SPEC.md
 TODOS

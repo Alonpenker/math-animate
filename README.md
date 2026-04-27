@@ -40,6 +40,8 @@
 | Local runtime | Docker Compose |
 | Infrastructure | Terraform, AWS (eu-north-1), Cloudflare Workers |
 | CI/CD | GitHub Actions + OIDC |
+| Monitoring & Logging | Seq (structured logs, VPS) |
+| Authentication | Cloudflare Zero Trust (Access) |
 
 ---
 

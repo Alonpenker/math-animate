@@ -30,12 +30,18 @@
             2a06:98c0::/29 \
             2c0f:f248::/32
     }
-    abort @not_cloudflare
+    respond @not_cloudflare 403
 
     @internal {
         path /internal /internal/*
     }
     respond @internal 404
+
+    redir /seq /seq/ 302
+
+    handle_path /seq* {
+        reverse_proxy seq:80
+    }
 
     reverse_proxy api:8000
 }
