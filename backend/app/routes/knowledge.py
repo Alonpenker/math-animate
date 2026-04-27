@@ -13,10 +13,13 @@ from app.schemas.knowledge import (
     KnowledgeDocumentsListResponse,
     KnowledgeType,
 )
+from app.utils.logging import Logger, APILog
 from app.workers.runner import WorkerRunner
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
 internal_router = APIRouter(prefix="/knowledge", tags=["Knowledge"])
+
+logger = Logger.get_logger("api")
 
 @internal_router.post("", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(LimitConfig.STRICT)
@@ -25,6 +28,11 @@ def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
     WorkerRunner.handle_create_document(
         document_id, body.content, body.doc_type.value, body.title
     )
+    logger.info(APILog(
+        operation="create_knowledge_document",
+        event="Knowledge document creation queued",
+        context={"document_id": str(document_id),"title": str(body.title),"doc_type":str(body.doc_type.value)},
+    ))
     return {"document_id": str(document_id), "message": "Document creation queued."}
 
 
@@ -32,6 +40,10 @@ def create_document(request: Request, body: KnowledgeDocumentCreate) -> dict:
 @limiter.limit(LimitConfig.STRICT)
 def seed_knowledge(request: Request) -> dict:
     WorkerRunner.handle_seed()
+    logger.info(APILog(
+        operation="seed_knowledge",
+        event="Knowledge seeding queued",
+    ))
     return {"message": "Knowledge seeding queued."}
 
 
@@ -76,3 +88,8 @@ def delete_document(request: Request,
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document not found. (document_id={document_id})",
         )
+    logger.info(APILog(
+        operation="delete_knowledge_document",
+        event="Knowledge document deleted",
+        context={"document_id": str(document_id)},
+    ))

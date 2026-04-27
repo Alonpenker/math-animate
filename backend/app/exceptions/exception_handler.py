@@ -13,7 +13,7 @@ from minio.error import S3Error
 from psycopg2 import Error as PsycopgError
 
 from app.exceptions.invalid_transition_error import InvalidTransitionError
-from app.utils.logging import get_logger
+from app.utils.logging import Logger, BaseLog
 
 ExcType = Union[Type[Exception], Tuple[Type[Exception], ...]]
 
@@ -34,7 +34,7 @@ ERROR_SPECS: tuple[ErrorSpec, ...] = (
     ErrorSpec(RuntimeError, status.HTTP_500_INTERNAL_SERVER_ERROR, None),
 )
 
-logger = get_logger(__name__)
+logger = Logger.get_logger("api")
 
 
 def _match_error(exc: Exception) -> Optional[HTTPException]:
@@ -52,12 +52,12 @@ async def handle_exceptions(request: Request, exc: Exception):
     if isinstance(exc, RequestValidationError):
         return await request_validation_exception_handler(request, exc)
 
-    logger.exception("Unhandled exception", exc_info=exc)
-
     mapped = _match_error(exc)
     if mapped is not None:
         return await http_exception_handler(request, mapped)
-
+    
+    logger.error(BaseLog(event="Unhandled exception", error=Logger.serialize_error(exc)), exc_info=exc)
+    
     return await http_exception_handler(
         request,
         HTTPException(

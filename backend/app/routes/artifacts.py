@@ -8,7 +8,7 @@ from uuid import UUID
 
 from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
-from app.utils.logging import get_logger
+from app.utils.logging import Logger, APILog
 from app.dependencies.limiter import limiter
 from app.dependencies.storage import get_storage_service
 from app.repositories.artifacts_repository import ArtifactsRepository
@@ -19,7 +19,7 @@ from app.utils.video_streaming import build_video_stream_response
 router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 internal_router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 
-logger = get_logger(__name__)
+logger = Logger.get_logger("api")
 
 
 @router.get("", response_model=List[ArtifactResponse])
@@ -93,7 +93,17 @@ def download_artifact(
     file_name = Path(artifact.path).name
     with tempfile.NamedTemporaryFile(suffix=f"_{file_name}", delete=False) as tmp:
         dest_path = Path(tmp.name)
-    storage.download_artifact(artifact.path, str(dest_path))
+    try:
+        storage.download_artifact(artifact.path, str(dest_path))
+    except Exception as exc:
+        dest_path.unlink(missing_ok=True)
+        logger.error(APILog(
+            operation="download_artifact",
+            event="Artifact download failed",
+            job_id=str(artifact.job_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
 
     return FileResponse(
         path=dest_path,
@@ -121,7 +131,10 @@ def delete_artifact(
     try:
         storage.delete_artifact(artifact.path)
     except Exception:
-        logger.warning("Storage delete failed for artifact_id=%s", artifact_id, exc_info=True)
+        logger.warning(APILog(
+            operation="delete_artifact",
+            event="Artifact delete failed",
+        ), exc_info=True)
 
     ArtifactsRepository.delete_artifact(cursor, artifact_id)
 

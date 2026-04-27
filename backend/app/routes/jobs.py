@@ -13,9 +13,12 @@ from app.schemas.jobs import *
 from app.schemas.job_request import JobListResponse
 from app.schemas.user_request import UserRequest
 from app.domain.job_state import JobStatus
+from app.utils.logging import Logger, APILog
 from app.workers.runner import WorkerRunner
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+logger = Logger.get_logger("api")
 
 @router.post("",status_code=status.HTTP_201_CREATED)
 @limiter.limit(LimitConfig.STRICT)
@@ -30,6 +33,11 @@ def create_job(
     JobsRepository.create_job(redis_client, job)
     JobRequestsRepository.create(cursor, job.job_id, user_request, JobStatus.CREATED)
     WorkerRunner.advance(job_request)
+    logger.info(APILog(
+        operation="create_job",
+        event="Job creation requested",
+        job_id=str(job.job_id),
+    ))
     return JobResponse(job=job)
 
 
@@ -117,8 +125,18 @@ def approve_plan(request: Request, job_id: UUID, approved: bool, redis_client=De
         JobRequestsRepository.update_status(cursor, job_id, JobStatus.APPROVED)
         job_request = JobPlanRequest(job=job, plan=plan.plan)
         WorkerRunner.advance(job_request)
+        logger.info(APILog(
+            operation="approve_job",
+            event="Job approved",
+            job_id=str(job_id),
+        ))
     else:
         job = Job(job_id=job_id, status=JobStatus.CANCELLED)
         JobsRepository.update_job_status(redis_client, job_id, JobStatus.CANCELLED)
         JobRequestsRepository.update_status(cursor, job_id, JobStatus.CANCELLED)
+        logger.info(APILog(
+            operation="cancel_job",
+            event="Job cancelled",
+            job_id=str(job_id),
+        ))
     return JobResponse(job=job)

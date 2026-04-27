@@ -1,13 +1,9 @@
-from typing import Optional
 from pathlib import Path
 from uuid import uuid4
 import hashlib
 import ast
 import subprocess
 import shutil
-import os
-
-from celery import current_task
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PROVIDER
@@ -22,22 +18,9 @@ from app.schemas.artifact import Artifact, ArtifactType
 from app.services.budget_service import BudgetService
 from app.services.files_storage_service import FilesStorageService
 from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, DRY_RUN_TIMEOUT_SECONDS, PathNames, DockerCommands
-from app.utils.logging import get_logger
+from app.utils.logging import Logger, WorkerLog, WorkerOperation
 
-logger = get_logger(__name__)
-
-
-def log_context(job_id: Optional[str] = None, call_id: Optional[str] = None) -> str:
-    parts: list[str] = [f"pid={os.getpid()}"]
-    if current_task is not None and getattr(current_task, "request", None) is not None:
-        hostname = getattr(current_task.request, "hostname", None)
-        if hostname:
-            parts.append(f"worker={hostname}")
-    if job_id:
-        parts.append(f"job_id={job_id}")
-    if call_id:
-        parts.append(f"call_id={call_id}")
-    return " ".join(parts)
+logger = Logger.get_logger("worker")
 
 
 def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None:
@@ -48,22 +31,42 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
         JobRequestsRepository.update_status(cursor, job_id, to_status)
 
 
-def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str) -> int:
+def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str, operation: WorkerOperation) -> int:
     with get_worker_cursor() as cursor:
-        return BudgetService.reserve(
+        reserved = BudgetService.reserve(
             cursor, call_id, job_id, stage.value, LLM_PROVIDER, model, prompt_text
         )
+    logger.info(WorkerLog(
+        operation=operation,
+        event="Budget reserved",
+        job_id=str(job_id),
+        call_id=str(call_id),
+        context={"reserved_tokens": reserved},
+    ))
+    return reserved
 
 
-def reconcile_budget(call_id, total_tokens: int) -> None:
+def reconcile_budget(call_id, total_tokens: int, reserved: int, operation: WorkerOperation) -> None:
     with get_worker_cursor() as cursor:
         BudgetService.reconcile(cursor, call_id, total_tokens)
+    logger.info(WorkerLog(
+        operation=operation,
+        event="Budget reconciled",
+        call_id=str(call_id),
+        context={"reserved_tokens": reserved, "total_tokens": total_tokens},
+    ))
 
 
-def release_budget_on_error(call_id, reserved: int, total_tokens: int) -> None:
+def release_budget_on_error(call_id, reserved: int, total_tokens: int, operation: WorkerOperation) -> None:
     if reserved:
         with get_worker_cursor() as cursor:
             BudgetService.reconcile(cursor, call_id, max(reserved, total_tokens))
+        logger.info(WorkerLog(
+            operation=operation,
+            event="Budget reconciled on error",
+            call_id=str(call_id),
+            context={"reserved_tokens": reserved, "total_tokens": total_tokens},
+        ))
 
 
 def get_storage() -> FilesStorageService:
@@ -223,8 +226,11 @@ def store_render_logs(
             save_artifact_to_storage(job_id, file_path, ArtifactType.LOG, storage)
         except Exception:
             logger.warning(
-                "Failed to store %s artifact (%s)",
-                filename, log_context(str(job_id)),
+                WorkerLog(
+                    operation="generate_render",
+                    event="Artifact save failed",
+                    job_id=str(job_id),
+                ),
                 exc_info=True,
             )
         finally:
