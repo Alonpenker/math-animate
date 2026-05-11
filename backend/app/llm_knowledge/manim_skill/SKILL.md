@@ -39,6 +39,14 @@ and ManimCE APIs. Do not use ManimGL patterns such as `from manimlib import *`,
 5. Use color, motion, and spatial layout to clarify the math, not to decorate it.
 6. Keep each scene focused on one instructional idea.
 
+## Reliability Guidance
+
+Reliability is part of creative Manim work. Prefer expressive choices that stay
+inside stable ManimCE APIs and render cleanly in the target runtime. When using
+LaTeX, text objects, transforms, layout helpers, camera behavior, or object
+indexing, choose the simpler reliable construct unless the advanced construct is
+necessary for the lesson.
+
 ## Educational Animation Guidance
 
 Good generated Manim scenes should teach through visible structure:

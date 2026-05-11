@@ -41,6 +41,7 @@ Before writing the final Python code, inspect the scene plan and load every list
 # Manim Generation Guidance
 
 * Prefer clear, idiomatic ManimCE code over rigid templates.
+* Creative visual choices must not come at the cost of ManimCE v0.19.2 API correctness or LaTeX renderability.
 * Choose objects, layout, camera behavior, and animation types that fit the math in the scene plan.
 * Keep scenes readable: avoid clutter, overlap, tiny text, and unnecessary motion.
 * Use visual continuity for mathematical transformations when it helps the viewer understand what changed.
