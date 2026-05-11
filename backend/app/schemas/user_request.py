@@ -10,3 +10,11 @@ class UserRequest(BaseModel):
     constraints: List[BoundedStr]
     examples: List[BoundedStr]
     number_of_scenes: int = Field(..., ge=1, le=3)
+
+    def __str__(self) -> str:
+        return (
+            f"Topic: {self.topic}\n"
+            f"Misconceptions: {', '.join(self.misconceptions)}\n"
+            f"Constraints: {', '.join(self.constraints)}\n"
+            f"Number of scenes: {self.number_of_scenes}"
+        )

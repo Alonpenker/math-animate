@@ -19,15 +19,16 @@ class JobUserRequest(JobRequest):
 class JobPlanRequest(JobRequest):
     plan: VideoPlan
 
-class JobCodeRequest(JobRequest):
-    code: str
-    is_retry: bool = False
+class JobFixAttemptRequest(JobRequest):
+    fix_attempt: int = Field(default=0, ge=0)
 
-class JobFixRequest(JobRequest):
+class JobCodeRequest(JobFixAttemptRequest):
+    code: str
+
+class JobFixRequest(JobFixAttemptRequest):
     code: str
     error_context: str
 
 class JobResponse(BaseModel):
     job: Job
     data: Optional[Any] = None
-

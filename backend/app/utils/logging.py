@@ -17,15 +17,14 @@ class BaseLog(BaseModel):
 WorkerOperation = Literal[
     "generate_plan", "generate_code", "verify_code",
     "fix_code", "generate_render", "seed_knowledge",
-    "create_knowledge_document","e2e_mode"
+    "e2e_mode"
 ]
 
 APIOperation = Literal[
     "health_check", "create_job", "get_job_status", "get_job_plan",
     "approve_job", "cancel_job", "list_artifacts", "get_artifact",
     "download_artifact", "list_knowledge", "get_knowledge_document",
-    "get_usage_summary", "delete_artifact", "create_knowledge_document",
-    "seed_knowledge", "delete_knowledge_document",
+    "get_usage_summary", "delete_artifact", "seed_knowledge",
 ]
 
 class WorkerLog(BaseLog):
