@@ -8,10 +8,9 @@
 #   --list-jobs [--status <status>] [--page <n>]
 #   --list-artifacts [--type video|code|log|plan]
 #   --rm-artifact <artifact_id>
-#   --list-knowledge --type example|context
-#   --create-knowledge --type example|context --title "..." --content "..."
-#   --rm-knowledge <document_id>
+#   --list-knowledge --type skill|rule|template|example
 #   --seed-knowledge
+#   --reset-knowledge
 #
 # Raw passthrough:
 #   --get    <path>
@@ -39,7 +38,7 @@ pretty() {
 
 api() {
   local method="$1" path="$2" data="${3:-}"
-  local args=(-s -X "$method" "http://localhost:8000${path}" \
+  local args=(-fsS -X "$method" "http://localhost:8000${path}" \
     -H "Content-Type: application/json" \
     -H "X-API-Key: ${X_API_KEY}")
   [[ -n "$data" ]] && args+=(-d "$data")
@@ -50,7 +49,7 @@ require() {
   [[ -n "${2:-}" ]] || { echo "ERROR: $1 requires a value." >&2; exit 1; }
 }
 
-CMD="" TYPE="" STATUS="" PAGE="" ARTIFACT_ID="" DOC_ID="" TITLE="" CONTENT="" RAW_PATH="" RAW_DATA=""
+CMD="" TYPE="" STATUS="" PAGE="" ARTIFACT_ID="" RAW_PATH="" RAW_DATA=""
 
 [[ $# -eq 0 ]] && { grep '^#' "$0" | sed 's/^# \?//'; exit 0; }
 
@@ -59,12 +58,11 @@ while [[ $# -gt 0 ]]; do
     --health)           CMD=health ;;
     --usage)            CMD=usage ;;
     --seed-knowledge)   CMD=seed_knowledge ;;
+    --reset-knowledge)  CMD=reset_knowledge ;;
     --list-artifacts)   CMD=list_artifacts ;;
     --list-jobs)        CMD=list_jobs ;;
     --list-knowledge)   CMD=list_knowledge ;;
-    --create-knowledge) CMD=create_knowledge ;;
     --rm-artifact)      CMD=rm_artifact;   require "$1" "${2:-}"; ARTIFACT_ID="$2"; shift ;;
-    --rm-knowledge)     CMD=rm_knowledge;  require "$1" "${2:-}"; DOC_ID="$2";      shift ;;
     --get)              CMD=raw_get;       require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
     --post)             CMD=raw_post;      require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
     --patch)            CMD=raw_patch;     require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
@@ -72,8 +70,6 @@ while [[ $# -gt 0 ]]; do
     --type)    require "$1" "${2:-}"; TYPE="$2";    shift ;;
     --status)  require "$1" "${2:-}"; STATUS="$2";  shift ;;
     --page)    require "$1" "${2:-}"; PAGE="$2";    shift ;;
-    --title)   require "$1" "${2:-}"; TITLE="$2";   shift ;;
-    --content) require "$1" "${2:-}"; CONTENT="$2"; shift ;;
     --data)    require "$1" "${2:-}"; RAW_DATA="$2"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -103,23 +99,27 @@ case "$CMD" in
     api GET "${path%[?&]}" ;;
 
   list_knowledge)
-    [[ -z "$TYPE" ]] && { echo "ERROR: --list-knowledge requires --type example|context" >&2; exit 1; }
+    [[ -z "$TYPE" ]] && { echo "ERROR: --list-knowledge requires --type skill|rule|template|example" >&2; exit 1; }
     api GET "/api/v1/knowledge?doc_type=$TYPE" ;;
-
-  rm_knowledge)
-    api DELETE "/internal/knowledge/$DOC_ID" ;;
-
-  create_knowledge)
-    [[ -z "$TYPE" || -z "$TITLE" || -z "$CONTENT" ]] && {
-      echo "ERROR: --create-knowledge requires --type, --title, and --content" >&2; exit 1; }
-    payload=$(python3 -c "
-import json, sys
-print(json.dumps({'doc_type': sys.argv[1], 'title': sys.argv[2], 'content': sys.argv[3]}))" \
-      "$TYPE" "$TITLE" "$CONTENT")
-    api POST /internal/knowledge "$payload" ;;
 
   seed_knowledge)
     api POST /internal/knowledge/seed ;;
+
+  reset_knowledge)
+    $COMPOSE exec -T postgres psql \
+      -U "${POSTGRES_USER:-mathanimate}" \
+      -d "${POSTGRES_DB:-mathanimate}" \
+      -c "DROP TABLE IF EXISTS knowledge_documents;"
+    $COMPOSE restart api
+    for _ in {1..30}; do
+      if api GET /health >/dev/null; then
+        $COMPOSE restart worker
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "ERROR: API health did not recover after resetting knowledge_documents." >&2
+    exit 1 ;;
 
   raw_get)    api GET    "$RAW_PATH" ;;
   raw_post)   api POST   "$RAW_PATH" "$RAW_DATA" ;;
