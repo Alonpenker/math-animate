@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 
 import numpy as np
@@ -16,10 +16,22 @@ class KnowledgeRepository(Repository):
     PRIMARY_KEY = "document_id"
 
     @classmethod
-    def create_document(cls, cursor, document_id: UUID,
-                        content: str, doc_type: str,
-                        title: str, embedding: np.ndarray) -> None:
-        cursor.execute(cls.insert(), (str(document_id), content, doc_type, title, embedding))
+    def create_document(
+        cls,
+        cursor,
+        *,
+        document_id: UUID,
+        doc_type: str,
+        title: str,
+        embedding: np.ndarray,
+        category: str = "",
+        priority: str = "optional",
+        tags: list[str] | None = None,
+    ) -> None:
+        cursor.execute(
+            cls.insert(),
+            (str(document_id), doc_type, priority, title, category, embedding, tags or []),
+        )
 
     @classmethod
     def get_document(cls, cursor, document_id: UUID) -> Optional[KnowledgeDocument]:
@@ -27,27 +39,17 @@ class KnowledgeRepository(Repository):
         row = cursor.fetchone()
         if row is None:
             return None
-        return KnowledgeDocument(
-            document_id=row[KnowledgeDocumentSchema.DOCUMENT_ID.name],
-            content=row[KnowledgeDocumentSchema.CONTENT.name],
-            doc_type=KnowledgeType(row[KnowledgeDocumentSchema.DOC_TYPE.name]),
-            title=row[KnowledgeDocumentSchema.TITLE.name],
-        )
-    
+        return cls._document_from_row(row)
+
     @classmethod
-    def get_documents(cls, cursor, doc_type: str) -> List[KnowledgeDocument]:
+    def get_documents(cls, cursor, doc_type: str) -> list[KnowledgeDocument]:
         cursor.execute(
             cls.get_all_by_field(KnowledgeDocumentSchema.DOC_TYPE.name),
             (doc_type,),
         )
         rows = cursor.fetchall()
         return [
-            KnowledgeDocument(
-                document_id=row[KnowledgeDocumentSchema.DOCUMENT_ID.name],
-                content=row[KnowledgeDocumentSchema.CONTENT.name],
-                doc_type=KnowledgeType(row[KnowledgeDocumentSchema.DOC_TYPE.name]),
-                title=row[KnowledgeDocumentSchema.TITLE.name],
-            )
+            cls._document_from_row(row)
             for row in rows
         ]
 
@@ -63,7 +65,7 @@ class KnowledgeRepository(Repository):
 
     @classmethod
     def search_similar(cls, cursor, embedding: np.ndarray,
-                       doc_type: str, limit: int = 3) -> List[KnowledgeDocument]:
+                       doc_type: str, limit: int = 3) -> list[KnowledgeDocument]:
         cursor.execute(
             cls.search_by_vector(
                 KnowledgeDocumentSchema.EMBEDDING.name,
@@ -73,11 +75,17 @@ class KnowledgeRepository(Repository):
         )
         rows = cursor.fetchall()
         return [
-            KnowledgeDocument(
-                document_id=row[KnowledgeDocumentSchema.DOCUMENT_ID.name],
-                content=row[KnowledgeDocumentSchema.CONTENT.name],
-                doc_type=KnowledgeType(row[KnowledgeDocumentSchema.DOC_TYPE.name]),
-                title=row[KnowledgeDocumentSchema.TITLE.name],
-            )
+            cls._document_from_row(row)
             for row in rows
         ]
+
+    @staticmethod
+    def _document_from_row(row) -> KnowledgeDocument:
+        return KnowledgeDocument(
+            document_id=row[KnowledgeDocumentSchema.DOCUMENT_ID.name],
+            doc_type=KnowledgeType(row[KnowledgeDocumentSchema.DOC_TYPE.name]),
+            title=row[KnowledgeDocumentSchema.TITLE.name],
+            category=row[KnowledgeDocumentSchema.CATEGORY.name],
+            priority=row[KnowledgeDocumentSchema.PRIORITY.name],
+            tags=row[KnowledgeDocumentSchema.TAGS.name] or [],
+        )
