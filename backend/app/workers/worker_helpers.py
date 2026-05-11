@@ -4,6 +4,7 @@ import hashlib
 import ast
 import subprocess
 import shutil
+import re
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PROVIDER
@@ -34,7 +35,7 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
 def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str, operation: WorkerOperation) -> int:
     with get_worker_cursor() as cursor:
         reserved = BudgetService.reserve(
-            cursor, call_id, job_id, stage.value, LLM_PROVIDER, model, prompt_text
+            cursor, call_id, job_id, stage, LLM_PROVIDER, model, prompt_text
         )
     logger.info(WorkerLog(
         operation=operation,
@@ -167,6 +168,19 @@ def extract_traceback(stderr: str) -> str:
     if idx != -1:
         return stderr[idx:]
     return stderr
+
+
+def summarize_verification_failure(failure: str) -> str:
+    lines = [line.strip() for line in failure.strip().splitlines() if line.strip()]
+    if not lines:
+        return failure
+
+    exception_line = re.compile(r"\b[A-Za-z_][\w.]*(?:Error|Exception):")
+    for index in range(len(lines) - 1, -1, -1):
+        if exception_line.search(lines[index]):
+            return " ".join(lines[index:])
+
+    return lines[-1]
 
 
 def dry_run_docker(code_path: Path, media_dir: Path) -> tuple[bool, str, bool]:

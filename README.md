@@ -104,9 +104,9 @@ CREATED
                                       RENDERED   FAILED_RENDER
 ```
 
-1. **Plan generation**: RAG-enriched prompt retrieves similar plan examples from pgvector. LLM drafts structured scenes.
+1. **Plan generation**: the planner prompt turns the teacher request into structured scenes.
 2. **Teacher approval gate**: the plan is surfaced for human review before any code is generated.
-3. **Code generation**: LLM generates Manim Python with RAG-injected code examples.
+3. **Code generation**: LLM generates Manim Python with core Manim guidance and optional skill documents retrieved from the pgvector knowledge index.
 4. **Auto-fix pipeline**: generated code that fails syntax/import verification is automatically patched and re-verified (one retry).
 5. **Isolated render**: Manim executes inside a fresh Docker container: no network, CPU/memory/PID limits.
 6. **Artifact storage**: video, generated code, render logs, and scene plan are all persisted as typed artifacts.
@@ -116,7 +116,7 @@ CREATED
 ## ✨ Key Features
 
 - **Human-in-the-loop approval**: plan review before any code is generated
-- **RAG-augmented generation**: planning and codegen prompts enriched via pgvector similarity search
+- **Skill-guided codegen**: core Manim knowledge is injected directly, with optional rules/templates retrieved via pgvector similarity search and langchain tool
 - **Auto-fix pipeline**: failed verification triggers one LLM-assisted patch before hard failure
 - **Sandboxed rendering**: Manim runs in a network-isolated container; code never executes in the API or worker
 - **Token budget enforcement**: 250K daily cap with pessimistic reservation and per-job ledger tracking
