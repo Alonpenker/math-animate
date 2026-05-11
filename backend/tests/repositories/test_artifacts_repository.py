@@ -1,20 +1,9 @@
-"""
-ArtifactsRepository tests.
-
-Uses FakeSqlCursor to verify that the repository builds correct SQL
-and maps rows to Artifact domain objects correctly.
-"""
 from uuid import uuid4
 
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import Artifact, ArtifactType
 
 from tests.repositories.conftest import FakeSqlCursor
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _make_artifact(job_id=None) -> Artifact:
     return Artifact(
@@ -25,7 +14,6 @@ def _make_artifact(job_id=None) -> Artifact:
         size=512,
         sha256="deadbeef" * 8,
     )
-
 
 def _artifact_row(artifact: Artifact) -> dict:
     return {
@@ -38,11 +26,6 @@ def _artifact_row(artifact: Artifact) -> dict:
         "created_at": None,
         "updated_at": None,
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ArtifactsRepository.create_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_create_artifact_executes_insert_with_correct_field_values():
     # Given
@@ -62,11 +45,6 @@ def test_create_artifact_executes_insert_with_correct_field_values():
     assert artifact.size in params
     assert artifact.sha256 in params
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ArtifactsRepository.get_artifact_by_id
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_get_artifact_by_id_returns_artifact_when_row_exists():
     # Given
     artifact = _make_artifact()
@@ -80,7 +58,6 @@ def test_get_artifact_by_id_returns_artifact_when_row_exists():
     assert result.artifact_id == artifact.artifact_id
     assert result.artifact_type == ArtifactType.PYTHON_FILE
 
-
 def test_get_artifact_by_id_returns_none_when_no_row_found():
     # Given
     cursor = FakeSqlCursor(rows=[])
@@ -90,11 +67,6 @@ def test_get_artifact_by_id_returns_none_when_no_row_found():
 
     # Then
     assert result is None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ArtifactsRepository.get_artifacts
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_artifacts_returns_all_artifacts_belonging_to_job():
     # Given
@@ -112,11 +84,6 @@ def test_get_artifacts_returns_all_artifacts_belonging_to_job():
     assert a1.artifact_id in result_ids
     assert a2.artifact_id in result_ids
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ArtifactsRepository.delete_artifact
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_delete_artifact_returns_true_when_row_was_deleted():
     # Given
     cursor = FakeSqlCursor(rowcount=1)
@@ -127,7 +94,6 @@ def test_delete_artifact_returns_true_when_row_was_deleted():
 
     # Then
     assert result is True
-
 
 def test_delete_artifact_returns_false_when_no_row_was_deleted():
     # Given

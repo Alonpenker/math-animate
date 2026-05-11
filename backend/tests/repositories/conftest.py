@@ -1,24 +1,6 @@
-"""
-Shared fixtures for repository tests.
-
-Provides FakeSqlCursor (a psycopg2 DictCursor double) and FakeRedis
-so repository tests run without any real database or Redis connection.
-"""
 from typing import Any
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SQL cursor double
-# ─────────────────────────────────────────────────────────────────────────────
-
 class FakeSqlCursor:
-    """
-    Minimal psycopg2 DictCursor double.
-
-    Pre-populate `rows` for fetchone / fetchall returns.
-    Set `rowcount` before calling a repository method that checks affected rows.
-    All executed (query, params) pairs are recorded in `queries`.
-    """
 
     def __init__(self, rows: list[dict[str, Any]] | None = None, rowcount: int = 0):
         self.queries: list[tuple[str, Any]] = []
@@ -34,16 +16,7 @@ class FakeSqlCursor:
     def fetchall(self) -> list[dict[str, Any]]:
         return list(self.rows)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Redis double
-# ─────────────────────────────────────────────────────────────────────────────
-
 class FakeRedis:
-    """
-    Minimal Redis double that supports get / set (with optional TTL).
-    Records the TTL passed to `set` so tests can assert on expiry behaviour.
-    """
 
     def __init__(self):
         self._store: dict[str, tuple[bytes, int | None]] = {}
@@ -57,6 +30,5 @@ class FakeRedis:
         return entry[0] if entry is not None else None
 
     def get_ttl(self, key: str) -> int | None:
-        """Return the TTL supplied to `set`, or None if key is unknown."""
         entry = self._store.get(key)
         return entry[1] if entry is not None else None

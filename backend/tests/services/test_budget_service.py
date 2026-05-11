@@ -8,6 +8,7 @@ from app.configs.llm_settings import (
     LLM_CODEGEN_OUTPUT_MAX_TOKENS,
     TOKEN_OUTPUT_BUFFER,
 )
+from app.domain.job_state import JobStatus
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.services.budget_service import BudgetService
 
@@ -48,7 +49,7 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
         cursor=object(),
         call_id=call_id,
         job_id=job_id,
-        stage="planning",
+        stage=JobStatus.PLANNING,
         provider="openai",
         model="gpt-5.2",
         prompt_text="x + 3 = 7",
@@ -64,13 +65,12 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
     kwargs = captured["kwargs"]
     assert kwargs["call_id"] == call_id
     assert kwargs["job_id"] == job_id
-    assert kwargs["stage"] == "planning"
+    assert kwargs["stage"] == JobStatus.PLANNING.value
     assert kwargs["provider"] == "openai"
     assert kwargs["model"] == "gpt-5.2"
     assert kwargs["reserved_tokens"] == reserved_tokens
 
-
-def test_reserve_uses_codegen_output_allowance_for_non_planning_stages(
+def test_reserve_uses_codegen_output_allowance_for_codegen_stage(
     monkeypatch: pytest.MonkeyPatch,
 ):
     # Given
@@ -95,7 +95,7 @@ def test_reserve_uses_codegen_output_allowance_for_non_planning_stages(
     reserved = BudgetService.reserve(
         cursor=object(),
         call_id=uuid4(), job_id=uuid4(),
-        stage="codegen", provider="openai", model="gpt-5.1-codex",
+        stage=JobStatus.CODEGEN, provider="openai", model="gpt-5.1-codex",
         prompt_text="some code prompt",
     )
 
@@ -103,6 +103,42 @@ def test_reserve_uses_codegen_output_allowance_for_non_planning_stages(
     assert reserved == 100 + LLM_CODEGEN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
     assert captured["reserved"] == reserved
 
+def test_reserve_uses_plan_output_allowance_for_fixing_stage(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # Given
+    from app.services import budget_service as budget_module
+
+    captured: dict = {}
+    monkeypatch.setattr(BudgetService, "_count_tokens", staticmethod(lambda text, model: 100))
+    monkeypatch.setattr(
+        budget_module.TokenLedgerRepository, "acquire_daily_lock",
+        staticmethod(lambda cursor: None),
+    )
+    monkeypatch.setattr(
+        budget_module.TokenLedgerRepository, "get_current_total",
+        staticmethod(lambda cursor: 0),
+    )
+    monkeypatch.setattr(
+        budget_module.TokenLedgerRepository, "reserve",
+        staticmethod(lambda cursor, **kwargs: captured.update({"reserved": kwargs["reserved_tokens"]})),
+    )
+
+    # When
+    reserved = BudgetService.reserve(
+        cursor=object(),
+        call_id=uuid4(), job_id=uuid4(),
+        stage=JobStatus.FIXING, provider="openai", model="gpt-5.1-codex",
+        prompt_text="some fix prompt",
+    )
+
+    # Then
+    assert reserved == 100 + LLM_PLAN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
+    assert captured["reserved"] == reserved
+
+def test_reserved_output_tokens_rejects_unknown_stage():
+    with pytest.raises(ValueError, match="Unsupported budget stage"):
+        BudgetService._reserved_output_tokens(JobStatus.RENDERING)
 
 def test_reserve_raises_quota_exceeded_when_daily_limit_reached(
     monkeypatch: pytest.MonkeyPatch,
@@ -131,7 +167,7 @@ def test_reserve_raises_quota_exceeded_when_daily_limit_reached(
         BudgetService.reserve(
             cursor=object(),
             call_id=uuid4(), job_id=uuid4(),
-            stage="planning", provider="openai", model="gpt-5.2",
+            stage=JobStatus.PLANNING, provider="openai", model="gpt-5.2",
             prompt_text="example prompt",
         )
 

@@ -1,12 +1,3 @@
-"""
-Worker pipeline tests.
-
-Covers three groups:
-  1. Utility functions (verify_code, extract_traceback, dry_run_docker) —
-     pure unit tests, no DB/storage/Celery mocks needed.
-  2. Celery task functions (generate_plan, generate_code, verify_code_task,
-     fix_code, generate_render) — use the mock_worker_* fixture family.
-"""
 import hashlib
 import subprocess
 from pathlib import Path
@@ -21,13 +12,7 @@ from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.jobs import Job, JobCodeRequest, JobFixRequest, JobPlanRequest, JobRequest, JobUserRequest
 from app.schemas.plan import Plan
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers shared across verify_code / dry_run_docker tests
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _patch_mypy_pass(monkeypatch):
-    """Make subprocess.run report mypy success (returncode 0)."""
     from app.workers import worker_helpers
 
     monkeypatch.setattr(
@@ -36,12 +21,7 @@ def _patch_mypy_pass(monkeypatch):
         lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(cmd, 0, "", ""),
     )
 
-
 def _setup_dry_run_env(monkeypatch, tmp_path):
-    """
-    Create minimal filesystem state and return (code_path, media_dir) for
-    dry_run_docker tests.
-    """
     from app.workers import worker_helpers
 
     render_root = tmp_path / "render_root"
@@ -57,11 +37,6 @@ def _setup_dry_run_env(monkeypatch, tmp_path):
     media_dir.mkdir(parents=True, exist_ok=True)
 
     return code_path, media_dir
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# verify_code — static analysis of generated Manim code
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_verify_code_passes_valid_manim_code(monkeypatch):
     # Given
@@ -79,7 +54,6 @@ def test_verify_code_passes_valid_manim_code(monkeypatch):
 
     # Then
     assert failure is None
-
 
 def test_verify_code_fails_when_mypy_reports_errors(monkeypatch):
     # Given
@@ -102,7 +76,6 @@ def test_verify_code_fails_when_mypy_reports_errors(monkeypatch):
     assert failure is not None
     assert "mypy errors" in failure
 
-
 def test_verify_code_fails_on_forbidden_import_os(monkeypatch):
     # Given
     from app.workers.worker_helpers import verify_code
@@ -115,7 +88,6 @@ def test_verify_code_fails_on_forbidden_import_os(monkeypatch):
     # Then
     assert failure is not None
     assert "os" in failure
-
 
 def test_verify_code_fails_on_from_import_of_forbidden_module(monkeypatch):
     # Given
@@ -130,7 +102,6 @@ def test_verify_code_fails_on_from_import_of_forbidden_module(monkeypatch):
     assert failure is not None
     assert "subprocess" in failure
 
-
 def test_verify_code_fails_on_dangerous_builtin_exec(monkeypatch):
     # Given
     from app.workers.worker_helpers import verify_code
@@ -143,7 +114,6 @@ def test_verify_code_fails_on_dangerous_builtin_exec(monkeypatch):
     # Then
     assert failure is not None
     assert "exec" in failure
-
 
 def test_verify_code_fails_on_dangerous_builtin_eval(monkeypatch):
     # Given
@@ -158,7 +128,6 @@ def test_verify_code_fails_on_dangerous_builtin_eval(monkeypatch):
     assert failure is not None
     assert "eval" in failure
 
-
 def test_verify_code_fails_on_syntax_error(monkeypatch):
     # Given
     from app.workers.worker_helpers import verify_code
@@ -171,7 +140,6 @@ def test_verify_code_fails_on_syntax_error(monkeypatch):
     # Then
     assert failure is not None
     assert "syntax error" in failure.lower()
-
 
 def test_verify_code_allows_all_permitted_imports(monkeypatch):
     # Given
@@ -188,7 +156,6 @@ def test_verify_code_allows_all_permitted_imports(monkeypatch):
     # Then
     assert failure is None
 
-
 def test_verify_code_reports_all_forbidden_modules_in_single_message(monkeypatch):
     # Given
     from app.workers.worker_helpers import verify_code
@@ -202,11 +169,6 @@ def test_verify_code_reports_all_forbidden_modules_in_single_message(monkeypatch
     assert failure is not None
     assert "os" in failure
     assert "sys" in failure
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# extract_traceback — isolates Python traceback from noisy stderr
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_extract_traceback_returns_from_marker_to_end():
     # Given
@@ -227,7 +189,6 @@ def test_extract_traceback_returns_from_marker_to_end():
     assert "IndexError" in result
     assert "INFO manim starting" not in result
 
-
 def test_extract_traceback_returns_full_string_when_no_traceback_marker_present():
     # Given
     from app.workers.worker_helpers import extract_traceback
@@ -239,7 +200,6 @@ def test_extract_traceback_returns_full_string_when_no_traceback_marker_present(
     # Then
     assert result == stderr
 
-
 def test_extract_traceback_handles_empty_string():
     # Given
     from app.workers.worker_helpers import extract_traceback
@@ -249,11 +209,6 @@ def test_extract_traceback_handles_empty_string():
 
     # Then
     assert result == ""
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# dry_run_docker — runs Manim --dry_run in a subprocess
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_dry_run_docker_passes_when_subprocess_exits_zero(monkeypatch, tmp_path):
     # Given
@@ -272,7 +227,6 @@ def test_dry_run_docker_passes_when_subprocess_exits_zero(monkeypatch, tmp_path)
     assert passed is True
     assert error == ""
     assert is_fixable is True
-
 
 def test_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp_path):
     # Given
@@ -295,7 +249,6 @@ def test_dry_run_docker_command_includes_manim_dry_run_flag(monkeypatch, tmp_pat
     cmd = captured_commands[0]
     assert "manim" in cmd
     assert "--dry_run" in cmd
-
 
 def test_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monkeypatch, tmp_path):
     # Given
@@ -326,7 +279,6 @@ def test_dry_run_docker_extracts_traceback_from_stderr_on_nonzero_exit(monkeypat
     assert "some stdout" not in error
     assert is_fixable is True
 
-
 def test_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeypatch, tmp_path):
     # Given
     from app.workers import worker_helpers
@@ -346,7 +298,6 @@ def test_dry_run_docker_returns_full_stderr_when_no_traceback_marker(monkeypatch
     assert passed is False
     assert error == "plain error message"
     assert is_fixable is True
-
 
 def test_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path):
     # Given
@@ -368,11 +319,6 @@ def test_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path
     assert passed is False
     assert "Dry-run timed out after 90s." in error
     assert is_fixable is False
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# generate_plan
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_generate_plan_transitions_to_planned_and_persists_plan(
     mock_repositories,
@@ -399,7 +345,6 @@ def test_generate_plan_transitions_to_planned_and_persists_plan(
         (job.job_id, JobStatus.PLANNING),
         (job.job_id, JobStatus.PLANNED),
     ]
-
 
 def test_generate_plan_sets_failed_planning_and_reraises_on_llm_error(
     monkeypatch,
@@ -432,7 +377,6 @@ def test_generate_plan_sets_failed_planning_and_reraises_on_llm_error(
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_PLANNING
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_PLANNING)
 
-
 def test_generate_plan_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     monkeypatch,
     mock_repositories,
@@ -462,7 +406,6 @@ def test_generate_plan_sets_failed_quota_exceeded_and_reraises_on_quota_error(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
-
 
 def test_generate_plan_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     monkeypatch,
@@ -497,11 +440,6 @@ def test_generate_plan_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# generate_code
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_generate_code_transitions_to_coded_and_enqueues_verify(
     monkeypatch,
     mock_repositories,
@@ -516,7 +454,7 @@ def test_generate_code_transitions_to_coded_and_enqueues_verify(
 
     enqueued = []
     monkeypatch.setattr(
-        worker_module.verify_code_task, "delay", lambda payload: enqueued.append(payload)
+        worker_module.verify_code, "delay", lambda payload: enqueued.append(payload)
     )
 
     job = Job(status=JobStatus.APPROVED)
@@ -534,8 +472,7 @@ def test_generate_code_transitions_to_coded_and_enqueues_verify(
     ]
     assert len(enqueued) == 1
     assert enqueued[0]["job"]["job_id"] == str(job.job_id)
-    assert enqueued[0]["is_retry"] is False
-
+    assert enqueued[0]["fix_attempt"] == 0
 
 def test_generate_code_sets_failed_codegen_and_reraises_on_llm_error(
     monkeypatch,
@@ -550,11 +487,11 @@ def test_generate_code_sets_failed_codegen_and_reraises_on_llm_error(
 
     monkeypatch.setattr(
         worker_module.LLMService, "render_codegen_prompt",
-        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query", [])),
     )
     monkeypatch.setattr(
         worker_module.LLMService, "codegen_call",
-        staticmethod(lambda sp, uq: (_ for _ in ()).throw(RuntimeError("codegen failed"))),
+        staticmethod(lambda sp, uq, tools=None: (_ for _ in ()).throw(RuntimeError("codegen failed"))),
     )
 
     job = Job(status=JobStatus.APPROVED)
@@ -566,7 +503,6 @@ def test_generate_code_sets_failed_codegen_and_reraises_on_llm_error(
         worker_module.generate_code(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_CODEGEN
-
 
 def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     monkeypatch,
@@ -580,7 +516,7 @@ def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
 
     monkeypatch.setattr(
         worker_module.LLMService, "render_codegen_prompt",
-        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query", [])),
     )
     monkeypatch.setattr(
         worker_module, "reserve_budget",
@@ -598,7 +534,6 @@ def test_generate_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
 
-
 def test_generate_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     monkeypatch,
     mock_repositories,
@@ -612,11 +547,11 @@ def test_generate_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
 
     monkeypatch.setattr(
         worker_module.LLMService, "render_codegen_prompt",
-        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query", [])),
     )
     monkeypatch.setattr(
         worker_module.LLMService, "codegen_call",
-        staticmethod(lambda sp, uq: (_ for _ in ()).throw(
+        staticmethod(lambda sp, uq, tools=None: (_ for _ in ()).throw(
             LLMUsageException("reasoning limit reached", total_tokens=456)
         )),
     )
@@ -631,11 +566,6 @@ def test_generate_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# verify_code_task
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_verify_code_task_saves_artifact_and_enqueues_render_on_success(
     monkeypatch,
@@ -667,11 +597,10 @@ def test_verify_code_task_saves_artifact_and_enqueues_render_on_success(
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.CODED),
         code=code,
-        is_retry=False,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.VERIFIED
@@ -686,7 +615,6 @@ def test_verify_code_task_saves_artifact_and_enqueues_render_on_success(
     assert len(python_artifacts) == 1
     assert len(test_store["render_delay_payloads"]) == 1
     assert test_store["render_delay_payloads"][0]["job"]["job_id"] == str(job.job_id)
-
 
 def test_verify_code_task_enqueues_fix_on_first_dry_run_failure(
     monkeypatch,
@@ -719,19 +647,55 @@ def test_verify_code_task_enqueues_fix_on_first_dry_run_failure(
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.CODED),
         code="from manim import *\n",
-        is_retry=False,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
     assert len(enqueued_fix) == 1
     assert "IndexError" in enqueued_fix[0]["error_context"]
+    assert enqueued_fix[0]["fix_attempt"] == 1
 
+def test_verify_code_task_enqueues_fix_on_second_dry_run_failure(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_paths,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
 
-def test_verify_code_task_sets_failed_verification_on_second_dry_run_failure(
+    monkeypatch.setattr(worker_helpers, "verify_code", lambda code, code_path: None)
+    monkeypatch.setattr(
+        worker_module, "dry_run_docker",
+        lambda code_path, media_dir: (False, "Traceback: IndexError", True),
+    )
+    enqueued_fix = []
+    monkeypatch.setattr(
+        worker_module.fix_code, "delay", lambda payload: enqueued_fix.append(payload)
+    )
+
+    job = Job(status=JobStatus.FIXING)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.FIXING),
+        code="from manim import *\n",
+        fix_attempt=1,
+    ).model_dump(mode="json")
+
+    # When
+    worker_module.verify_code(payload)
+
+    # Then
+    assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
+    assert len(enqueued_fix) == 1
+    assert enqueued_fix[0]["fix_attempt"] == 2
+
+def test_verify_code_task_sets_failed_verification_when_fix_attempts_exhausted(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -753,15 +717,45 @@ def test_verify_code_task_sets_failed_verification_on_second_dry_run_failure(
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.FIXING),
         code="from manim import *\n",
-        is_retry=True,
+        fix_attempt=worker_module.MAX_FIX_ATTEMPTS,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
 
+def test_verify_code_task_respects_zero_max_fix_attempts(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_worker_paths,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+    from app.workers import worker_helpers
+
+    monkeypatch.setattr(worker_module, "MAX_FIX_ATTEMPTS", 0)
+    monkeypatch.setattr(
+        worker_helpers,
+        "verify_code",
+        lambda code, code_path: "mypy errors: bad type",
+    )
+
+    job = Job(status=JobStatus.CODED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobCodeRequest(
+        job=Job(job_id=job.job_id, status=JobStatus.CODED),
+        code="from manim import *\n",
+    ).model_dump(mode="json")
+
+    # When
+    worker_module.verify_code(payload)
+
+    # Then
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
 
 def test_verify_code_task_enqueues_fix_on_first_static_analysis_failure(
     monkeypatch,
@@ -789,19 +783,18 @@ def test_verify_code_task_enqueues_fix_on_first_static_analysis_failure(
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.CODED),
         code="import os\nfrom manim import *\n",
-        is_retry=False,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
     assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
     assert len(enqueued_fix) == 1
     assert "Forbidden imports" in enqueued_fix[0]["error_context"]
+    assert enqueued_fix[0]["fix_attempt"] == 1
 
-
-def test_verify_code_task_sets_failed_verification_on_second_static_failure(
+def test_verify_code_task_enqueues_fix_on_second_static_failure(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -816,21 +809,26 @@ def test_verify_code_task_sets_failed_verification_on_second_static_failure(
         worker_helpers, "verify_code",
         lambda code, code_path: "mypy errors: bad type",
     )
+    enqueued_fix = []
+    monkeypatch.setattr(
+        worker_module.fix_code, "delay", lambda payload: enqueued_fix.append(payload)
+    )
 
     job = Job(status=JobStatus.FIXING)
     test_store["jobs"][job.job_id] = job
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.FIXING),
         code="from manim import *\n",
-        is_retry=True,
+        fix_attempt=1,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
-    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
-
+    assert test_store["jobs"][job.job_id].status == JobStatus.FIXING
+    assert len(enqueued_fix) == 1
+    assert enqueued_fix[0]["fix_attempt"] == 2
 
 def test_verify_code_task_does_not_persist_artifact_when_verification_fails(
     monkeypatch,
@@ -854,22 +852,16 @@ def test_verify_code_task_does_not_persist_artifact_when_verification_fails(
     payload = JobCodeRequest(
         job=Job(job_id=job.job_id, status=JobStatus.CODED),
         code="from manim import *\n",
-        is_retry=False,
     ).model_dump(mode="json")
 
     # When
-    worker_module.verify_code_task(payload)
+    worker_module.verify_code(payload)
 
     # Then
     job_artifacts = [a for a in test_store["artifacts"].values() if a.job_id == job.job_id]
     assert len(job_artifacts) == 0, "Failed verification must not persist any artifact"
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# fix_code
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_fix_code_enqueues_re_verify_with_retry_flag_on_success(
+def test_fix_code_enqueues_re_verify_with_fix_attempt_on_success(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
@@ -896,7 +888,7 @@ def test_fix_code_enqueues_re_verify_with_retry_flag_on_success(
 
     enqueued_verify = []
     monkeypatch.setattr(
-        worker_module.verify_code_task, "delay", lambda payload: enqueued_verify.append(payload)
+        worker_module.verify_code, "delay", lambda payload: enqueued_verify.append(payload)
     )
 
     job = Job(status=JobStatus.FIXING)
@@ -905,6 +897,7 @@ def test_fix_code_enqueues_re_verify_with_retry_flag_on_success(
         job=Job(job_id=job.job_id, status=JobStatus.FIXING),
         code="from manim import *\n",
         error_context="IndexError: list index out of range",
+        fix_attempt=2,
     ).model_dump(mode="json")
 
     # When
@@ -912,10 +905,9 @@ def test_fix_code_enqueues_re_verify_with_retry_flag_on_success(
 
     # Then
     assert len(enqueued_verify) == 1
-    assert enqueued_verify[0]["is_retry"] is True
+    assert enqueued_verify[0]["fix_attempt"] == 2
     assert enqueued_verify[0]["job"]["status"] == JobStatus.FIXING.value
     assert enqueued_verify[0]["code"] == fixed_code
-
 
 def test_fix_code_sets_failed_verification_and_reraises_on_llm_error(
     monkeypatch,
@@ -950,7 +942,6 @@ def test_fix_code_sets_failed_verification_and_reraises_on_llm_error(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_VERIFICATION
 
-
 def test_fix_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
     monkeypatch,
     mock_repositories,
@@ -983,7 +974,6 @@ def test_fix_code_sets_failed_quota_exceeded_and_reraises_on_quota_error(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
-
 
 def test_fix_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     monkeypatch,
@@ -1021,13 +1011,7 @@ def test_fix_code_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# generate_render — helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _make_render_payload(job, sample_video_plan, test_store):
-    """Populate test_store with plan + code artifact, return serialised JobRequest."""
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id, plan=sample_video_plan, approved=True
     )
@@ -1049,11 +1033,6 @@ def _make_render_payload(job, sample_video_plan, test_store):
     )
     test_store["artifacts"][code_artifact.artifact_id] = code_artifact
     return JobRequest(job=job).model_dump(mode="json")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# generate_render
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_generate_render_invokes_docker_and_persists_mp4_and_log_artifacts(
     monkeypatch,
@@ -1111,14 +1090,12 @@ def test_generate_render_invokes_docker_and_persists_mp4_and_log_artifacts(
     assert len(log_artifacts) == 2
     assert {Path(a.path).name for a in log_artifacts} == {"render_stdout.log", "render_stderr.log"}
 
-    # Docker security constraints enforced
     cmd = test_store["subprocess_commands"][0]
     assert "--network" in cmd and "none" in cmd
     assert "--cpus" in cmd
     assert "--memory" in cmd
     assert "--pids-limit" in cmd
     assert "--security-opt" in cmd and "no-new-privileges" in cmd
-
 
 def test_generate_render_sets_failed_render_and_stores_logs_on_docker_nonzero_exit(
     monkeypatch,
@@ -1154,7 +1131,6 @@ def test_generate_render_sets_failed_render_and_stores_logs_on_docker_nonzero_ex
     ]
     assert len(log_artifacts) == 2
 
-
 def test_generate_render_sets_failed_render_on_subprocess_timeout(
     monkeypatch,
     mock_repositories,
@@ -1184,7 +1160,6 @@ def test_generate_render_sets_failed_render_on_subprocess_timeout(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_RENDER
 
-
 def test_generate_render_sets_failed_render_when_plan_is_missing(
     monkeypatch,
     mock_repositories,
@@ -1198,7 +1173,6 @@ def test_generate_render_sets_failed_render_when_plan_is_missing(
 
     job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
-    # Deliberately no plan in test_store
     payload = JobRequest(job=job).model_dump(mode="json")
 
     # When / Then
@@ -1206,7 +1180,6 @@ def test_generate_render_sets_failed_render_when_plan_is_missing(
         worker_module.generate_render(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_RENDER
-
 
 def test_generate_render_sets_failed_render_when_python_artifact_is_missing(
     monkeypatch,
@@ -1225,7 +1198,6 @@ def test_generate_render_sets_failed_render_when_python_artifact_is_missing(
     test_store["plans"][job.job_id] = Plan(
         job_id=job.job_id, plan=sample_video_plan, approved=True
     )
-    # Deliberately no artifacts
     payload = JobRequest(job=job).model_dump(mode="json")
 
     # When / Then
@@ -1233,7 +1205,6 @@ def test_generate_render_sets_failed_render_when_python_artifact_is_missing(
         worker_module.generate_render(payload)
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_RENDER
-
 
 def test_generate_render_succeeds_even_when_log_storage_raises(
     monkeypatch,

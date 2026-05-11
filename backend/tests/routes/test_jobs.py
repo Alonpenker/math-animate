@@ -7,11 +7,6 @@ from app.domain.job_state import JobStatus
 from app.schemas.jobs import Job
 from app.schemas.plan import Plan
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# create_job
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_create_job_persists_created_status_and_enqueues_worker(
     jobs_routes_with_runner_mock,
     sample_user_request,
@@ -35,11 +30,6 @@ def test_create_job_persists_created_status_and_enqueues_worker(
     assert runner_call.job.job_id == response.job.job_id
     assert runner_call.user_request.topic == sample_user_request.topic
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# get_job_status
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_get_job_status_returns_current_status(
     jobs_routes_with_runner_mock,
     fake_cursor,
@@ -59,7 +49,6 @@ def test_get_job_status_returns_current_status(
     assert response.job.job_id == job.job_id
     assert response.job.status == JobStatus.PLANNED
 
-
 def test_get_job_status_raises_404_when_job_does_not_exist(
     jobs_routes_with_runner_mock,
     fake_cursor,
@@ -74,11 +63,6 @@ def test_get_job_status_raises_404_when_job_does_not_exist(
 
     assert exc_info.value.status_code == 404
     assert "Job not found" in exc_info.value.detail
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# get_plan
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_plan_returns_job_and_plan_data(
     jobs_routes_with_runner_mock,
@@ -103,7 +87,6 @@ def test_get_plan_returns_job_and_plan_data(
     assert response.job.status == JobStatus.PLANNED
     assert response.data.job_id == job.job_id
 
-
 def test_get_plan_raises_404_when_plan_not_yet_created(
     jobs_routes_with_runner_mock,
     fake_cursor,
@@ -112,7 +95,6 @@ def test_get_plan_raises_404_when_plan_not_yet_created(
     # Given
     job = Job(status=JobStatus.PLANNED)
     test_store["jobs"][job.job_id] = job
-    # No plan in test_store
 
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
@@ -122,11 +104,6 @@ def test_get_plan_raises_404_when_plan_not_yet_created(
 
     assert exc_info.value.status_code == 404
     assert "Plan not found" in exc_info.value.detail
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# approve_plan
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_approve_plan_with_true_updates_status_and_enqueues_worker(
     jobs_routes_with_runner_mock,
@@ -155,7 +132,6 @@ def test_approve_plan_with_true_updates_status_and_enqueues_worker(
     assert runner_call.job.status == JobStatus.APPROVED
     assert len(runner_call.plan.scenes) == len(sample_video_plan.scenes)
 
-
 def test_approve_plan_with_false_cancels_job_without_enqueuing_worker(
     jobs_routes_with_runner_mock,
     fake_cursor,
@@ -178,7 +154,6 @@ def test_approve_plan_with_false_cancels_job_without_enqueuing_worker(
     assert response.job.status == JobStatus.CANCELLED
     assert test_store["jobs"][job.job_id].status == JobStatus.CANCELLED
     assert test_store["worker_runner_calls"] == []
-
 
 def test_approve_plan_raises_409_when_job_is_not_in_planned_state(
     jobs_routes_with_runner_mock,
