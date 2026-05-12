@@ -21,6 +21,15 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/SKILL.md",
     ),
     KnowledgeDocumentSeed(
+        document_id=UUID("4ea2e34e-32c1-58ae-9060-8ae705d0eb3c"),
+        doc_type=KnowledgeType.RULE,
+        priority="core",
+        title="Layout Composition",
+        category="rules",
+        tags=["layout", "composition", "frame", "positioning", "readability"],
+        path="manim_skill/rules/layout-composition.md",
+    ),
+    KnowledgeDocumentSeed(
         document_id=UUID("bd9bb577-81f5-5ce1-969d-5a864f43c62e"),
         doc_type=KnowledgeType.RULE,
         priority="recommended",
