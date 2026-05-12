@@ -35,7 +35,16 @@ export function AboutPage() {
           </SectionText>
         </InfoSection>
         
-        <InfoSection title="The Codegen Prompt">
+        <InfoSection title="LLM Intelligence Layer">
+          <SectionText>
+            MathAnimate does more than send a generic prompt to an LLM. Planning
+            first turns the teacher request into a scene-by-scene storyboard;
+            code generation then combines the base prompt with core Manim skill
+            guidance and retrieves the most relevant rule or template documents
+            for that specific plan. The model can load those documents by title
+            while writing code, so each animation is guided by focused Manim best
+            practices instead of a one-size-fits-all prompt.
+          </SectionText>
           {isLoading ? (
             <SkeletonPromptView />
           ) : isError || !data ? (
