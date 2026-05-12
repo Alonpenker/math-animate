@@ -1,17 +1,6 @@
-"""
-DB dependency tests.
-
-Verifies get_cursor lifecycle: vector registration, commit/rollback, and
-connection pool return on both success and failure paths.
-"""
 import pytest
 
 from app.dependencies import db as db_module
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 class FakeCursor:
     def __init__(self) -> None:
@@ -23,7 +12,6 @@ class FakeCursor:
 
     def close(self) -> None:
         self.closed = True
-
 
 class FakeConnection:
     def __init__(self) -> None:
@@ -42,7 +30,6 @@ class FakeConnection:
     def rollback(self) -> None:
         self.rollback_calls += 1
 
-
 class FakePool:
     def __init__(self, conn: FakeConnection) -> None:
         self._conn = conn
@@ -55,11 +42,6 @@ class FakePool:
 
     def putconn(self, conn: FakeConnection, close: bool = False) -> None:
         self.putconn_calls.append((conn, close))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# get_cursor — success path
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_cursor_registers_vector_commits_and_returns_connection_to_pool(
     monkeypatch: pytest.MonkeyPatch,
@@ -84,7 +66,6 @@ def test_get_cursor_registers_vector_commits_and_returns_connection_to_pool(
     assert conn.commit_calls == 1
     assert conn.rollback_calls == 0
     assert pool.putconn_calls == [(conn, False)]
-
 
 def test_get_cursor_registers_vector_on_each_successive_checkout(
     monkeypatch: pytest.MonkeyPatch,
@@ -112,11 +93,6 @@ def test_get_cursor_registers_vector_on_each_successive_checkout(
     assert register_calls == [conn, conn]
     assert conn.commit_calls == 2
     assert pool.putconn_calls == [(conn, False), (conn, False)]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# get_cursor — failure path
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_cursor_returns_connection_to_pool_with_close_flag_when_registration_fails(
     monkeypatch: pytest.MonkeyPatch,

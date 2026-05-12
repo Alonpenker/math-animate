@@ -1,31 +1,11 @@
-"""
-Worker-level fixtures.
-
-Depends on root conftest for: test_store, fake_cursor, mock_repositories,
-sample_user_request, sample_video_plan.
-"""
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DATABASE + REDIS CONTEXT MANAGERS
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> None:
-    """
-    Provides fake context managers for get_worker_cursor and get_worker_redis
-    in both worker.py and worker_helpers.py.
-
-    - get_worker_cursor: yields fake_cursor (used for budget/DB calls)
-    - get_worker_redis: yields an object() placeholder (used for JobsRepository
-      calls, which are already patched by mock_repositories to ignore the client)
-    - current_task is set to None to prevent Celery context access in log_context()
-    """
     from app.workers import worker as worker_module
     from app.workers import worker_helpers
 
@@ -41,17 +21,8 @@ def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> 
     monkeypatch.setattr(worker_helpers, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_redis", fake_redis_ctx)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FILESYSTEM PATHS
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_worker_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    """
-    Redirects ARTIFACTS_FOLDER and TMP_RENDER_FOLDER to isolated temp directories
-    so worker tasks never touch the real filesystem.
-    """
     from app.workers import worker as worker_module
 
     artifacts_root = tmp_path / "job_artifacts"
@@ -63,17 +34,8 @@ def mock_worker_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setattr(worker_module.PathNames, "TMP_RENDER_FOLDER", str(render_root))
     return {"artifacts_root": artifacts_root, "render_root": render_root}
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# STORAGE
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_worker_storage(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any]) -> None:
-    """
-    Replaces FilesStorageService in worker_helpers with an in-memory store.
-    Files are saved as bytes in test_store["objects"] keyed by object_name.
-    """
     from app.workers import worker_helpers
 
     class FakeStorageService:
@@ -94,18 +56,8 @@ def mock_worker_storage(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, A
     monkeypatch.setattr(worker_helpers, "FilesStorageService", FakeStorageService)
     monkeypatch.setattr(worker_helpers, "get_storage_client", lambda: object())
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# LLM
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_worker_llm(monkeypatch: pytest.MonkeyPatch, sample_video_plan) -> None:
-    """
-    Stubs all LLMService prompt-building and inference methods so no real API
-    calls are made.  plan_call returns sample_video_plan; codegen_call returns
-    minimal valid Manim code.
-    """
     from app.workers import worker as worker_module
 
     fake_code = (
@@ -121,7 +73,7 @@ def mock_worker_llm(monkeypatch: pytest.MonkeyPatch, sample_video_plan) -> None:
     )
     monkeypatch.setattr(
         worker_module.LLMService, "render_codegen_prompt",
-        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query")),
+        staticmethod(lambda plan: ("fake-system-prompt", "fake-user-query", [])),
     )
     monkeypatch.setattr(
         worker_module.LLMService, "plan_call",
@@ -129,20 +81,11 @@ def mock_worker_llm(monkeypatch: pytest.MonkeyPatch, sample_video_plan) -> None:
     )
     monkeypatch.setattr(
         worker_module.LLMService, "codegen_call",
-        staticmethod(lambda system_prompt, user_query: (fake_code, 200)),
+        staticmethod(lambda system_prompt, user_query, tools=None: (fake_code, 200)),
     )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BUDGET
-# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_worker_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    """
-    Stubs BudgetService so worker tasks bypass real token budget enforcement.
-    reserve() always returns 1000; reconcile and release_on_error are no-ops.
-    """
     from app.workers import worker_helpers
 
     monkeypatch.setattr(
@@ -158,17 +101,8 @@ def mock_worker_budget(monkeypatch: pytest.MonkeyPatch) -> None:
         staticmethod(lambda cursor, call_id, reserved_tokens: None),
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CELERY TASK DELAYS
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def capture_render_delay(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any]) -> None:
-    """
-    Intercepts generate_render.delay() and records its payload in
-    test_store["render_delay_payloads"] instead of enqueuing a real Celery task.
-    """
     from app.workers import worker as worker_module
 
     monkeypatch.setattr(

@@ -16,11 +16,11 @@ interface LessonVideosTabProps {
 
 function LessonVideosSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, minmax(16rem, 1fr))' }}>
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={index}
-          className="rounded-lg p-6"
+          className="min-h-44 rounded-lg p-6"
           style={{ border: '2px solid rgba(245,240,232,0.25)' }}
         >
           <Skeleton className="mx-auto h-4 w-24" style={{ background: 'rgba(245,240,232,0.1)' }} />
@@ -79,18 +79,18 @@ export function LessonVideosTab({
         Select a scene to watch:
       </p>
       <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${Math.min(scenes.length, 3)}, 1fr)` }}
+        className="grid min-w-0 gap-4"
+        style={{ gridTemplateColumns: `repeat(${Math.min(scenes.length, 3)}, minmax(16rem, 1fr))` }}
       >
         {scenes.map((scene) => (
           <button
             key={scene.artifactId}
             type="button"
             onClick={() => onSelectScene(scene)}
-            className="group flex cursor-pointer flex-col items-center rounded-lg p-6 transition-all hover:bg-white/5"
+            className="group flex min-h-44 min-w-0 cursor-pointer flex-col items-center justify-center rounded-lg p-6 text-center transition-all hover:bg-white/5"
             style={{ border: '2px solid rgba(245,240,232,0.25)' }}
           >
-            <p className="mb-4 text-sm text-off-white">
+            <p className="mb-4 w-full min-w-0 text-sm font-medium leading-snug text-off-white" style={{ overflowWrap: 'break-word' }}>
               {scene.displayName}
             </p>
             <span

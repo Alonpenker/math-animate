@@ -1,24 +1,9 @@
-"""
-Route-level fixtures.
-
-Depends on root conftest for: test_store, fake_cursor, mock_repositories,
-sample_user_request, sample_video_plan.
-"""
 from typing import Any
 
 import pytest
 
-# Disable slowapi rate-limiting before any route module is imported.
-# Route functions lack `request: Request` (they're called directly in tests,
-# not through FastAPI's routing layer), so slowapi's signature check would
-# raise at decoration time. This no-op makes `@limiter.limit(...)` transparent.
 from app.dependencies.limiter import limiter as _limiter
 _limiter.limit = lambda *args, **kwargs: (lambda f: f)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JOBS ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def jobs_routes_with_runner_mock(
@@ -26,11 +11,6 @@ def jobs_routes_with_runner_mock(
     mock_repositories: None,
     test_store: dict[str, Any],
 ):
-    """
-    Returns the jobs routes module with:
-    - All repository methods replaced by test_store equivalents (via mock_repositories).
-    - WorkerRunner.advance replaced by a recorder that appends to test_store.
-    """
     from app.routes import jobs as jobs_routes
 
     monkeypatch.setattr(
@@ -40,17 +20,8 @@ def jobs_routes_with_runner_mock(
     )
     return jobs_routes
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ARTIFACTS ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_storage_service(test_store: dict[str, Any]):
-    """
-    In-memory MinIO replacement.
-    Reads/writes objects to test_store["objects"] keyed by object_name.
-    """
     from io import BytesIO
     from pathlib import Path
 
@@ -86,29 +57,17 @@ def mock_storage_service(test_store: dict[str, Any]):
 
     return FakeFilesStorageService()
 
-
 @pytest.fixture
 def artifacts_routes_with_mocks(
     mock_repositories: None,
     mock_storage_service,
 ):
-    """
-    Returns the artifacts routes module with repository and storage mocked.
-    mock_storage_service is injected directly into route calls via the
-    `storage=` parameter.
-    """
     from app.routes import artifacts as artifacts_routes
 
     return artifacts_routes
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KNOWLEDGE ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_rag_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patches RAGService.embed_text to return a zero vector (avoids Ollama calls)."""
     import numpy as np
     from app.services import rag_service as rag_module
 
@@ -118,24 +77,25 @@ def mock_rag_service(monkeypatch: pytest.MonkeyPatch) -> None:
         staticmethod(lambda text: np.zeros(768, dtype=np.float32)),
     )
 
-
 @pytest.fixture
 def mock_knowledge_repository(
     monkeypatch: pytest.MonkeyPatch,
     test_store: dict[str, Any],
 ) -> None:
-    """Replaces KnowledgeRepository SQL methods with in-memory equivalents."""
     from app.repositories.knowledge_repository import KnowledgeRepository
     from app.schemas.knowledge import KnowledgeDocument, KnowledgeDocumentSchema, KnowledgeType
 
     S = KnowledgeDocumentSchema
 
-    def create_document(_cursor, document_id, content, doc_type, title, embedding):
+    def create_document(_cursor, *, document_id, doc_type, title, embedding,
+                        category="", priority="optional", tags=None):
         test_store["knowledge"][document_id] = {
             S.DOCUMENT_ID.name: document_id,
-            S.CONTENT.name: content,
             S.DOC_TYPE.name: doc_type,
             S.TITLE.name: title,
+            S.CATEGORY.name: category,
+            S.PRIORITY.name: priority,
+            S.TAGS.name: tags or [],
         }
 
     def get_document(_cursor, document_id):
@@ -144,9 +104,11 @@ def mock_knowledge_repository(
             return None
         return KnowledgeDocument(
             document_id=row[S.DOCUMENT_ID.name],
-            content=row[S.CONTENT.name],
             doc_type=KnowledgeType(row[S.DOC_TYPE.name]),
             title=row[S.TITLE.name],
+            category=row[S.CATEGORY.name],
+            priority=row[S.PRIORITY.name],
+            tags=row[S.TAGS.name] or [],
         )
 
     def delete_document(_cursor, document_id):
@@ -156,9 +118,11 @@ def mock_knowledge_repository(
         return [
             KnowledgeDocument(
                 document_id=row[S.DOCUMENT_ID.name],
-                content=row[S.CONTENT.name],
                 doc_type=KnowledgeType(row[S.DOC_TYPE.name]),
                 title=row[S.TITLE.name],
+                category=row[S.CATEGORY.name],
+                priority=row[S.PRIORITY.name],
+                tags=row[S.TAGS.name] or [],
             )
             for row in test_store["knowledge"].values()
             if row[S.DOC_TYPE.name] == doc_type
@@ -177,7 +141,6 @@ def mock_knowledge_repository(
     monkeypatch.setattr(KnowledgeRepository, "search_similar", staticmethod(search_similar))
     monkeypatch.setattr(KnowledgeRepository, "document_exists", staticmethod(document_exists))
 
-
 @pytest.fixture
 def knowledge_routes_with_mocks(
     monkeypatch: pytest.MonkeyPatch,
@@ -185,33 +148,21 @@ def knowledge_routes_with_mocks(
     mock_rag_service: None,
     test_store: dict[str, Any],
 ):
-    """Returns the knowledge routes module with repository, RAG, and WorkerRunner mocked."""
     from app.routes import knowledge as knowledge_routes
 
     monkeypatch.setattr(
         knowledge_routes.WorkerRunner,
-        "handle_create_document",
-        staticmethod(lambda document_id, content, doc_type, title: test_store["worker_runner_calls"].append(
-            {"document_id": document_id, "content": content, "doc_type": doc_type, "title": title}
-        )),
+        "handle_seed",
+        staticmethod(lambda: test_store["worker_runner_calls"].append({"op": "seed"})),
     )
 
     return knowledge_routes
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# USAGE ROUTES
-# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_token_ledger_repository(
     monkeypatch: pytest.MonkeyPatch,
     test_store: dict[str, Any],
 ) -> None:
-    """
-    Replaces TokenLedgerRepository.get_daily_summary with an in-memory
-    aggregation over test_store["token_ledger"].
-    """
     from datetime import date as date_type
 
     from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
@@ -260,12 +211,10 @@ def mock_token_ledger_repository(
         TokenLedgerRepository, "get_daily_summary", staticmethod(get_daily_summary)
     )
 
-
 @pytest.fixture
 def usage_routes_with_mocks(
     mock_token_ledger_repository: None,
 ):
-    """Returns the usage routes module with the token ledger mocked."""
     from app.routes import usage as usage_routes
 
     return usage_routes

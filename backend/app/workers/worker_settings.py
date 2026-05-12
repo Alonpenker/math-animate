@@ -13,6 +13,7 @@ DANGEROUS_BUILTINS: frozenset[str] = frozenset({
 
 DRY_RUN_TIMEOUT_SECONDS: int = 90
 RENDER_TIMEOUT_SECONDS: int = 600
+MAX_FIX_ATTEMPTS: int = 3
 
 class PathNames:
     ARTIFACTS_FOLDER = 'job_artifacts'

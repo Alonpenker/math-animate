@@ -19,6 +19,13 @@ function parseSceneNumber(name: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
+function formatArtifactDisplayName(name: string): string {
+  return name
+    .replace(/\.mp4$/i, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .trim();
+}
+
 function buildLessonScenes(artifacts: ArtifactResponse[], plan: VideoPlan | null): LessonScene[] {
   const scenePlansByNumber = new Map(
     plan?.scenes.map((scenePlan) => [scenePlan.scene_number, scenePlan]) ?? [],
@@ -31,7 +38,7 @@ function buildLessonScenes(artifacts: ArtifactResponse[], plan: VideoPlan | null
       return {
         artifactId: artifact.artifact_id,
         sceneNumber: sceneNumber ?? 0,
-        displayName: sceneNumber !== null ? `Scene ${sceneNumber}` : artifact.name,
+        displayName: sceneNumber !== null ? `Scene ${sceneNumber}` : formatArtifactDisplayName(artifact.name),
         plan: sceneNumber !== null ? scenePlansByNumber.get(sceneNumber) : undefined,
       };
     })

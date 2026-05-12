@@ -10,6 +10,8 @@ interface CreateFormProps {
   error: string | null;
 }
 
+const TOPIC_MAX_LENGTH = 70;
+
 const EXAMPLE_BRIEFS: UserRequest[] = [
   {
     topic: 'One-Step Equations',
@@ -69,7 +71,7 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const lastExampleIndex = useRef<number>(-1);
 
-  const isValid = topic.trim().length > 0 && topic.length <= 200 && numberOfScenes >= 1 && numberOfScenes <= 3;
+  const isValid = topic.trim().length > 0 && topic.trim().length <= TOPIC_MAX_LENGTH && numberOfScenes >= 1 && numberOfScenes <= 3;
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -115,11 +117,11 @@ export function CreateForm({ onSubmit, error }: CreateFormProps) {
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              maxLength={200}
+              maxLength={TOPIC_MAX_LENGTH}
               required
               placeholder="e.g. Solving linear equations, Understanding fractions"
             />
-            <p className="mt-1 text-xs text-off-white/40">{topic.length}/200</p>
+            <p className="mt-1 text-xs text-off-white/40">{topic.length}/{TOPIC_MAX_LENGTH}</p>
           </div>
 
           <TagInput

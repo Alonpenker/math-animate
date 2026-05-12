@@ -4,10 +4,8 @@ from uuid import uuid4
 from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
 from app.schemas.token_usage import TokenUsageResponse
 
-
 def _today() -> date:
     return datetime.now(timezone.utc).date()
-
 
 def _ledger_row(
     *,
@@ -30,11 +28,6 @@ def _ledger_row(
         "consumed_tokens": consumed_tokens,
         "state": state,
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Normal state
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_usage_aggregates_consumed_and_reserved_from_ledger(
     usage_routes_with_mocks,
@@ -59,17 +52,12 @@ def test_get_usage_aggregates_consumed_and_reserved_from_ledger(
     assert len(result.breakdown) > 0
     assert result.day == _today()
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Empty state
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_get_usage_returns_full_remaining_when_no_tokens_used(
     usage_routes_with_mocks,
     fake_cursor,
 ):
-    # Given — empty ledger
 
+    # Given — empty ledger
     # When
     result = usage_routes_with_mocks.get_usage(request=object(), cursor=fake_cursor)
 
@@ -79,11 +67,6 @@ def test_get_usage_returns_full_remaining_when_no_tokens_used(
     assert result.remaining == DAILY_TOKEN_LIMIT
     assert result.breakdown == []
     assert result.soft_threshold_exceeded is False
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Concurrent active reservations
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_usage_active_reservations_reduce_remaining_capacity(
     usage_routes_with_mocks,
@@ -104,11 +87,6 @@ def test_get_usage_active_reservations_reduce_remaining_capacity(
     assert result.consumed == 0
     assert result.remaining == DAILY_TOKEN_LIMIT - 50_000
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Soft threshold
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_get_usage_detects_soft_threshold_exceeded(
     usage_routes_with_mocks,
     fake_cursor,
@@ -125,11 +103,6 @@ def test_get_usage_detects_soft_threshold_exceeded(
 
     # Then
     assert result.soft_threshold_exceeded is True
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Hard limit
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_usage_remaining_is_zero_at_hard_limit(
     usage_routes_with_mocks,

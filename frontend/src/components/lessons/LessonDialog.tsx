@@ -34,8 +34,8 @@ export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
-        className="max-w-6xl max-h-[90vh] overflow-y-auto w-[90vw]"
-        style={{ background: '#1e2b2e', border: '2px solid rgba(245,240,232,0.2)', borderRadius: '12px' }}
+        className="max-h-[90vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
+        style={{ width: 'min(75vw, 48rem)', maxWidth: 'none', background: '#1e2b2e', border: '2px solid rgba(245,240,232,0.2)', borderRadius: '12px' }}
       >
         <DialogHeader>
           <DialogTitle className="text-xl text-off-white">
@@ -43,13 +43,17 @@ export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value === 'code' ? 'code' : 'videos')}>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value === 'code' ? 'code' : 'videos')}
+          className="min-h-0 overflow-hidden"
+        >
           <TabsList>
             <TabsTrigger value="videos">Videos</TabsTrigger>
             <TabsTrigger value="code">Code</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="videos">
+          <TabsContent value="videos" className="min-h-0 min-w-0 overflow-x-auto overflow-y-auto">
             <LessonVideosTab
               scenes={scenes}
               isLoading={scenesLoading}
@@ -61,7 +65,7 @@ export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
             />
           </TabsContent>
 
-          <TabsContent value="code" className="min-w-0 overflow-hidden">
+          <TabsContent value="code" className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
             <LessonCodeTab
               code={code}
               isEmpty={codeIsEmpty}

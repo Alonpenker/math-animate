@@ -3,7 +3,6 @@ from typing import Any
 
 import pytest
 
-# Ensure settings can load during module imports across all test modules.
 os.environ.setdefault("x_api_key", "test-api-key")
 os.environ.setdefault("openai_api_key", "sk-test-openai-key")
 os.environ.setdefault("frontend_url", "http://localhost:3000")
@@ -16,18 +15,18 @@ os.environ.setdefault("broker_url", "redis://localhost:6379/0")
 os.environ.setdefault("ollama_base_url", "http://localhost:11434")
 os.environ.setdefault("redis_url", "redis://localhost:6379/0")
 
+@pytest.fixture(autouse=True)
+def disable_app_logging(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.utils.logging import Logger
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SHARED PRIMITIVES
-# These fixtures are available to every test folder (routes/, workers/, etc.)
-# ─────────────────────────────────────────────────────────────────────────────
+    monkeypatch.setattr(
+        Logger,
+        "_log",
+        lambda self, method, log, exc_info=False: None,
+    )
 
 @pytest.fixture
 def test_store() -> dict[str, Any]:
-    """
-    In-memory store that replaces all persistent backends (DB, Redis, MinIO).
-    Each key holds a different resource type so fixtures can share state cleanly.
-    """
     return {
         "jobs": {},
         "plans": {},
@@ -41,20 +40,12 @@ def test_store() -> dict[str, Any]:
         "subprocess_commands": [],
     }
 
-
 @pytest.fixture
 def fake_cursor() -> object:
-    """
-    Opaque placeholder cursor.
-    All repository methods are patched in tests so the cursor value is never used
-    for real — it just satisfies the dependency parameter signature.
-    """
     return object()
-
 
 @pytest.fixture
 def sample_user_request():
-    """Standard teacher lesson request used as input for planning tests."""
     from app.schemas.user_request import UserRequest
 
     return UserRequest(
@@ -65,10 +56,8 @@ def sample_user_request():
         number_of_scenes=2,
     )
 
-
 @pytest.fixture
 def sample_video_plan():
-    """Two-scene video plan corresponding to sample_user_request."""
     from app.schemas.scene_plan import ScenePlan
     from app.schemas.video_plan import VideoPlan
 
@@ -89,29 +78,14 @@ def sample_video_plan():
         ]
     )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SHARED REPOSITORY MOCKS
-# Used by both routes/ and workers/ — must live in the root conftest.
-# All patched methods ignore their first argument (cursor or redis_client) so
-# tests work without real DB or Redis connections.
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any]) -> None:
-    """
-    Replaces every SQL and Redis repository method with an in-memory equivalent
-    backed by test_store.  The first argument of each patched method is the
-    connection/cursor — it is intentionally ignored here since no real I/O occurs.
-    """
     from app.repositories.artifacts_repository import ArtifactsRepository
     from app.repositories.jobs_repository import JobsRepository
     from app.repositories.plans_repository import PlansRepository
     from app.schemas.artifact import Artifact
     from app.schemas.jobs import Job
     from app.schemas.plan import Plan
-
-    # ── Jobs (Redis-backed in production) ───────────────────────────────────
 
     def create_job(_conn, job: Job) -> None:
         test_store["jobs"][job.job_id] = job.model_copy(deep=True)
@@ -130,8 +104,6 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
         test_store["jobs"][job_id] = updated
         test_store["status_updates"].append((job_id, status))
 
-    # ── Plans (cursor-backed in production) ─────────────────────────────────
-
     def create_plan(_cursor, job_id, plan) -> None:
         test_store["plans"][job_id] = Plan(job_id=job_id, plan=plan, approved=False)
 
@@ -146,8 +118,6 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
         updated = plan.model_copy(update={"approved": approved}, deep=True)
         test_store["plans"][job_id] = updated
         return updated.model_copy(deep=True)
-
-    # ── Artifacts (cursor-backed in production) ──────────────────────────────
 
     def create_artifact(_cursor, artifact: Artifact) -> None:
         test_store["artifacts"][artifact.artifact_id] = artifact.model_copy(deep=True)
@@ -177,8 +147,6 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
         return test_store["artifacts"].pop(artifact_id, None) is not None
 
     from app.repositories.job_requests_repository import JobRequestsRepository
-
-    # ── JobRequests (cursor-backed SQL table, mirrors Redis job state) ────────
 
     def create_job_request(_cursor, job_id, user_request, job_status) -> None:
         pass  # job state is tracked via JobsRepository; no separate store needed

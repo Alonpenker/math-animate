@@ -1,21 +1,9 @@
-"""
-FilesStorageService tests.
-
-Uses a fake Minio client to verify object storage operations without any
-real network or MinIO instance.
-"""
 from pathlib import Path
 from uuid import uuid4
 
 from app.services.files_storage_service import FilesStorageService
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 class FakeMinioClient:
-    """Records every call made so tests can assert on exact arguments."""
 
     def __init__(self):
         self.fput_calls: list[tuple[str, str, str]] = []
@@ -31,11 +19,6 @@ class FakeMinioClient:
     def remove_object(self, bucket: str, object_name: str) -> None:
         self.remove_calls.append((bucket, object_name))
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FilesStorageService.save_artifact
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_save_artifact_returns_object_name_with_job_id_prefix():
     # Given
     client = FakeMinioClient()
@@ -48,7 +31,6 @@ def test_save_artifact_returns_object_name_with_job_id_prefix():
 
     # Then
     assert result == f"{job_id}/abc123.py"
-
 
 def test_save_artifact_uploads_to_correct_bucket_and_path():
     # Given
@@ -67,11 +49,6 @@ def test_save_artifact_uploads_to_correct_bucket_and_path():
     assert object_name == f"{job_id}/scene.py"
     assert path_str == str(file_path)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FilesStorageService.download_artifact
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_download_artifact_calls_fget_with_bucket_and_paths():
     # Given
     client = FakeMinioClient()
@@ -82,11 +59,6 @@ def test_download_artifact_calls_fget_with_bucket_and_paths():
 
     # Then
     assert client.fget_calls == [("my-bucket", "job123/scene.py", "/local/scene.py")]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FilesStorageService.delete_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_delete_artifact_calls_remove_with_bucket_and_object_name():
     # Given

@@ -9,6 +9,7 @@ from app.configs.llm_settings import (
     LLM_CODEGEN_OUTPUT_MAX_TOKENS,
     TOKEN_OUTPUT_BUFFER,
 )
+from app.domain.job_state import JobStatus
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.token_repository import TokenLedgerRepository
 
@@ -16,10 +17,12 @@ from app.repositories.token_repository import TokenLedgerRepository
 class BudgetService:
     
     @staticmethod
-    def _reserved_output_tokens(stage: str) -> int:
-        if stage == "planning":
+    def _reserved_output_tokens(stage: JobStatus) -> int:
+        if stage == JobStatus.PLANNING or stage == JobStatus.FIXING:
             return LLM_PLAN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
-        return LLM_CODEGEN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
+        if stage == JobStatus.CODEGEN:
+            return LLM_CODEGEN_OUTPUT_MAX_TOKENS + TOKEN_OUTPUT_BUFFER
+        raise ValueError(f"Unsupported budget stage: {stage.value}")
 
     @staticmethod
     def _count_tokens(text: str, model_name: str) -> int:
@@ -34,7 +37,7 @@ class BudgetService:
         cursor,
         call_id: UUID,
         job_id: UUID,
-        stage: str,
+        stage: JobStatus,
         provider: str,
         model: str,
         prompt_text: str,
@@ -59,7 +62,7 @@ class BudgetService:
             call_id=call_id,
             day=date.today(),
             job_id=job_id,
-            stage=stage,
+            stage=stage.value,
             provider=provider,
             model=model,
             reserved_tokens=reserved_tokens,

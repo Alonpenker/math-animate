@@ -6,7 +6,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.schemas.artifact import Artifact, ArtifactType, ArtifactResponse
 
-
 def _make_artifact(job_id, artifact_type=ArtifactType.PYTHON_FILE, **overrides):
     defaults = dict(
         artifact_id=uuid4(),
@@ -18,11 +17,6 @@ def _make_artifact(job_id, artifact_type=ArtifactType.PYTHON_FILE, **overrides):
     )
     defaults.update(overrides)
     return Artifact(**defaults)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# list_artifacts
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_list_artifacts_returns_all_when_no_filters_applied(
     artifacts_routes_with_mocks,
@@ -45,7 +39,6 @@ def test_list_artifacts_returns_all_when_no_filters_applied(
     assert len(result) == 2
     assert all(isinstance(r, ArtifactResponse) for r in result)
 
-
 def test_list_artifacts_returns_only_matching_type_when_type_filter_provided(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -67,7 +60,6 @@ def test_list_artifacts_returns_only_matching_type_when_type_filter_provided(
     assert len(result) == 1
     assert result[0].artifact_type == ArtifactType.PYTHON_FILE
 
-
 def test_list_artifacts_returns_only_matching_job_when_job_filter_provided(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -88,7 +80,6 @@ def test_list_artifacts_returns_only_matching_job_when_job_filter_provided(
     # Then
     assert len(result) == 1
     assert result[0].job_id == job_a
-
 
 def test_list_artifacts_applies_both_type_and_job_id_filters_simultaneously(
     artifacts_routes_with_mocks,
@@ -114,13 +105,12 @@ def test_list_artifacts_applies_both_type_and_job_id_filters_simultaneously(
     assert result[0].artifact_type == ArtifactType.PYTHON_FILE
     assert result[0].job_id == job_id
 
-
 def test_list_artifacts_returns_empty_list_when_no_artifacts_exist(
     artifacts_routes_with_mocks,
     fake_cursor,
 ):
-    # Given — empty store
 
+    # Given — empty store
     # When
     result = artifacts_routes_with_mocks.list_artifacts(
         request=object(), artifact_type=None, job_id=None, cursor=fake_cursor
@@ -128,7 +118,6 @@ def test_list_artifacts_returns_empty_list_when_no_artifacts_exist(
 
     # Then
     assert result == []
-
 
 def test_list_artifacts_response_does_not_expose_storage_path(
     artifacts_routes_with_mocks,
@@ -147,11 +136,6 @@ def test_list_artifacts_response_does_not_expose_storage_path(
 
     # Then
     assert "path" not in type(result[0]).model_fields
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# get_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_get_artifact_returns_metadata_for_existing_artifact(
     artifacts_routes_with_mocks,
@@ -172,7 +156,6 @@ def test_get_artifact_returns_metadata_for_existing_artifact(
     assert result.size == a.size
     assert result.sha256 == a.sha256
 
-
 def test_get_artifact_raises_404_when_artifact_not_found(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -186,7 +169,6 @@ def test_get_artifact_raises_404_when_artifact_not_found(
 
     assert exc_info.value.status_code == 404
     assert "Artifact not found" in exc_info.value.detail
-
 
 def test_get_artifact_response_does_not_expose_storage_path(
     artifacts_routes_with_mocks,
@@ -202,11 +184,6 @@ def test_get_artifact_response_does_not_expose_storage_path(
 
     # Then
     assert "path" not in type(result).model_fields
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# download_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_download_artifact_returns_file_response_with_correct_filename_and_media_type(
     artifacts_routes_with_mocks,
@@ -230,7 +207,6 @@ def test_download_artifact_returns_file_response_with_correct_filename_and_media
     assert result.filename == "code.py"
     assert result.media_type == "text/x-python"
 
-
 def test_download_artifact_uses_video_mp4_media_type_for_mp4_artifacts(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -252,7 +228,6 @@ def test_download_artifact_uses_video_mp4_media_type_for_mp4_artifacts(
     assert result.media_type == "video/mp4"
     assert result.filename == "scene.mp4"
 
-
 def test_download_artifact_raises_404_when_artifact_not_found(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -268,11 +243,6 @@ def test_download_artifact_raises_404_when_artifact_not_found(
         )
 
     assert exc_info.value.status_code == 404
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# delete_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_delete_artifact_removes_record_from_store_and_storage(
     artifacts_routes_with_mocks,
@@ -296,7 +266,6 @@ def test_delete_artifact_removes_record_from_store_and_storage(
     assert a.artifact_id not in test_store["artifacts"]
     assert a.path not in test_store["objects"]
 
-
 def test_delete_artifact_raises_404_when_artifact_not_found(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -313,7 +282,6 @@ def test_delete_artifact_raises_404_when_artifact_not_found(
 
     assert exc_info.value.status_code == 404
 
-
 def test_delete_artifact_succeeds_even_when_minio_object_already_missing(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -324,7 +292,6 @@ def test_delete_artifact_succeeds_even_when_minio_object_already_missing(
     job_id = uuid4()
     a = _make_artifact(job_id, ArtifactType.MP4, path=f"{job_id}/scene.mp4")
     test_store["artifacts"][a.artifact_id] = a
-    # Intentionally NOT putting the file in test_store["objects"]
 
     # When
     result = artifacts_routes_with_mocks.delete_artifact(
@@ -334,11 +301,6 @@ def test_delete_artifact_succeeds_even_when_minio_object_already_missing(
     # Then
     assert result is None
     assert a.artifact_id not in test_store["artifacts"]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# stream_artifact
-# ─────────────────────────────────────────────────────────────────────────────
 
 def test_stream_artifact_returns_200_with_full_content_headers_when_no_range(
     artifacts_routes_with_mocks,
@@ -369,7 +331,6 @@ def test_stream_artifact_returns_200_with_full_content_headers_when_no_range(
     assert result.headers["accept-ranges"] == "bytes"
     assert result.headers["content-length"] == str(len(payload))
 
-
 def test_stream_artifact_returns_206_with_partial_content_headers_when_range_provided(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -399,7 +360,6 @@ def test_stream_artifact_returns_206_with_partial_content_headers_when_range_pro
     assert result.headers["content-range"] == "bytes 2-5/10"
     assert result.headers["content-length"] == "4"
 
-
 def test_stream_artifact_raises_416_when_range_header_format_is_invalid(
     artifacts_routes_with_mocks,
     fake_cursor,
@@ -424,11 +384,6 @@ def test_stream_artifact_raises_416_when_range_header_format_is_invalid(
 
     assert exc_info.value.status_code == 416
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ArtifactType.content_type mapping
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.mark.parametrize(
     "artifact_type, expected_content_type",
     [
@@ -442,8 +397,8 @@ def test_stream_artifact_raises_416_when_range_header_format_is_invalid(
     ],
 )
 def test_artifact_type_has_correct_content_type_mapping(artifact_type, expected_content_type):
-    # Given — artifact_type enum value
 
+    # Given — artifact_type enum value
     # When
     content_type = artifact_type.content_type
 

@@ -1,36 +1,93 @@
-"""
-KnowledgeRepository tests.
-
-Uses FakeSqlCursor to verify SQL interactions and domain object construction
-for knowledge document CRUD and vector similarity search operations.
-"""
 import numpy as np
+import pytest
 from uuid import uuid4
 
 from app.repositories.knowledge_repository import KnowledgeRepository
-from app.schemas.knowledge import KnowledgeDocument, KnowledgeType
+from app.schemas.knowledge import (
+    KnowledgeDocument,
+    KnowledgeDocumentSchema,
+    KnowledgeDocumentSeed,
+    KnowledgeType,
+)
 
 from tests.repositories.conftest import FakeSqlCursor
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _doc_row(document_id=None, doc_type: str = "plan") -> dict:
+def _doc_row(document_id=None, doc_type: str = "rule") -> dict:
     return {
         "document_id": str(document_id or uuid4()),
-        "content": "Sample knowledge content",
         "doc_type": doc_type,
         "title": "Sample Title",
+        "category": "rules",
+        "priority": "recommended",
+        "tags": ["foo"],
     }
 
+def test_knowledge_type_enum_has_exactly_four_values():
+    values = {member.value for member in KnowledgeType}
 
-# ─────────────────────────────────────────────────────────────────────────────
-# KnowledgeRepository.create_document
-# ─────────────────────────────────────────────────────────────────────────────
+    assert values == {"skill", "rule", "template", "example"}
+    assert len(list(KnowledgeType)) == 4
 
-def test_create_document_executes_insert_with_all_required_fields():
+def test_knowledge_document_validates_with_metadata_only_no_content_or_path():
+    doc = KnowledgeDocument(
+        document_id=uuid4(),
+        doc_type=KnowledgeType.RULE,
+        title="A rule",
+    )
+
+    assert doc.category == ""
+    assert doc.priority == "optional"
+    assert doc.tags == []
+    assert "content" not in KnowledgeDocument.model_fields
+    assert "path" not in KnowledgeDocument.model_fields
+
+def test_knowledge_document_priority_rejects_unlisted_strings():
+    with pytest.raises(Exception):
+        KnowledgeDocument(
+            document_id=uuid4(),
+            doc_type=KnowledgeType.RULE,
+            title="Bad priority",
+            priority="urgent",  # not in PriorityType literal
+        )
+
+def test_knowledge_document_seed_requires_path_and_has_no_content():
+    seed = KnowledgeDocumentSeed(
+        document_id=uuid4(),
+        doc_type=KnowledgeType.SKILL,
+        title="Seed",
+        priority="core",
+        path="manim_skill/SKILL.md",
+    )
+
+    assert seed.path == "manim_skill/SKILL.md"
+    assert "content" not in KnowledgeDocumentSeed.model_fields
+
+    with pytest.raises(Exception):
+        KnowledgeDocumentSeed(
+            document_id=uuid4(),
+            doc_type=KnowledgeType.SKILL,
+            title="No path",
+            priority="core",
+        )
+
+def test_knowledge_document_schema_has_exactly_seven_columns_with_no_content_or_path():
+    column_attrs = {
+        name: value
+        for name, value in vars(KnowledgeDocumentSchema).items()
+        if name.isupper() and not name.startswith("_")
+    }
+    column_names = {col.name for col in column_attrs.values()}
+
+    assert len(column_attrs) == 7
+    assert column_names == {
+        "document_id", "doc_type", "priority",
+        "title", "category", "embedding", "tags",
+    }
+    assert "CONTENT" not in vars(KnowledgeDocumentSchema)
+    assert "PATH" not in vars(KnowledgeDocumentSchema)
+    assert KnowledgeDocumentSchema.TAGS.type == "TEXT[]"
+
+def test_create_document_executes_insert_with_seven_params_and_no_content():
     # Given
     cursor = FakeSqlCursor()
     document_id = uuid4()
@@ -40,28 +97,47 @@ def test_create_document_executes_insert_with_all_required_fields():
     KnowledgeRepository.create_document(
         cursor,
         document_id=document_id,
-        content="Quadratic formula derivation",
-        doc_type="plan",
+        doc_type="rule",
         title="Quadratic Formula",
         embedding=embedding,
+        category="rules",
+        priority="recommended",
+        tags=["math", "algebra"],
     )
 
     # Then
     assert len(cursor.queries) == 1
     _, params = cursor.queries[0]
-    assert str(document_id) in params
-    assert "Quadratic formula derivation" in params
-    assert "plan" in params
+    assert len(params) == 7
+    assert params[0] == str(document_id)
+    assert params[1] == "rule"
+    assert params[2] == "recommended"
+    assert params[3] == "Quadratic Formula"
+    assert params[4] == "rules"
+    assert params[5] is embedding
+    assert params[6] == ["math", "algebra"]
 
+def test_create_document_defaults_tags_to_empty_list_when_none():
+    cursor = FakeSqlCursor()
+    embedding = np.zeros(768, dtype=np.float32)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# KnowledgeRepository.get_document
-# ─────────────────────────────────────────────────────────────────────────────
+    KnowledgeRepository.create_document(
+        cursor,
+        document_id=uuid4(),
+        doc_type="rule",
+        title="Default tags",
+        embedding=embedding,
+    )
+
+    _, params = cursor.queries[0]
+    assert params[6] == []
+    assert params[2] == "optional"
+    assert params[4] == ""
 
 def test_get_document_returns_knowledge_document_when_row_exists():
     # Given
     document_id = uuid4()
-    cursor = FakeSqlCursor(rows=[_doc_row(document_id=document_id, doc_type="plan")])
+    cursor = FakeSqlCursor(rows=[_doc_row(document_id=document_id, doc_type="rule")])
 
     # When
     result = KnowledgeRepository.get_document(cursor, document_id)
@@ -69,9 +145,11 @@ def test_get_document_returns_knowledge_document_when_row_exists():
     # Then
     assert result is not None
     assert str(result.document_id) == str(document_id)
-    assert result.doc_type == KnowledgeType.PLAN
-    assert result.content == "Sample knowledge content"
-
+    assert result.doc_type == KnowledgeType.RULE
+    assert result.title == "Sample Title"
+    assert result.category == "rules"
+    assert result.priority == "recommended"
+    assert result.tags == ["foo"]
 
 def test_get_document_returns_none_when_no_row_found():
     # Given
@@ -83,11 +161,6 @@ def test_get_document_returns_none_when_no_row_found():
     # Then
     assert result is None
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KnowledgeRepository.delete_document
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_delete_document_returns_true_when_row_was_deleted():
     # Given
     cursor = FakeSqlCursor(rowcount=1)
@@ -97,7 +170,6 @@ def test_delete_document_returns_true_when_row_was_deleted():
 
     # Then
     assert result is True
-
 
 def test_delete_document_returns_false_when_no_row_was_deleted():
     # Given
@@ -109,11 +181,6 @@ def test_delete_document_returns_false_when_no_row_was_deleted():
     # Then
     assert result is False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KnowledgeRepository.document_exists
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_document_exists_returns_true_when_row_found():
     # Given
     cursor = FakeSqlCursor(rows=[_doc_row()])
@@ -123,7 +190,6 @@ def test_document_exists_returns_true_when_row_found():
 
     # Then
     assert result is True
-
 
 def test_document_exists_returns_false_when_no_row_found():
     # Given
@@ -135,25 +201,19 @@ def test_document_exists_returns_false_when_no_row_found():
     # Then
     assert result is False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KnowledgeRepository.search_similar
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_search_similar_returns_list_of_knowledge_documents():
     # Given
-    rows = [_doc_row(doc_type="plan"), _doc_row(doc_type="plan")]
+    rows = [_doc_row(doc_type="rule"), _doc_row(doc_type="rule")]
     cursor = FakeSqlCursor(rows=rows)
     embedding = np.zeros(768, dtype=np.float32)
 
     # When
-    results = KnowledgeRepository.search_similar(cursor, embedding, doc_type="plan", limit=2)
+    results = KnowledgeRepository.search_similar(cursor, embedding, doc_type="rule", limit=2)
 
     # Then
     assert len(results) == 2
     assert all(isinstance(doc, KnowledgeDocument) for doc in results)
-    assert all(doc.doc_type == KnowledgeType.PLAN for doc in results)
-
+    assert all(doc.doc_type == KnowledgeType.RULE for doc in results)
 
 def test_search_similar_returns_empty_list_when_no_matches():
     # Given
@@ -161,7 +221,7 @@ def test_search_similar_returns_empty_list_when_no_matches():
     embedding = np.zeros(768, dtype=np.float32)
 
     # When
-    results = KnowledgeRepository.search_similar(cursor, embedding, doc_type="plan", limit=5)
+    results = KnowledgeRepository.search_similar(cursor, embedding, doc_type="rule", limit=5)
 
     # Then
     assert results == []

@@ -1,8 +1,7 @@
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown, worker_ready, setup_logging
 from pathlib import Path
-from uuid import UUID, uuid4
-import json
+from uuid import uuid4
 import tempfile
 import shutil
 import subprocess
@@ -11,19 +10,26 @@ from psycopg2.errors import UniqueViolation
 
 from app.configs.app_settings import settings
 from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
-from app.workers.worker_settings import PathNames, DockerCommands, RENDER_TIMEOUT_SECONDS, SQS_VISIBILITY_TIMEOUT, SQS_POLLING_INTERVAL
+from app.workers.worker_settings import (
+    PathNames,
+    DockerCommands,
+    RENDER_TIMEOUT_SECONDS,
+    SQS_VISIBILITY_TIMEOUT,
+    SQS_POLLING_INTERVAL,
+    MAX_FIX_ATTEMPTS,
+)
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.redis_client import init_redis_pool, close_redis_pool
 from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
+from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
 from app.schemas.artifact import ArtifactType
-from app.schemas.knowledge import KnowledgeDocument
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
 from app.workers.worker_helpers import (
@@ -35,6 +41,7 @@ from app.workers.worker_helpers import (
     save_artifact_to_storage,
     store_render_logs,
     dry_run_docker,
+    summarize_verification_failure,
 )
 from app.utils.llm_stubs import IS_E2E_MODE
 from app.utils.logging import Logger, WorkerLog
@@ -70,7 +77,7 @@ if IS_E2E_MODE:
 
 @setup_logging.connect
 def _suppress_celery_logging(**kwargs):
-    pass  # prevent Celery from overwriting our structlog configuration
+    pass  # prevent Celery from overwriting structlog configuration
 
 
 @worker_process_init.connect
@@ -85,7 +92,7 @@ def init_worker(**kwargs) -> None:
 def on_worker_ready(**kwargs) -> None:
     init_db_pool()
     try:
-        seed_knowledge_task()
+        seed_knowledge()
     except Exception:
         logger.warning(WorkerLog(
             operation="seed_knowledge",
@@ -210,14 +217,14 @@ def generate_code(job_request_payload: dict) -> None:
         ))
         transition_job(job_id, job_request.job.status, JobStatus.CODEGEN)
 
-        system_prompt, user_query = LLMService.render_codegen_prompt(job_request.plan)
+        system_prompt, user_query, tools = LLMService.render_codegen_prompt(job_request.plan)
         reserved = reserve_budget(
             call_id, job_id, JobStatus.CODEGEN, LLM_CODE_MODEL,
             f"{system_prompt}\n{user_query}",
             operation="generate_code",
         )
 
-        code, total_tokens = LLMService.codegen_call(system_prompt, user_query)
+        code, total_tokens = LLMService.codegen_call(system_prompt, user_query, tools)
         reconcile_budget(call_id, total_tokens, reserved, operation="generate_code")
 
         transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
@@ -227,8 +234,8 @@ def generate_code(job_request_payload: dict) -> None:
             job_id=str(job_id),
             call_id=str(call_id),
         ))
-        verify_code_task.delay(
-            JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code, is_retry=False).model_dump(mode="json")
+        verify_code.delay(
+            JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code).model_dump(mode="json")
         )
 
     except QuotaExceededError as exc:
@@ -268,7 +275,7 @@ def generate_code(job_request_payload: dict) -> None:
 
 
 @app.task()
-def verify_code_task(job_request_payload: dict) -> None:
+def verify_code(job_request_payload: dict) -> None:
     try:
         job_request = JobCodeRequest(**job_request_payload)
     except Exception as exc:
@@ -281,7 +288,7 @@ def verify_code_task(job_request_payload: dict) -> None:
 
     job_id = job_request.job.job_id
     code = job_request.code
-    is_retry = job_request.is_retry
+    fix_attempt = job_request.fix_attempt
 
     render_root = Path(PathNames.TMP_RENDER_FOLDER)
     input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
@@ -295,7 +302,7 @@ def verify_code_task(job_request_payload: dict) -> None:
             operation="verify_code",
             event="Verification started",
             job_id=str(job_id),
-            context={"is_retry": is_retry},
+            context={"fix_attempt": fix_attempt},
         ))
 
         from app.workers.worker_helpers import verify_code as static_verify
@@ -312,7 +319,7 @@ def verify_code_task(job_request_payload: dict) -> None:
                         operation="verify_code",
                         event="Dry-run aborted due to infrastructure error",
                         job_id=str(job_id),
-                        context={"is_retry": is_retry, "error_output": error_output},
+                        context={"fix_attempt": fix_attempt, "error_output": error_output},
                     ))
                     transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
                     return
@@ -346,20 +353,21 @@ def verify_code_task(job_request_payload: dict) -> None:
                 JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
             )
         else:
-            failure_summary = failure.strip().splitlines()[-1] if failure.strip() else failure
+            failure_summary = summarize_verification_failure(failure)
             logger.warning(WorkerLog(
                 operation="verify_code",
                 event="Verification failed",
                 job_id=str(job_id),
-                context={"is_retry": is_retry, "failure_summary": failure_summary},
+                context={"fix_attempt": fix_attempt, "failure_summary": failure_summary},
             ))
 
-            if is_retry:
+            if fix_attempt >= MAX_FIX_ATTEMPTS:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
                 logger.error(WorkerLog(
                     operation="verify_code",
                     event="Verification exhausted; job failed",
                     job_id=str(job_id),
+                    context={"fix_attempt": fix_attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
                 ))
             else:
                 transition_job(job_id, JobStatus.VERIFYING, JobStatus.FIXING)
@@ -367,12 +375,14 @@ def verify_code_task(job_request_payload: dict) -> None:
                     operation="verify_code",
                     event="Fix enqueued",
                     job_id=str(job_id),
+                    context={"fix_attempt": fix_attempt + 1, "max_fix_attempts": MAX_FIX_ATTEMPTS},
                 ))
                 fix_code.delay(
                     JobFixRequest(
                         job=Job(job_id=job_id, status=JobStatus.FIXING),
                         code=code,
                         error_context=failure,
+                        fix_attempt=fix_attempt + 1,
                     ).model_dump(mode="json")
                 )
 
@@ -431,11 +441,11 @@ def fix_code(job_request_payload: dict) -> None:
             job_id=str(job_id),
             call_id=str(call_id),
         ))
-        verify_code_task.delay(
+        verify_code.delay(
             JobCodeRequest(
                 job=Job(job_id=job_id, status=JobStatus.FIXING),
                 code=fixed_code,
-                is_retry=True,
+                fix_attempt=job_request.fix_attempt,
             ).model_dump(mode="json")
         )
 
@@ -603,61 +613,32 @@ def generate_render(job_request_payload: dict) -> None:
 
 
 @app.task()
-def seed_knowledge_task() -> None:
-    examples_dir = Path(__file__).resolve().parent.parent / "examples"
-    index = json.loads((examples_dir / "index.json").read_text(encoding="utf-8"))
+def seed_knowledge() -> None:
     inserted = skipped = 0
-    for entry in index:
-        document_id = UUID(entry["document_id"])
-        with get_worker_cursor() as cursor:
-            if KnowledgeRepository.document_exists(cursor, document_id):
+    with get_worker_cursor() as cursor:
+        for entry in REGISTRY:
+            if KnowledgeRepository.document_exists(cursor, entry.document_id):
                 skipped += 1
                 continue
-        content = (examples_dir / entry["file"]).read_text(encoding="utf-8")
-        embedding = RAGService.embed_text(content)
-        try:
-            with get_worker_cursor() as cursor:
+
+            content = (LLMKNOWLEDGE_DIR / entry.path).read_text(encoding="utf-8")
+            embedding = RAGService.embed_text(content)
+            try:
                 KnowledgeRepository.create_document(
-                    cursor, document_id, content, entry["doc_type"], entry["title"], embedding
+                    cursor,
+                    document_id=entry.document_id,
+                    doc_type=entry.doc_type.value,
+                    title=entry.title,
+                    embedding=embedding,
+                    category=entry.category,
+                    priority=entry.priority,
+                    tags=entry.tags,
                 )
-            inserted += 1
-        except UniqueViolation:
-            skipped += 1
+                inserted += 1
+            except UniqueViolation:
+                skipped += 1
     logger.info(WorkerLog(
         operation="seed_knowledge",
         event="Seed complete",
         context={"inserted": inserted, "skipped": skipped},
     ))
-
-
-@app.task()
-def create_knowledge_document_task(payload: dict) -> None:
-    try:
-        doc = KnowledgeDocument(**payload)
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="create_knowledge_document",
-            event="Invalid request payload",
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    try:
-        embedding = RAGService.embed_text(doc.content)
-        with get_worker_cursor() as cursor:
-            KnowledgeRepository.create_document(
-                cursor, doc.document_id, doc.content, doc.doc_type.value, doc.title, embedding
-            )
-        logger.info(WorkerLog(
-            operation="create_knowledge_document",
-            event="Knowledge document created",
-            context={"document_id": str(doc.document_id)},
-        ))
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="create_knowledge_document",
-            event="Knowledge document creation failed",
-            context={"document_id": str(doc.document_id)},
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
