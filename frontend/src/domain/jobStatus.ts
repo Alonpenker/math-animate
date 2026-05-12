@@ -150,7 +150,7 @@ export const JOB_STATUS_DEFS: Record<JobStatus, JobStatusDef> = {
     terminal: {
       icon: 'ShieldAlert',
       heading: 'Code Verification Failed',
-      explanation: "The generated code didn't pass our quality checks. Please try submitting again.",
+      explanation: "Sorry, we couldn't get the animation code into a good enough shape this time. Trying again with a simpler lesson idea may help.",
     },
   },
   FAILED_RENDER: {
