@@ -11,6 +11,9 @@
 #   --list-knowledge --type skill|rule|template|example
 #   --seed-knowledge
 #   --reset-knowledge
+#   --db-console
+#   --migrate-schema --all [--dry-run] [--allow-destructive]
+#   --migrate-schema --table <table> [--dry-run] [--allow-destructive]
 #
 # Raw passthrough:
 #   --get    <path>
@@ -27,7 +30,6 @@ if [[ -f backend/.env ]]; then
   source <(sed 's/\r//' backend/.env)
   set +a
 fi
-[[ -z "${X_API_KEY:-}" ]] && { echo "ERROR: X_API_KEY is not set. Add it to backend/.env." >&2; exit 1; }
 
 COMPOSE="docker compose --project-directory . -f backend/docker-compose.yml -f docker-compose.vps.yml"
 API="http://localhost:8000/api/v1"
@@ -37,6 +39,7 @@ pretty() {
 }
 
 api() {
+  [[ -z "${X_API_KEY:-}" ]] && { echo "ERROR: X_API_KEY is not set. Add it to backend/.env." >&2; exit 1; }
   local method="$1" path="$2" data="${3:-}"
   local args=(-fsS -X "$method" "http://localhost:8000${path}" \
     -H "Content-Type: application/json" \
@@ -49,7 +52,8 @@ require() {
   [[ -n "${2:-}" ]] || { echo "ERROR: $1 requires a value." >&2; exit 1; }
 }
 
-CMD="" TYPE="" STATUS="" PAGE="" ARTIFACT_ID="" RAW_PATH="" RAW_DATA=""
+CMD="" TYPE="" STATUS="" PAGE="" ARTIFACT_ID="" RAW_PATH="" RAW_DATA="" TABLE_NAME=""
+MIGRATE_ALL="" DRY_RUN="" ALLOW_DESTRUCTIVE=""
 
 [[ $# -eq 0 ]] && { grep '^#' "$0" | sed 's/^# \?//'; exit 0; }
 
@@ -57,6 +61,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --health)           CMD=health ;;
     --usage)            CMD=usage ;;
+    --db-console)       CMD=db_console ;;
+    --migrate-schema)   CMD=migrate_schema ;;
     --seed-knowledge)   CMD=seed_knowledge ;;
     --reset-knowledge)  CMD=reset_knowledge ;;
     --list-artifacts)   CMD=list_artifacts ;;
@@ -67,6 +73,10 @@ while [[ $# -gt 0 ]]; do
     --post)             CMD=raw_post;      require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
     --patch)            CMD=raw_patch;     require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
     --delete)           CMD=raw_delete;    require "$1" "${2:-}"; RAW_PATH="$2";    shift ;;
+    --table)   require "$1" "${2:-}"; TABLE_NAME="$2"; shift ;;
+    --all)     MIGRATE_ALL=1 ;;
+    --dry-run) DRY_RUN=1 ;;
+    --allow-destructive) ALLOW_DESTRUCTIVE=1 ;;
     --type)    require "$1" "${2:-}"; TYPE="$2";    shift ;;
     --status)  require "$1" "${2:-}"; STATUS="$2";  shift ;;
     --page)    require "$1" "${2:-}"; PAGE="$2";    shift ;;
@@ -120,6 +130,23 @@ case "$CMD" in
     done
     echo "ERROR: API health did not recover after resetting knowledge_documents." >&2
     exit 1 ;;
+
+  db_console)
+    $COMPOSE exec postgres psql \
+      -U "${POSTGRES_USER:-mathanimate}" \
+      -d "${POSTGRES_DB:-mathanimate}" ;;
+
+  migrate_schema)
+    args=()
+    if [[ -n "$MIGRATE_ALL" ]]; then
+      args+=(--all)
+    else
+      [[ -n "$TABLE_NAME" ]] || { echo "ERROR: --migrate-schema requires --all or --table <table>." >&2; exit 1; }
+      args+=(--table "$TABLE_NAME")
+    fi
+    [[ -n "$DRY_RUN" ]] && args+=(--dry-run)
+    [[ -n "$ALLOW_DESTRUCTIVE" ]] && args+=(--allow-destructive)
+    $COMPOSE exec -T api uv run python app/scripts/migrate_schema.py "${args[@]}" ;;
 
   raw_get)    api GET    "$RAW_PATH" ;;
   raw_post)   api POST   "$RAW_PATH" "$RAW_DATA" ;;
