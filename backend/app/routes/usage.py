@@ -2,7 +2,7 @@ from datetime import timezone, datetime
 
 from fastapi import APIRouter, Depends, Request
 
-from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
+from app.configs.llm_settings import OPENROUTER_DAILY_CALL_LIMIT
 from app.configs.limiter_config import LimitConfig
 from app.dependencies.db import get_cursor
 from app.dependencies.limiter import limiter
@@ -20,11 +20,9 @@ def get_usage(request: Request, cursor=Depends(get_cursor)) -> TokenUsageRespons
 
     return TokenUsageResponse(
         day=today,
-        daily_limit=summary.daily_limit,
-        soft_threshold=int(DAILY_TOKEN_LIMIT * SOFT_THRESHOLD_RATIO),
-        consumed=summary.consumed,
-        reserved=summary.reserved,
-        remaining=summary.remaining,
-        soft_threshold_exceeded=summary.soft_threshold_exceeded,
+        openrouter_calls=summary.openrouter_calls,
+        openrouter_call_limit=OPENROUTER_DAILY_CALL_LIMIT,
+        openrouter_calls_remaining=max(0, OPENROUTER_DAILY_CALL_LIMIT - summary.openrouter_calls),
+        token_totals=summary.token_totals,
         breakdown=summary.breakdown,
     )

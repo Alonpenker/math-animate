@@ -1,11 +1,11 @@
 from datetime import date, datetime
-from typing import List
+from typing import Any, List
 from uuid import UUID
 
-from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
+from app.configs.llm_settings import DAILY_TOKEN_LIMIT, LLM_PROVIDER, OPENROUTER_DAILY_CALL_LIMIT
 from app.repositories.repository import Repository
 from app.schemas.token_ledger import TokenLedgerSchema, State
-from app.schemas.token_usage import BreakdownEntry, DailySummary
+from app.schemas.token_usage import BreakdownEntry, DailySummary, TokenTotals
 
 
 class TokenLedgerRepository(Repository):
@@ -13,10 +13,7 @@ class TokenLedgerRepository(Repository):
     TABLE_NAME = "token_ledger"
     SCHEMA = TokenLedgerSchema
     PRIMARY_KEY = "call_id"
-
-    @classmethod
-    def create_day_index(cls, cursor) -> None:
-        cursor.execute(cls._create_index(cls.SCHEMA.DAY.name))
+    INDEX_FIELDS = (TokenLedgerSchema.DAY.name,)
 
     @classmethod
     def reserve(
@@ -33,7 +30,7 @@ class TokenLedgerRepository(Repository):
         cursor.execute(
             cls.insert(),
             (str(call_id), day, str(job_id), stage, provider, model,
-             reserved_tokens, 0, State.ACTIVE),
+             "unknown", 0, 0, 0, reserved_tokens, 0, State.ACTIVE),
         )
 
     @classmethod
@@ -49,52 +46,139 @@ class TokenLedgerRepository(Repository):
         )
 
     @classmethod
+    def count_openrouter_calls(cls, cursor, day: date) -> int:
+        cursor.execute(
+            f"SELECT COUNT(*) AS calls "
+            f"FROM {cls.TABLE_NAME} "
+            f"WHERE {cls.SCHEMA.PROVIDER.name} = %s "
+            f"AND {cls.SCHEMA.DAY.name} = %s",
+            (LLM_PROVIDER.OPENROUTER.value, day),
+        )
+        row = cursor.fetchone()
+        return int(row["calls"]) if row else 0
+
+    @classmethod
+    def claim_openrouter_call(
+        cls,
+        cursor,
+        *,
+        call_id: UUID,
+        day: date,
+        job_id: UUID,
+        stage: str,
+        call_type: str,
+        model: str,
+    ) -> None:
+        cursor.execute(
+            cls.insert(),
+            (
+                str(call_id),
+                day,
+                str(job_id),
+                stage,
+                LLM_PROVIDER.OPENROUTER.value,
+                model,
+                call_type,
+                0,
+                0,
+                0,
+                0,
+                0,
+                State.ACTIVE,
+            ),
+        )
+
+    @classmethod
+    def record_openrouter_usage(
+        cls,
+        cursor,
+        *,
+        call_id: UUID,
+        usage: Any,
+    ) -> None:
+        cursor.execute(
+            f"UPDATE {cls.TABLE_NAME} "
+            f"SET {cls.SCHEMA.INPUT_TOKENS.name} = %s, "
+            f"{cls.SCHEMA.OUTPUT_TOKENS.name} = %s, "
+            f"{cls.SCHEMA.REASONING_TOKENS.name} = %s, "
+            f"{cls.SCHEMA.CONSUMED_TOKENS.name} = %s, "
+            f"{cls.SCHEMA.RESERVED_TOKENS.name} = 0, "
+            f"{cls.SCHEMA.STATE.name} = '{State.RELEASED}', "
+            f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
+            f"WHERE {cls.SCHEMA.CALL_ID.name} = %s",
+            (
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.reasoning_tokens,
+                usage.total_tokens,
+                str(call_id),
+            ),
+        )
+
+    @classmethod
     def get_daily_summary(cls, cursor, day: date) -> DailySummary:
         cursor.execute(
             f"SELECT "
             f"{cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, {cls.SCHEMA.STAGE.name}, "
-            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = '{State.RELEASED}' "
-            f"THEN {cls.SCHEMA.CONSUMED_TOKENS.name} ELSE 0 END), 0) AS {cls.SCHEMA.CONSUMED_TOKENS.name}, "
-            f"COALESCE(SUM(CASE WHEN {cls.SCHEMA.STATE.name} = '{State.ACTIVE}' "
-            f"THEN {cls.SCHEMA.RESERVED_TOKENS.name} ELSE 0 END), 0) AS {cls.SCHEMA.RESERVED_TOKENS.name} "
+            f"{cls.SCHEMA.CALL_TYPE.name}, "
+            f"COUNT(*) AS calls, "
+            f"COALESCE(SUM({cls.SCHEMA.INPUT_TOKENS.name}), 0) AS {cls.SCHEMA.INPUT_TOKENS.name}, "
+            f"COALESCE(SUM({cls.SCHEMA.OUTPUT_TOKENS.name}), 0) AS {cls.SCHEMA.OUTPUT_TOKENS.name}, "
+            f"COALESCE(SUM({cls.SCHEMA.REASONING_TOKENS.name}), 0) AS {cls.SCHEMA.REASONING_TOKENS.name}, "
+            f"COALESCE(SUM({cls.SCHEMA.CONSUMED_TOKENS.name}), 0) AS {cls.SCHEMA.CONSUMED_TOKENS.name} "
             f"FROM {cls.TABLE_NAME} "
             f"WHERE {cls.SCHEMA.DAY.name} = %s "
-            f"GROUP BY {cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, {cls.SCHEMA.STAGE.name}",
-            (day,),
+            f"AND {cls.SCHEMA.PROVIDER.name} = %s "
+            f"GROUP BY {cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, "
+            f"{cls.SCHEMA.STAGE.name}, {cls.SCHEMA.CALL_TYPE.name} "
+            f"ORDER BY {cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, "
+            f"{cls.SCHEMA.STAGE.name}, {cls.SCHEMA.CALL_TYPE.name}",
+            (day, LLM_PROVIDER.OPENROUTER.value),
         )
         rows = cursor.fetchall()
 
         breakdown: List[BreakdownEntry] = []
-        total_consumed = 0
-        total_reserved = 0
+        calls = 0
+        input_tokens = 0
+        output_tokens = 0
+        reasoning_tokens = 0
+        total_tokens = 0
 
         for row in rows:
-            consumed = row[cls.SCHEMA.CONSUMED_TOKENS.name]
-            reserved = row[cls.SCHEMA.RESERVED_TOKENS.name]
+            row_calls = int(row["calls"])
+            row_input = int(row[cls.SCHEMA.INPUT_TOKENS.name])
+            row_output = int(row[cls.SCHEMA.OUTPUT_TOKENS.name])
+            row_reasoning = int(row[cls.SCHEMA.REASONING_TOKENS.name])
+            row_total = int(row[cls.SCHEMA.CONSUMED_TOKENS.name])
             breakdown.append(
                 BreakdownEntry(
                     provider=row[cls.SCHEMA.PROVIDER.name],
                     model=row[cls.SCHEMA.MODEL.name],
                     stage=row[cls.SCHEMA.STAGE.name],
-                    consumed=consumed,
-                    reserved=reserved,
+                    call_type=row[cls.SCHEMA.CALL_TYPE.name],
+                    calls=row_calls,
+                    input_tokens=row_input,
+                    output_tokens=row_output,
+                    reasoning_tokens=row_reasoning,
+                    total_tokens=row_total,
                 )
             )
-            total_consumed += consumed
-            total_reserved += reserved
-
-        used = total_consumed + total_reserved
-        remaining = max(0, DAILY_TOKEN_LIMIT - used)
-        remaining_pct = round((remaining / DAILY_TOKEN_LIMIT) * 100, 2) if DAILY_TOKEN_LIMIT > 0 else 0.0
-        soft_threshold = int(DAILY_TOKEN_LIMIT * SOFT_THRESHOLD_RATIO)
+            calls += row_calls
+            input_tokens += row_input
+            output_tokens += row_output
+            reasoning_tokens += row_reasoning
+            total_tokens += row_total
 
         return DailySummary(
-            daily_limit=DAILY_TOKEN_LIMIT,
-            consumed=total_consumed,
-            reserved=total_reserved,
-            remaining=remaining,
-            remaining_pct=remaining_pct,
-            soft_threshold_exceeded=used >= soft_threshold,
+            openrouter_calls=calls,
+            openrouter_call_limit=OPENROUTER_DAILY_CALL_LIMIT,
+            openrouter_calls_remaining=max(0, OPENROUTER_DAILY_CALL_LIMIT - calls),
+            token_totals=TokenTotals(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                reasoning_tokens=reasoning_tokens,
+                total_tokens=total_tokens,
+            ),
             breakdown=breakdown,
         )
 
@@ -119,13 +203,3 @@ class TokenLedgerRepository(Repository):
             "SELECT pg_advisory_xact_lock(extract(epoch from current_date)::bigint)"
         )
 
-    @classmethod
-    def expire_stale(cls, cursor, before_timestamp: datetime) -> None:
-        cursor.execute(
-            f"UPDATE {cls.TABLE_NAME} "
-            f"SET {cls.SCHEMA.STATE.name} = '{State.EXPIRED}', "
-            f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
-            f"WHERE {cls.SCHEMA.STATE.name} = '{State.ACTIVE}' "
-            f"AND {cls.SCHEMA.CREATED_AT.name} < %s",
-            (before_timestamp,),
-        )
