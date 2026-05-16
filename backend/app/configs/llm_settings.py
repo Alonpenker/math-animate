@@ -1,13 +1,24 @@
 from pathlib import Path
+from enum import StrEnum
 
 # --- Provider & model defaults ---
-LLM_PROVIDER = "openai"
+class LLM_PROVIDER(StrEnum):
+    OPENAI = "openai"
+    OPENROUTER = "openrouter"
+
+
 LLM_PLAN_MODEL = "gpt-5.2"
 LLM_CODE_MODEL = "gpt-5.1-codex"
 LLM_TEMPERATURE = 0.1
 LLM_PLAN_OUTPUT_MAX_TOKENS = 12_000
 LLM_CODEGEN_OUTPUT_MAX_TOKENS = 42_000
-LLM_REASONING_EFFORT = "low"
+class LLM_REASONING_EFFORT(StrEnum):
+    NONE = "none"
+    MINIMAL = "minimal"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    XHIGH = "xhigh"
 
 # --- Token budget defaults ---
 DAILY_TOKEN_LIMIT = 250_000

@@ -4,6 +4,7 @@ import pytest
 
 from app.configs.llm_settings import (
     DAILY_TOKEN_LIMIT,
+    LLM_PROVIDER,
     LLM_PLAN_OUTPUT_MAX_TOKENS,
     LLM_CODEGEN_OUTPUT_MAX_TOKENS,
     TOKEN_OUTPUT_BUFFER,
@@ -50,7 +51,7 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
         call_id=call_id,
         job_id=job_id,
         stage=JobStatus.PLANNING,
-        provider="openai",
+        provider=LLM_PROVIDER.OPENAI.value,
         model="gpt-5.2",
         prompt_text="x + 3 = 7",
     )
@@ -66,7 +67,7 @@ def test_reserve_acquires_lock_checks_total_then_creates_reservation(
     assert kwargs["call_id"] == call_id
     assert kwargs["job_id"] == job_id
     assert kwargs["stage"] == JobStatus.PLANNING.value
-    assert kwargs["provider"] == "openai"
+    assert kwargs["provider"] == LLM_PROVIDER.OPENAI.value
     assert kwargs["model"] == "gpt-5.2"
     assert kwargs["reserved_tokens"] == reserved_tokens
 
@@ -95,7 +96,7 @@ def test_reserve_uses_codegen_output_allowance_for_codegen_stage(
     reserved = BudgetService.reserve(
         cursor=object(),
         call_id=uuid4(), job_id=uuid4(),
-        stage=JobStatus.CODEGEN, provider="openai", model="gpt-5.1-codex",
+        stage=JobStatus.CODEGEN, provider=LLM_PROVIDER.OPENAI.value, model="gpt-5.1-codex",
         prompt_text="some code prompt",
     )
 
@@ -128,7 +129,7 @@ def test_reserve_uses_plan_output_allowance_for_fixing_stage(
     reserved = BudgetService.reserve(
         cursor=object(),
         call_id=uuid4(), job_id=uuid4(),
-        stage=JobStatus.FIXING, provider="openai", model="gpt-5.1-codex",
+        stage=JobStatus.FIXING, provider=LLM_PROVIDER.OPENAI.value, model="gpt-5.1-codex",
         prompt_text="some fix prompt",
     )
 
@@ -167,7 +168,7 @@ def test_reserve_raises_quota_exceeded_when_daily_limit_reached(
         BudgetService.reserve(
             cursor=object(),
             call_id=uuid4(), job_id=uuid4(),
-            stage=JobStatus.PLANNING, provider="openai", model="gpt-5.2",
+            stage=JobStatus.PLANNING, provider=LLM_PROVIDER.OPENAI.value, model="gpt-5.2",
             prompt_text="example prompt",
         )
 

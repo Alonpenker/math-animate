@@ -18,6 +18,8 @@ services:
         condition: service_started
       worker:
         condition: service_started
+    environment:
+      E2E: ${E2E:-}
     env_file:
       - ./backend/.env
 

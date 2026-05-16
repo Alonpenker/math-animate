@@ -16,7 +16,7 @@ class BaseLog(BaseModel):
 
 WorkerOperation = Literal[
     "generate_plan", "generate_code", "verify_code",
-    "fix_code", "generate_render", "seed_knowledge",
+    "fix_code", "generate_code_langgraph", "generate_render", "seed_knowledge",
     "e2e_mode"
 ]
 

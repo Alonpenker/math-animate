@@ -1,6 +1,13 @@
 from app.domain.job_state import JobStatus
 from app.schemas.jobs import JobRequest
-from app.workers.worker import generate_plan, generate_code, generate_render, seed_knowledge
+from app.utils.llm_stubs import IS_E2E_MODE
+from app.workers.worker import (
+    generate_code,
+    generate_code_langgraph,
+    generate_plan,
+    generate_render,
+    seed_knowledge,
+)
 
 class WorkerRunner:
     """Coordinates job steps; actual implementations live in planner.py and render.py"""
@@ -22,7 +29,10 @@ class WorkerRunner:
     
     @staticmethod
     def handle_codegen(job_request: JobRequest) -> None:
-        generate_code.delay(job_request.model_dump(mode="json"))
+        if IS_E2E_MODE:
+            generate_code_langgraph.delay(job_request.model_dump(mode="json"))
+        else:
+            generate_code.delay(job_request.model_dump(mode="json"))
 
     @staticmethod
     def handle_render(job_request: JobRequest) -> None:

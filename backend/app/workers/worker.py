@@ -1,15 +1,31 @@
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown, worker_ready, setup_logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 import tempfile
 import shutil
 import subprocess
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
+from enum import StrEnum
+from typing import Annotated, TypedDict
 from psycopg2.errors import UniqueViolation
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
+from pydantic import BaseModel
 
 from app.configs.app_settings import settings
-from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
+from app.configs.llm_settings import (
+    CODEGEN_SYSTEM_PROMPT,
+    LLM_PROVIDER,
+    LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+    LLM_CODE_MODEL,
+    LLM_PLAN_MODEL,
+    LLM_REASONING_EFFORT
+)
 from app.workers.worker_settings import (
     PathNames,
     DockerCommands,
@@ -24,14 +40,30 @@ from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
-from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
+from app.llm_knowledge.skill_documents import (
+    CORE_DOCUMENTS,
+    LLMKNOWLEDGE_DIR,
+    REGISTRY,
+    REGISTRY_BY_ID,
+    read_knowledge_file,
+)
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
-from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
+from app.schemas.jobs import (
+    Job,
+    JobCodeRequest,
+    JobFixRequest,
+    JobPlanRequest,
+    JobRequest,
+    JobUserRequest,
+)
 from app.schemas.artifact import ArtifactType
-from app.services.llm_service import LLMService
+from app.schemas.knowledge import KnowledgeDocumentSeed
+from app.schemas.video_plan import VideoPlan
+from app.services.llm_service import CallType, LLMService
 from app.services.rag_service import RAGService
+from app.services.skill_retrieval_service import SkillRetrievalService
 from app.workers.worker_helpers import (
     transition_job,
     reserve_budget,
@@ -73,6 +105,82 @@ if IS_E2E_MODE:
         operation="e2e_mode",
         event="E2E mode enabled - LLM calls will be stubbed",
     ))
+
+
+OPENROUTER_MODEL = "poolside/laguna-m.1:free"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+class NodesNames(StrEnum):
+    DOCUMENT_SELECTION = "document_selection"
+    LOAD_SELECTED_DOCUMENTS = "load_selected_documents"
+    GENERATE_CODE = "generate_code"
+    VERIFY = "verify"
+    FIX_CODE = "fix_code"
+    SAVE_AND_RENDER = "save_and_render"
+    FAIL = "fail"
+
+    @classmethod
+    def non_loop_nodes(cls) -> tuple["NodesNames", ...]:
+        return (
+            cls.DOCUMENT_SELECTION,
+            cls.LOAD_SELECTED_DOCUMENTS,
+            cls.GENERATE_CODE,
+            cls.VERIFY,
+            cls.SAVE_AND_RENDER,
+            cls.FAIL,
+        )
+
+    @classmethod
+    def loop_nodes_per_fix_attempt(cls) -> tuple["NodesNames", ...]:
+        return (
+            cls.FIX_CODE,
+            cls.VERIFY,
+        )
+
+
+class SelectedSkillDocuments(BaseModel):
+    selected_titles: list[str]
+
+
+class LangGraphCodegenState(TypedDict):
+    job_id: UUID
+    plan: VideoPlan
+    messages: Annotated[list[BaseMessage], add_messages]
+    code: str
+    verification_failure: str
+    fix_attempt: int
+    verification_fixable: bool
+
+
+def _get_openrouter_client() -> ChatOpenAI:
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise EnvironmentError(
+            "OPENROUTER_API_KEY is not set. "
+            "Set it in the backend .env or process environment to use the LangGraph workflow."
+        )
+    return ChatOpenAI(
+        model=OPENROUTER_MODEL,
+        base_url=OPENROUTER_BASE_URL,
+        api_key=api_key,
+        max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+        extra_body={
+            "reasoning": {
+                "effort": LLM_REASONING_EFFORT.HIGH.value
+            }
+        }
+    )
+
+
+def route_after_verify(state: LangGraphCodegenState) -> str:
+    if not state["verification_failure"]:
+        return NodesNames.SAVE_AND_RENDER
+    if not state["verification_fixable"]:
+        return NodesNames.FAIL
+    if state["fix_attempt"] >= MAX_FIX_ATTEMPTS:
+        return NodesNames.FAIL
+    return NodesNames.FIX_CODE
 
 
 @setup_logging.connect
@@ -481,6 +589,430 @@ def fix_code(job_request_payload: dict) -> None:
             event="Fix task failed",
             job_id=str(job_id),
             call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+
+@app.task()
+def generate_code_langgraph(job_request_payload: dict) -> None:
+    try:
+        job_request = JobPlanRequest(**job_request_payload)
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    job_id = job_request.job.job_id
+    current_status = job_request.job.status
+    call_number = 0
+    candidates_by_title: dict[str, KnowledgeDocumentSeed] = {}
+    selected_titles: list[str] = []
+
+    def set_status(from_status: JobStatus, to_status: JobStatus) -> None:
+        nonlocal current_status
+        transition_job(job_id, from_status, to_status)
+        current_status = to_status
+
+    def mark_failed_after_exception() -> None:
+        if current_status == JobStatus.CODEGEN:
+            set_status(JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
+        elif current_status == JobStatus.CODED:
+            set_status(JobStatus.CODED, JobStatus.FAILED_VERIFICATION)
+        elif current_status in {JobStatus.VERIFYING, JobStatus.FIXING}:
+            set_status(current_status, JobStatus.FAILED_VERIFICATION)
+
+    def log_node_started(name: NodesNames) -> None:
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event=f"Node: {name} started",
+            job_id=str(job_id),
+        ))
+
+    def log_openrouter_call(
+        call_type: CallType,
+        started_at: float,
+        response,
+        extra_context: dict | None = None,
+    ) -> None:
+        nonlocal call_number
+        call_number += 1
+        input_tokens, output_tokens, total_tokens, reasoning_tokens = LLMService._extract_token_usage(response)
+        context = {
+            "provider": LLM_PROVIDER.OPENROUTER.value,
+            "model": OPENROUTER_MODEL,
+            "call_type": call_type.value,
+            "call_number": call_number,
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+            "input_tokens": input_tokens,
+            "reasoning_tokens": reasoning_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+        }
+        if extra_context:
+            context.update(extra_context)
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="OpenRouter call completed",
+            job_id=str(job_id),
+            context=context,
+        ))
+
+    def extract_code(response: BaseMessage) -> str:
+        try:
+            text = LLMService._extract_text_content(response)
+        except ValueError as exc:
+            _, _, total_tokens, _ = LLMService._extract_token_usage(response)
+            raise LLMUsageException(
+                "LLM output validation failed: response did not contain plain text code.",
+                total_tokens=total_tokens,
+            ) from exc
+
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            lines = stripped.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            stripped = "\n".join(lines).strip()
+        return stripped
+
+    def build_system_messages(valid_titles: list[str]) -> list[SystemMessage]:
+        core_content = "\n\n".join(read_knowledge_file(doc.path) for doc in CORE_DOCUMENTS)
+        prompt_content = CODEGEN_SYSTEM_PROMPT
+        core_section_start = prompt_content.find("\n# Core Skill Guidance")
+        output_contract_start = prompt_content.find("\n# Output Contract")
+        if core_section_start != -1 and output_contract_start != -1:
+            prompt_content = (
+                prompt_content[:core_section_start]
+                + prompt_content[output_contract_start:]
+            )
+        else:
+            prompt_content = (
+                prompt_content
+                .replace("{core_content}", "")
+                .replace("{candidate_metadata}", "")
+            )
+
+        document_sections = []
+        for title in valid_titles:
+            content = read_knowledge_file(candidates_by_title[title].path)
+            document_sections.append(f"# {title}\n\n{content}")
+        selected_document_content = (
+            "\n\n".join(document_sections)
+            if document_sections
+            else "(No selected optional skill documents.)"
+        )
+        return [
+            SystemMessage(content=prompt_content.strip()),
+            SystemMessage(content=f"# Core Skill Documents\n\n{core_content}"),
+            SystemMessage(content=f"# Selected Skill Documents\n\n{selected_document_content}"),
+        ]
+
+    def node_document_selection(state: LangGraphCodegenState) -> dict:
+        nonlocal candidates_by_title, selected_titles
+        log_node_started(NodesNames.DOCUMENT_SELECTION)
+        plan_text = state["plan"].model_dump_json()
+        with get_worker_cursor() as cursor:
+            candidates = SkillRetrievalService.retrieve(cursor, plan_text)
+
+        candidate_documents = [
+            doc for doc in candidates.all_candidates
+            if doc.document_id in REGISTRY_BY_ID
+        ]
+        candidates_by_title = {
+            doc.title: REGISTRY_BY_ID[doc.document_id]
+            for doc in candidate_documents
+        }
+        candidate_metadata = (
+            "\n".join(doc.to_metadata() for doc in candidate_documents)
+            if candidate_documents
+            else "(No candidate skill documents retrieved.)"
+        )
+        selection_prompt = (
+            "From this list, return only the document titles needed to generate "
+            "reliable Manim code for the lesson plan.\n\n"
+            f"Lesson plan JSON:\n{plan_text}\n\n"
+            f"Candidate documents:\n{candidate_metadata}\n\n"
+            "Return exact titles from the list. Select an empty list if none are useful."
+        )
+
+        structured_client = client.with_structured_output(SelectedSkillDocuments, include_raw=True)
+        started_at = time.perf_counter()
+        result = structured_client.invoke([HumanMessage(content=selection_prompt)])
+        raw_response = result.get("raw") if isinstance(result, dict) else result
+        parsed = result.get("parsed") if isinstance(result, dict) else result
+        selected_count = (
+            len(parsed.selected_titles)
+            if isinstance(parsed, SelectedSkillDocuments)
+            else 0
+        )
+        log_openrouter_call(
+            CallType.DOCUMENT_SELECTION,
+            started_at,
+            raw_response,
+            {
+                "candidate_count": len(candidate_documents),
+                "selected_count": selected_count,
+            },
+        )
+        if not isinstance(parsed, SelectedSkillDocuments):
+            parsing_error = result.get("parsing_error") if isinstance(result, dict) else None
+            _, _, total_tokens, _ = LLMService._extract_token_usage(raw_response)
+            exception = LLMUsageException(
+                "LLM output validation failed: document selection response was not valid.",
+                total_tokens=total_tokens,
+            )
+            if isinstance(parsing_error, BaseException):
+                raise exception from parsing_error
+            raise exception
+
+        selected_titles = list(dict.fromkeys(parsed.selected_titles))
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Document selection completed",
+            job_id=str(job_id),
+            context={
+                "candidate_count": len(candidate_documents),
+                "selected_count": len(selected_titles),
+                "selected_titles": selected_titles,
+            },
+        ))
+        return {}
+
+    def node_load_selected_documents(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.LOAD_SELECTED_DOCUMENTS)
+        valid_titles = [title for title in selected_titles if title in candidates_by_title]
+        invalid_titles = [title for title in selected_titles if title not in candidates_by_title]
+        if invalid_titles:
+            logger.warning(WorkerLog(
+                operation="generate_code_langgraph",
+                event="Ignoring unknown selected skill document titles",
+                job_id=str(job_id),
+                context={"invalid_titles": invalid_titles},
+            ))
+
+        try:
+            system_messages = build_system_messages(valid_titles)
+        except Exception as exc:
+            logger.error(WorkerLog(
+                operation="generate_code_langgraph",
+                event="Selected skill document load failed",
+                job_id=str(job_id),
+                error=Logger.serialize_error(exc),
+            ), exc_info=exc)
+            raise
+        return {"messages": system_messages}
+
+    def node_generate_code(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.GENERATE_CODE)
+        plan_text = state["plan"].model_dump_json()
+        human_message = HumanMessage(
+            content=f"Generate Manim code for this lesson plan:\n\n{plan_text}"
+        )
+        started_at = time.perf_counter()
+        response: AIMessage = client.invoke([*state["messages"], human_message])
+        code = extract_code(response)
+        log_openrouter_call(CallType.CODEGEN, started_at, response)
+        set_status(JobStatus.CODEGEN, JobStatus.CODED)
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Code generation completed",
+            job_id=str(job_id),
+        ))
+        return {"messages": [human_message, response], "code": code}
+
+    def node_verify(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.VERIFY)
+        expected_from = JobStatus.CODED if state["fix_attempt"] == 0 else JobStatus.FIXING
+        set_status(expected_from, JobStatus.VERIFYING)
+
+        render_root = Path(PathNames.TMP_RENDER_FOLDER)
+        input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
+        input_dir.mkdir(parents=True, exist_ok=True)
+        code_path = input_dir / PathNames.MANIM_CODE
+        code_path.write_text(state["code"], encoding="utf-8")
+
+        try:
+            from app.workers.worker_helpers import verify_code as static_verify
+            failure = static_verify(state["code"], code_path)
+            is_fixable = True
+
+            if failure is None:
+                media_dir = input_dir / PathNames.MEDIA_FOLDER
+                media_dir.mkdir(parents=True, exist_ok=True)
+                media_dir.chmod(0o777)
+                passed, error_output, is_fixable = dry_run_docker(code_path, media_dir)
+                if not passed:
+                    failure = (
+                        f"Dry-run failed:\n{error_output}"
+                        if is_fixable
+                        else f"Dry-run infrastructure error:\n{error_output}"
+                    )
+
+            if failure is None:
+                logger.info(WorkerLog(
+                    operation="generate_code_langgraph",
+                    event="Verification passed",
+                    job_id=str(job_id),
+                    context={"fix_attempt": state["fix_attempt"]},
+                ))
+                return {"verification_failure": "", "verification_fixable": True}
+
+            failure_summary = summarize_verification_failure(failure)
+            logger.warning(WorkerLog(
+                operation="generate_code_langgraph",
+                event="Verification failed",
+                job_id=str(job_id),
+                context={
+                    "fix_attempt": state["fix_attempt"],
+                    "failure_summary": failure_summary,
+                    "is_fixable": is_fixable,
+                },
+            ))
+            return {"verification_failure": failure, "verification_fixable": is_fixable}
+        except Exception:
+            set_status(JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+            raise
+        finally:
+            shutil.rmtree(input_dir, ignore_errors=True)
+
+    def node_fix_code(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.FIX_CODE)
+        set_status(JobStatus.VERIFYING, JobStatus.FIXING)
+        attempt = state["fix_attempt"] + 1
+        fix_instruction = HumanMessage(
+            content=(
+                f"Attempt {attempt} of {MAX_FIX_ATTEMPTS}: verification failed.\n\n"
+                f"{state['verification_failure']}\n\n"
+                "Return a complete corrected Python script only."
+            )
+        )
+        started_at = time.perf_counter()
+        try:
+            response: AIMessage = client.invoke([*state["messages"], fix_instruction])
+            fixed_code = extract_code(response)
+        except Exception:
+            set_status(JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
+            raise
+
+        log_openrouter_call(
+            CallType.FIX,
+            started_at,
+            response,
+            {"attempt": attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
+        )
+        return {"messages": [fix_instruction, response], "code": fixed_code, "fix_attempt": attempt}
+
+    def node_save_and_render(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.SAVE_AND_RENDER)
+        storage = get_storage()
+        job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
+        job_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=f".{ArtifactType.PYTHON_FILE.value}",
+                dir=job_dir,
+                delete=False,
+            ) as tmp:
+                tmp.write(state["code"].encode("utf-8"))
+                file_path = Path(tmp.name)
+            save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
+        finally:
+            if job_dir.exists():
+                shutil.rmtree(job_dir, ignore_errors=True)
+
+        set_status(JobStatus.VERIFYING, JobStatus.VERIFIED)
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Verification completed and render enqueued",
+            job_id=str(job_id),
+        ))
+        generate_render.delay(
+            JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
+        )
+        return {}
+
+    def node_fail(state: LangGraphCodegenState) -> dict:
+        log_node_started(NodesNames.FAIL)
+        logger.error(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Verification failed; job failed",
+            job_id=str(job_id),
+            context={
+                "fix_attempt": state["fix_attempt"],
+                "max_fix_attempts": MAX_FIX_ATTEMPTS,
+                "verification_fixable": state["verification_fixable"],
+                "failure_summary": summarize_verification_failure(state["verification_failure"]),
+            },
+        ))
+        set_status(JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
+        return {}
+
+    try:
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="LangGraph task started",
+            job_id=str(job_id),
+        ))
+        set_status(job_request.job.status, JobStatus.CODEGEN)
+        client = _get_openrouter_client()
+
+        graph = StateGraph(LangGraphCodegenState)
+        graph.add_node(NodesNames.DOCUMENT_SELECTION, node_document_selection)
+        graph.add_node(NodesNames.LOAD_SELECTED_DOCUMENTS, node_load_selected_documents)
+        graph.add_node(NodesNames.GENERATE_CODE, node_generate_code)
+        graph.add_node(NodesNames.VERIFY, node_verify)
+        graph.add_node(NodesNames.FIX_CODE, node_fix_code)
+        graph.add_node(NodesNames.SAVE_AND_RENDER, node_save_and_render)
+        graph.add_node(NodesNames.FAIL, node_fail)
+
+        graph.set_entry_point(NodesNames.DOCUMENT_SELECTION)
+        graph.add_edge(NodesNames.DOCUMENT_SELECTION, NodesNames.LOAD_SELECTED_DOCUMENTS)
+        graph.add_edge(NodesNames.LOAD_SELECTED_DOCUMENTS, NodesNames.GENERATE_CODE)
+        graph.add_edge(NodesNames.GENERATE_CODE, NodesNames.VERIFY)
+        graph.add_conditional_edges(NodesNames.VERIFY, route_after_verify)
+        graph.add_edge(NodesNames.FIX_CODE, NodesNames.VERIFY)
+        graph.add_edge(NodesNames.SAVE_AND_RENDER, END)
+        graph.add_edge(NodesNames.FAIL, END)
+
+        compiled = graph.compile()
+        initial_state: LangGraphCodegenState = {
+            "job_id": job_id,
+            "plan": job_request.plan,
+            "messages": [],
+            "code": "",
+            "verification_failure": "",
+            "fix_attempt": 0,
+            "verification_fixable": True,
+        }
+        recursion_limit = (
+            len(NodesNames.non_loop_nodes())
+            + MAX_FIX_ATTEMPTS * len(NodesNames.loop_nodes_per_fix_attempt())
+        )
+        compiled.invoke(initial_state, config={"recursion_limit": recursion_limit})
+        logger.info(WorkerLog(
+            operation="generate_code_langgraph",
+            event="LangGraph task completed",
+            job_id=str(job_id),
+        ))
+    except Exception as exc:
+        try:
+            mark_failed_after_exception()
+        except Exception:
+            logger.warning(WorkerLog(
+                operation="generate_code_langgraph",
+                event="Failed to transition job after LangGraph exception",
+                job_id=str(job_id),
+            ), exc_info=True)
+        logger.error(WorkerLog(
+            operation="generate_code_langgraph",
+            event="LangGraph task failed",
+            job_id=str(job_id),
             error=Logger.serialize_error(exc),
         ), exc_info=exc)
         raise

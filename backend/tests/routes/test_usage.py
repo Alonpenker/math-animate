@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
-from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
+from app.configs.llm_settings import DAILY_TOKEN_LIMIT, LLM_PROVIDER, SOFT_THRESHOLD_RATIO
 from app.schemas.token_usage import TokenUsageResponse
 
 def _today() -> date:
@@ -12,7 +12,7 @@ def _ledger_row(
     state: str,
     consumed_tokens: int = 0,
     reserved_tokens: int = 0,
-    provider: str = "openai",
+    provider: str = LLM_PROVIDER.OPENAI.value,
     model: str = "gpt-5.2",
     stage: str = "planning",
     day: date | None = None,

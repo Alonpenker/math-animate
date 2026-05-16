@@ -25,6 +25,7 @@ dependencies = [
     "pytest>=7.4",
     "slowapi>=0.1.9",
     "structlog>=25.1",
+    "langgraph>=1.1.6",
 ]
 
 [tool.pytest.ini_options]
