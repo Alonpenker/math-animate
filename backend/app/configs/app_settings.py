@@ -8,14 +8,15 @@ The system turns a lesson idea into a reviewed scene plan, generates visual anim
 renders the video in an isolated environment, and stores the final artifacts for download. 
 Built for reliability, reproducibility, and human-in-the-loop control—so teachers stay in charge 
 while the system handles the heavy lifting."""
-APP_VERSION = "0.1.6"
+APP_VERSION = "0.1.8"
 
 ROUTER_PREFIX = "/api/v1"
 INTERNAL_ROUTER_PREFIX = "/internal"
 
 class Settings(BaseSettings):
     x_api_key: SecretStr
-    openai_api_key: SecretStr
+    openrouter_api_key: SecretStr
+    openai_api_key: SecretStr | None = None
 
     storage_endpoint: str
     storage_access_key: str
