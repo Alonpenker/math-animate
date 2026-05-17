@@ -173,8 +173,8 @@ export const JOB_STATUS_DEFS: Record<JobStatus, JobStatusDef> = {
     kind: 'failure',
     terminal: {
       icon: 'Gauge',
-      heading: 'Daily Token Limit Reached',
-      explanation: 'The shared daily token budget has been exhausted. Please try again after midnight UTC.',
+      heading: 'Daily AI Call Limit Reached',
+      explanation: 'The shared daily AI call limit has been exhausted. Please try again after midnight UTC.',
     },
   },
   FAILED_LLM_USAGE: {
