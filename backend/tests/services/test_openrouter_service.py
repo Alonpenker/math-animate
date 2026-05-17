@@ -178,11 +178,14 @@ def test_invoke_structured_returns_schema_instance_and_records_token_telemetry(m
             }
 
     class FakeClient:
-        def with_structured_output(self, schema, include_raw):
+        def with_structured_output(self, schema, method, strict, include_raw):
             assert schema is SampleStructuredResponse
+            assert method == "json_schema"
+            assert strict is True
             assert include_raw is True
             return FakeStructuredClient()
 
+    captured_client_kwargs = {}
     monkeypatch.setattr(
         OpenRouterService,
         "claim_call",
@@ -191,7 +194,9 @@ def test_invoke_structured_returns_schema_instance_and_records_token_telemetry(m
     monkeypatch.setattr(
         OpenRouterService,
         "get_client",
-        staticmethod(lambda **kwargs: FakeClient()),
+        staticmethod(
+            lambda **kwargs: captured_client_kwargs.update(kwargs) or FakeClient()
+        ),
     )
     monkeypatch.setattr(
         service_module.TokenLedgerRepository,
@@ -219,6 +224,8 @@ def test_invoke_structured_returns_schema_instance_and_records_token_telemetry(m
     assert usage.total_tokens == 20
     assert recorded["call_id"] == call_id
     assert recorded["usage"] == usage
+    assert captured_client_kwargs["reasoning_effort"] is None
+    assert captured_client_kwargs["require_parameters"] is True
 
 
 def test_invoke_structured_raises_when_parsed_value_does_not_match_schema(monkeypatch: pytest.MonkeyPatch):
@@ -245,7 +252,7 @@ def test_invoke_structured_raises_when_parsed_value_does_not_match_schema(monkey
             }
 
     class FakeClient:
-        def with_structured_output(self, schema, include_raw):
+        def with_structured_output(self, schema, method, strict, include_raw):
             return FakeStructuredClient()
 
     monkeypatch.setattr(

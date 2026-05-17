@@ -130,12 +130,13 @@ class AgentService:
             started_at: float,
             usage: OpenRouterTokenUsage,
             extra_context: dict | None = None,
+            model: OPENROUTER_MODELS = OPENROUTER_MODELS.CODING_MODEL,
         ) -> None:
             nonlocal call_number
             call_number += 1
             context = {
                 "provider": LLM_PROVIDER.OPENROUTER.value,
-                "model": OPENROUTER_MODELS.CODING_MODEL.value,
+                "model": model.value,
                 "call_type": call_type.value,
                 "call_number": call_number,
                 "duration_ms": int((time.perf_counter() - started_at) * 1000),
@@ -237,7 +238,7 @@ class AgentService:
                 job_id=job_id,
                 stage=JobStatus.CODEGEN,
                 call_type=CallType.DOCUMENT_SELECTION,
-                model=OPENROUTER_MODELS.CODING_MODEL,
+                model=OPENROUTER_MODELS.PLAN_MODEL,
                 messages=[HumanMessage(content=selection_prompt)],
                 schema=SelectedSkillDocuments,
                 max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
@@ -251,6 +252,7 @@ class AgentService:
                     "candidate_count": len(candidate_documents),
                     "selected_count": selected_count,
                 },
+                model=OPENROUTER_MODELS.PLAN_MODEL,
             )
             selected_titles = list(dict.fromkeys(parsed.selected_titles))
             logger.info(WorkerLog(

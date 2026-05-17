@@ -14,7 +14,7 @@ LLM_PLAN_OUTPUT_MAX_TOKENS = 12_000
 LLM_CODEGEN_OUTPUT_MAX_TOKENS = 42_000
 
 class OPENROUTER_MODELS(StrEnum):
-    PLAN_MODEL = "openai/gpt-oss-120b:free"
+    PLAN_MODEL = "openrouter/owl-alpha"
     CODING_MODEL = "poolside/laguna-m.1:free"
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
