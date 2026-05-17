@@ -165,45 +165,63 @@ def mock_token_ledger_repository(
 ) -> None:
     from datetime import date as date_type
 
-    from app.configs.llm_settings import DAILY_TOKEN_LIMIT, SOFT_THRESHOLD_RATIO
+    from app.configs.llm_settings import LLM_PROVIDER, OPENROUTER_DAILY_CALL_LIMIT
     from app.repositories.token_repository import TokenLedgerRepository
-    from app.schemas.token_usage import BreakdownEntry, DailySummary
+    from app.schemas.token_usage import BreakdownEntry, DailySummary, TokenTotals
 
     def get_daily_summary(_cursor, day: date_type):
-        rows = [r for r in test_store["token_ledger"] if r["day"] == day]
+        rows = [
+            r for r in test_store["token_ledger"]
+            if r["day"] == day and r["provider"] == LLM_PROVIDER.OPENROUTER.value
+        ]
 
         groups: dict[tuple, dict] = {}
         for row in rows:
-            key = (row["provider"], row["model"], row["stage"])
+            key = (row["provider"], row["model"], row["stage"], row.get("call_type", "unknown"))
             if key not in groups:
-                groups[key] = {"consumed": 0, "reserved": 0}
-            if row["state"] == "RELEASED":
-                groups[key]["consumed"] += row["consumed_tokens"]
-            if row["state"] == "ACTIVE":
-                groups[key]["reserved"] += row["reserved_tokens"]
+                groups[key] = {
+                    "calls": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 0,
+                }
+            groups[key]["calls"] += 1
+            groups[key]["input_tokens"] += row.get("input_tokens", 0)
+            groups[key]["output_tokens"] += row.get("output_tokens", 0)
+            groups[key]["reasoning_tokens"] += row.get("reasoning_tokens", 0)
+            groups[key]["total_tokens"] += row.get("consumed_tokens", 0)
 
         breakdown = []
-        total_consumed = total_reserved = 0
-        for (provider, model, stage), totals in groups.items():
+        calls = input_tokens = output_tokens = reasoning_tokens = total_tokens = 0
+        for (provider, model, stage, call_type), totals in groups.items():
             breakdown.append(BreakdownEntry(
-                provider=provider, model=model, stage=stage,
-                consumed=totals["consumed"], reserved=totals["reserved"],
+                provider=provider,
+                model=model,
+                stage=stage,
+                call_type=call_type,
+                calls=totals["calls"],
+                input_tokens=totals["input_tokens"],
+                output_tokens=totals["output_tokens"],
+                reasoning_tokens=totals["reasoning_tokens"],
+                total_tokens=totals["total_tokens"],
             ))
-            total_consumed += totals["consumed"]
-            total_reserved += totals["reserved"]
-
-        used = total_consumed + total_reserved
-        remaining = max(0, DAILY_TOKEN_LIMIT - used)
-        remaining_pct = round((remaining / DAILY_TOKEN_LIMIT) * 100, 2) if DAILY_TOKEN_LIMIT > 0 else 0.0
-        soft_threshold = int(DAILY_TOKEN_LIMIT * SOFT_THRESHOLD_RATIO)
+            calls += totals["calls"]
+            input_tokens += totals["input_tokens"]
+            output_tokens += totals["output_tokens"]
+            reasoning_tokens += totals["reasoning_tokens"]
+            total_tokens += totals["total_tokens"]
 
         return DailySummary(
-            daily_limit=DAILY_TOKEN_LIMIT,
-            consumed=total_consumed,
-            reserved=total_reserved,
-            remaining=remaining,
-            remaining_pct=remaining_pct,
-            soft_threshold_exceeded=used >= soft_threshold,
+            openrouter_calls=calls,
+            openrouter_call_limit=OPENROUTER_DAILY_CALL_LIMIT,
+            openrouter_calls_remaining=max(0, OPENROUTER_DAILY_CALL_LIMIT - calls),
+            token_totals=TokenTotals(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                reasoning_tokens=reasoning_tokens,
+                total_tokens=total_tokens,
+            ),
             breakdown=breakdown,
         )
 

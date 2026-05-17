@@ -440,6 +440,123 @@ def test_generate_plan_sets_failed_llm_usage_and_reraises_on_llm_usage_error(
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_USAGE
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_USAGE)
 
+def test_generate_plan_openrouter_transitions_to_planned_and_persists_plan(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    sample_user_request,
+    sample_video_plan,
+    test_store,
+):
+    # Given
+    from app.services.openrouter_service import OpenRouterTokenUsage
+    from app.workers import worker as worker_module
+
+    budget_called = {"called": False}
+    monkeypatch.setattr(
+        worker_module.LLMService,
+        "render_plan_prompt",
+        staticmethod(lambda user_request: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.OpenRouterService,
+        "invoke_structured",
+        staticmethod(lambda **kwargs: (sample_video_plan, OpenRouterTokenUsage(total_tokens=123))),
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "reserve_budget",
+        lambda *args, **kwargs: budget_called.update({"called": True}),
+    )
+
+    job = Job(status=JobStatus.CREATED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobUserRequest(job=job, user_request=sample_user_request).model_dump(mode="json")
+
+    # When
+    worker_module.generate_plan_openrouter(payload)
+
+    # Then
+    assert test_store["jobs"][job.job_id].status == JobStatus.PLANNED
+    assert job.job_id in test_store["plans"]
+    assert budget_called["called"] is False
+    assert test_store["status_updates"][-2:] == [
+        (job.job_id, JobStatus.PLANNING),
+        (job.job_id, JobStatus.PLANNED),
+    ]
+
+def test_generate_plan_openrouter_sets_failed_quota_exceeded_and_reraises(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    sample_user_request,
+    test_store,
+):
+    # Given
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module.LLMService,
+        "render_plan_prompt",
+        staticmethod(lambda user_request: ("fake-system-prompt", "fake-user-query")),
+    )
+    monkeypatch.setattr(
+        worker_module.OpenRouterService,
+        "invoke_structured",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(
+            QuotaExceededError(limit=50, consumed=50, reserved=0, requested=1)
+        )),
+    )
+
+    job = Job(status=JobStatus.CREATED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobUserRequest(job=job, user_request=sample_user_request).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(QuotaExceededError):
+        worker_module.generate_plan_openrouter(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
+
+def test_worker_runner_routes_created_jobs_to_openrouter_planning(monkeypatch):
+    # Given
+    from app.workers import runner as runner_module
+
+    enqueued = []
+    monkeypatch.setattr(
+        runner_module.generate_plan_openrouter,
+        "delay",
+        lambda payload: enqueued.append(payload),
+    )
+    job_request = JobRequest(job=Job(status=JobStatus.CREATED))
+
+    # When
+    runner_module.WorkerRunner.handle_planning(job_request)
+
+    # Then
+    assert len(enqueued) == 1
+    assert enqueued[0]["job"]["status"] == JobStatus.CREATED.value
+
+def test_worker_runner_routes_approved_jobs_to_langgraph_codegen(monkeypatch):
+    # Given
+    from app.workers import runner as runner_module
+
+    enqueued = []
+    monkeypatch.setattr(
+        runner_module.generate_code_langgraph,
+        "delay",
+        lambda payload: enqueued.append(payload),
+    )
+    job_request = JobRequest(job=Job(status=JobStatus.APPROVED))
+
+    # When
+    runner_module.WorkerRunner.handle_codegen(job_request)
+
+    # Then
+    assert len(enqueued) == 1
+    assert enqueued[0]["job"]["status"] == JobStatus.APPROVED.value
+
 def test_generate_code_transitions_to_coded_and_enqueues_verify(
     monkeypatch,
     mock_repositories,
