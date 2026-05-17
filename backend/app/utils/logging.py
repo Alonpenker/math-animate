@@ -24,7 +24,7 @@ APIOperation = Literal[
     "health_check", "create_job", "get_job_status", "get_job_plan",
     "approve_job", "cancel_job", "list_artifacts", "get_artifact",
     "download_artifact", "list_knowledge", "get_knowledge_document",
-    "get_usage_summary", "delete_artifact", "seed_knowledge",
+    "get_usage_summary", "delete_artifact", "seed_knowledge", "migrate_schema",
 ]
 
 class WorkerLog(BaseLog):

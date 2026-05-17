@@ -10,8 +10,10 @@ from app.repositories import (
     PlansRepository,
     TokenLedgerRepository,
 )
+from app.utils.logging import APILog, Logger
 
 
+logger = Logger.get_logger("api")
 ALL_REPOSITORIES: tuple[type[Repository], ...] = (
     PlansRepository,
     ArtifactsRepository,
@@ -36,15 +38,48 @@ def migrate_repository_schemas(
     dry_run: bool = False,
     allow_destructive: bool = False,
 ) -> list[MigrationResult]:
-    return [
-        migrate_repository_schema(
-            cursor,
-            repository,
-            dry_run=dry_run,
-            allow_destructive=allow_destructive,
-        )
-        for repository in repositories
-    ]
+    logger.info(APILog(
+        operation="migrate_schema",
+        event="Schema migration started",
+        context={
+            "tables": [repository.TABLE_NAME for repository in repositories],
+            "dry_run": dry_run,
+            "allow_destructive": allow_destructive,
+        },
+    ))
+    results: list[MigrationResult] = []
+    try:
+        for repository in repositories:
+            results.append(migrate_repository_schema(
+                cursor,
+                repository,
+                dry_run=dry_run,
+                allow_destructive=allow_destructive,
+            ))
+    except Exception as exc:
+        logger.error(APILog(
+            operation="migrate_schema",
+            event="Schema migration failed",
+            error=Logger.serialize_error(exc),
+            context={
+                "tables": [repository.TABLE_NAME for repository in repositories],
+                "dry_run": dry_run,
+                "allow_destructive": allow_destructive,
+            },
+        ), exc_info=exc)
+        raise
+
+    logger.info(APILog(
+        operation="migrate_schema",
+        event="Schema migration completed",
+        context={
+            "tables": [result.table_name for result in results],
+            "operation_count": sum(len(result.operations) for result in results),
+            "warning_count": sum(len(result.warnings) for result in results),
+            "dry_run": dry_run,
+        },
+    ))
+    return results
 
 
 def migrate_repository_schema(
@@ -55,22 +90,25 @@ def migrate_repository_schema(
     allow_destructive: bool = False,
 ) -> MigrationResult:
     result = MigrationResult(repository.TABLE_NAME)
+    table_exists = _table_exists(cursor, repository.TABLE_NAME)
 
-    # Create table if not exists
-    _run(cursor, repository._create(), result, dry_run=dry_run)
+    if not table_exists:
+        _run(cursor, repository._create(), result, dry_run=dry_run)
 
     # Adds any missing columns
     expected_columns = {column.name for column in repository.SCHEMA.columns()}
+    existing_columns = _existing_columns(cursor, repository.TABLE_NAME) if table_exists else expected_columns
     for column in repository.SCHEMA.columns():
-        _run(
-            cursor,
-            (
-                f"ALTER TABLE {repository.TABLE_NAME} "
-                f"ADD COLUMN IF NOT EXISTS {column.name} {column.sql_type}"
-            ),
-            result,
-            dry_run=dry_run,
-        )
+        if column.name not in existing_columns:
+            _run(
+                cursor,
+                (
+                    f"ALTER TABLE {repository.TABLE_NAME} "
+                    f"ADD COLUMN {column.name} {column.sql_type}"
+                ),
+                result,
+                dry_run=dry_run,
+            )
     
     # Remove any column missing from code schema (given --allow-destructive flag)
     extra_columns = _existing_columns(cursor, repository.TABLE_NAME) - expected_columns
@@ -83,16 +121,52 @@ def migrate_repository_schema(
                 dry_run=dry_run,
             )
         else:
-            result.warnings.append(
+            warning = (
                 f"{repository.TABLE_NAME}.{column_name} exists in DB but not in code; "
                 "pass --allow-destructive to drop it."
             )
+            result.warnings.append(warning)
+            logger.warning(APILog(
+                operation="migrate_schema",
+                event="Schema migration warning",
+                context={"table": repository.TABLE_NAME, "warning": warning},
+            ))
 
     # Create indexes
+    existing_indexes = _existing_indexes(cursor, repository.TABLE_NAME) if table_exists else set()
     for field_name in repository.INDEX_FIELDS:
-        _run(cursor, repository._create_index(field_name), result, dry_run=dry_run)
+        index_name = f"idx_{repository.TABLE_NAME}_{field_name}"
+        if index_name not in existing_indexes:
+            _run(cursor, repository._create_index(field_name), result, dry_run=dry_run)
 
+    if result.operations or result.warnings:
+        logger.info(APILog(
+            operation="migrate_schema",
+            event="Table migration completed",
+            context={
+                "table": repository.TABLE_NAME,
+                "operation_count": len(result.operations),
+                "warning_count": len(result.warnings),
+                "dry_run": dry_run,
+            },
+        ))
     return result
+
+
+def _table_exists(cursor, table_name: str) -> bool:
+    cursor.execute(
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name = %s
+        ) AS exists
+        """,
+        (table_name,),
+    )
+    row = cursor.fetchone()
+    return bool(row["exists"] if isinstance(row, dict) else row[0])
 
 
 def _existing_columns(cursor, table_name: str) -> set[str]:
@@ -106,11 +180,34 @@ def _existing_columns(cursor, table_name: str) -> set[str]:
         (table_name,),
     )
     rows = cursor.fetchall()
-    return {row[0] for row in rows}
+    return {row["column_name"] if isinstance(row, dict) else row[0] for row in rows}
+
+
+def _existing_indexes(cursor, table_name: str) -> set[str]:
+    cursor.execute(
+        """
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+        AND tablename = %s
+        """,
+        (table_name,),
+    )
+    rows = cursor.fetchall()
+    return {row["indexname"] if isinstance(row, dict) else row[0] for row in rows}
 
 
 def _run(cursor, sql: str, result: MigrationResult, *, dry_run: bool) -> None:
     result.operations.append(sql)
+    logger.debug(APILog(
+        operation="migrate_schema",
+        event="Schema migration operation prepared",
+        context={
+            "table": result.table_name,
+            "dry_run": dry_run,
+            "sql": sql,
+        },
+    ))
     if not dry_run:
         cursor.execute(sql)
 
@@ -128,12 +225,18 @@ def _select_repositories(table_name: str | None, migrate_all: bool) -> tuple[typ
 
 
 def _print_results(results: list[MigrationResult]) -> None:
+    printed = False
     for result in results:
+        if not result.operations and not result.warnings:
+            continue
+        printed = True
         print(f"{result.table_name}:")
         for operation in result.operations:
             print(f"OPERATION: {operation}")
         for warning in result.warnings:
             print(f"WARNING: {warning}", file=sys.stderr)
+    if not printed:
+        print("No schema changes required.")
 
 
 def main() -> None:
