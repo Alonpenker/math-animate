@@ -12,6 +12,14 @@ LLM_CODE_MODEL = "gpt-5.1-codex"
 LLM_TEMPERATURE = 0.1
 LLM_PLAN_OUTPUT_MAX_TOKENS = 12_000
 LLM_CODEGEN_OUTPUT_MAX_TOKENS = 42_000
+
+class OPENROUTER_MODELS(StrEnum):
+    PLAN_MODEL = "openai/gpt-oss-120b:free"
+    CODING_MODEL = "poolside/laguna-m.1:free"
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_DAILY_CALL_LIMIT = 50
+
 class LLM_REASONING_EFFORT(StrEnum):
     NONE = "none"
     MINIMAL = "minimal"
