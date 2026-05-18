@@ -309,6 +309,7 @@ class OpenRouterService:
         model: OPENROUTER_MODELS,
         messages: list[BaseMessage],
         max_tokens: int | None = None,
+        reasoning_effort: LLM_REASONING_EFFORT | None = LLM_REASONING_EFFORT.HIGH,
     ) -> tuple[BaseMessage, OpenRouterTokenUsage]:
         if IS_E2E_MODE:
             content = STUB_FIXED_CODE if call_type == CallType.FIX else STUB_BROKEN_CODE
@@ -327,7 +328,11 @@ class OpenRouterService:
         )
         started_at = time.perf_counter()
         try:
-            client = OpenRouterService.get_client(model=model, max_tokens=max_tokens)
+            client = OpenRouterService.get_client(
+                model=model,
+                max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
+            )
             response = client.invoke(messages)
         except Exception as exc:
             try:

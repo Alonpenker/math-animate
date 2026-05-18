@@ -12,6 +12,15 @@ Design scenes that make the target math idea visually clear. Choose representati
 
 Each scene should have a clear visual intent: what the viewer should notice, what changes, and why the change helps the concept.
 
+# LAYOUT AND COMPOSITION
+
+For each scene, describe the intended screen composition in plain English:
+
+* Assign stable regions for major content, such as title, reference list, main equation or diagram, annotations, and final result.
+* State which objects stay visible, which objects fade out, and which objects compress into a smaller summary before new content appears.
+* Do not keep reference material on screen if it would crowd the main math. If a reference list stays visible, make it a compact sidebar or corner element.
+* End with a readable final frame: the final answer or takeaway should be visually dominant, with stale highlights and temporary annotations removed.
+
 # PEDAGOGY
 
 Use the misconceptions and constraints from the teacher request as design inputs. Address likely mistakes directly through the visuals:

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.configs.llm_settings import (
     CODEGEN_SYSTEM_PROMPT,
+    LLM_REASONING_EFFORT,
     LLM_CODEGEN_OUTPUT_MAX_TOKENS,
     LLM_PROVIDER,
     OPENROUTER_MODELS,
@@ -131,6 +132,7 @@ class AgentService:
             usage: OpenRouterTokenUsage,
             extra_context: dict | None = None,
             model: OPENROUTER_MODELS = OPENROUTER_MODELS.CODING_MODEL,
+            reasoning_effort: LLM_REASONING_EFFORT | None = None,
         ) -> None:
             nonlocal call_number
             call_number += 1
@@ -145,6 +147,8 @@ class AgentService:
                 "output_tokens": usage.output_tokens,
                 "total_tokens": usage.total_tokens,
             }
+            if reasoning_effort is not None:
+                context["requested_reasoning_effort"] = reasoning_effort.value
             if extra_context:
                 context.update(extra_context)
             logger.info(WorkerLog(
@@ -175,20 +179,6 @@ class AgentService:
 
         def build_system_messages(valid_titles: list[str]) -> list[SystemMessage]:
             core_content = "\n\n".join(read_knowledge_file(doc.path) for doc in CORE_DOCUMENTS)
-            prompt_content = CODEGEN_SYSTEM_PROMPT
-            core_section_start = prompt_content.find("\n# Core Skill Guidance")
-            output_contract_start = prompt_content.find("\n# Output Contract")
-            if core_section_start != -1 and output_contract_start != -1:
-                prompt_content = (
-                    prompt_content[:core_section_start]
-                    + prompt_content[output_contract_start:]
-                )
-            else:
-                prompt_content = (
-                    prompt_content
-                    .replace("{core_content}", "")
-                    .replace("{candidate_metadata}", "")
-                )
 
             document_sections = []
             for title in valid_titles:
@@ -200,7 +190,7 @@ class AgentService:
                 else "(No selected optional skill documents.)"
             )
             return [
-                SystemMessage(content=prompt_content.strip()),
+                SystemMessage(content=CODEGEN_SYSTEM_PROMPT.strip()),
                 SystemMessage(content=f"# Core Skill Documents\n\n{core_content}"),
                 SystemMessage(content=f"# Selected Skill Documents\n\n{selected_document_content}"),
             ]
@@ -227,7 +217,10 @@ class AgentService:
             )
             selection_prompt = (
                 "From this list, return only the document titles needed to generate "
-                "reliable Manim code for the lesson plan.\n\n"
+                "reliable Manim code for the lesson plan. Prefer the smallest useful "
+                "set, usually 4 to 5 documents. Select more only when the plan clearly "
+                "needs multiple Manim APIs, animation techniques, or reliability risk "
+                "areas.\n\n"
                 f"Lesson plan JSON:\n{plan_text}\n\n"
                 f"Candidate documents:\n{candidate_metadata}\n\n"
                 "Return exact titles from the list. Select an empty list if none are useful."
@@ -251,6 +244,7 @@ class AgentService:
                 {
                     "candidate_count": len(candidate_documents),
                     "selected_count": selected_count,
+                    "candidate_titles": [doc.title for doc in candidate_documents],
                 },
                 model=OPENROUTER_MODELS.PLAN_MODEL,
             )
@@ -261,6 +255,7 @@ class AgentService:
                 job_id=str(job_id),
                 context={
                     "candidate_count": len(candidate_documents),
+                    "candidate_titles": [doc.title for doc in candidate_documents],
                     "selected_count": len(selected_titles),
                     "selected_titles": selected_titles,
                 },
@@ -305,8 +300,14 @@ class AgentService:
                 model=OPENROUTER_MODELS.CODING_MODEL,
                 messages=[*state["messages"], human_message],
                 max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
             )
-            log_openrouter_call(CallType.CODEGEN, started_at, usage)
+            log_openrouter_call(
+                CallType.CODEGEN,
+                started_at,
+                usage,
+                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+            )
             code = extract_code(response, usage)
             set_status(JobStatus.CODEGEN, JobStatus.CODED)
             logger.info(WorkerLog(
@@ -400,12 +401,14 @@ class AgentService:
                     model=OPENROUTER_MODELS.CODING_MODEL,
                     messages=[*state["messages"], fix_instruction],
                     max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
+                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
                 )
                 log_openrouter_call(
                     CallType.FIX,
                     started_at,
                     usage,
                     {"attempt": attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
+                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
                 )
                 fixed_code = extract_code(response, usage)
             except (LLMUsageException, QuotaExceededError):

@@ -176,9 +176,9 @@ class LLMService:
             else "(No candidate skill documents retrieved.)"
         )
         system_prompt = (
-            CODEGEN_SYSTEM_PROMPT
-            .replace("{core_content}", core_content)
-            .replace("{candidate_metadata}", candidate_metadata)
+            f"{CODEGEN_SYSTEM_PROMPT}\n\n"
+            f"# Core Skill Documents\n\n{core_content}\n\n"
+            f"# Optional Candidate Documents\n\n{candidate_metadata}"
         )
         return system_prompt, plan_text, [SkillRetrievalService.make_load_skill_document(candidate_seeds)]
 
