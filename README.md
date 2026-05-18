@@ -31,7 +31,7 @@
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui |
 | Backend API | FastAPI, Python 3.13 |
 | Async processing | Celery + RabbitMQ |
-| LLM pipeline | LangChain (OpenAI) |
+| LLM pipeline | LangChain + LangGraph (OpenRouter) |
 | Job state | Redis |
 | Database | PostgreSQL 16 + pgvector |
 | Embeddings (RAG) | Ollama `nomic-embed-text` (768 dims) |
@@ -97,7 +97,7 @@ CREATED
                                            OK │            NEEDS FIX  │   FAILED
                                               ▼                ▼      │     ▼
                                           RENDERING         FIXING    │  FAILED_VERIFICATION
-                                              │          (1 retry)    │
+                                              │          (3 retry)    │
                                          ┌───┤                └──────►┘
                                       OK │   │ FAILED
                                          ▼   ▼
@@ -119,10 +119,9 @@ CREATED
 - **Skill-guided codegen**: core Manim knowledge is injected directly, with optional rules/templates retrieved via pgvector similarity search and langchain tool
 - **Auto-fix pipeline**: failed verification triggers one LLM-assisted patch before hard failure
 - **Sandboxed rendering**: Manim runs in a network-isolated container; code never executes in the API or worker
-- **Token budget enforcement**: 250K daily cap with pessimistic reservation and per-job ledger tracking
 - **Lesson library**: browse rendered videos and download artifacts by type
 - **Job history**: full state timeline with failure details
-- **Usage visibility**: daily token consumption dashboard
+- **Usage visibility**: daily calls and token consumption dashboard
 
 ---
 
