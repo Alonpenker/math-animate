@@ -218,7 +218,7 @@ class AgentService:
             selection_prompt = (
                 "From this list, return only the document titles needed to generate "
                 "reliable Manim code for the lesson plan. Prefer the smallest useful "
-                "set, usually 4 to 5 documents. Select more only when the plan clearly "
+                "set, usually 6 to 8 documents. Select more only when the plan clearly "
                 "needs multiple Manim APIs, animation techniques, or reliability risk "
                 "areas.\n\n"
                 f"Lesson plan JSON:\n{plan_text}\n\n"
