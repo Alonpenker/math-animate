@@ -69,18 +69,27 @@ export interface BreakdownEntry {
   provider: string;
   model: string;
   stage: string;
-  consumed: number;
-  reserved: number;
+  call_type: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  total_tokens: number;
+}
+
+export interface TokenTotals {
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  total_tokens: number;
 }
 
 export interface TokenUsageResponse {
   day: string;
-  daily_limit: number;
-  soft_threshold: number;
-  consumed: number;
-  reserved: number;
-  remaining: number;
-  soft_threshold_exceeded: boolean;
+  openrouter_calls: number;
+  openrouter_call_limit: number;
+  openrouter_calls_remaining: number;
+  token_totals: TokenTotals;
   breakdown: BreakdownEntry[];
 }
 

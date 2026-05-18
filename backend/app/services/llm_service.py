@@ -30,6 +30,7 @@ logger = Logger.get_logger("worker")
 class CallType(StrEnum):
     PLAN = "plan"
     CODEGEN = "codegen"
+    DOCUMENT_SELECTION = "document_selection"
     FIX = "fix"
 
 class CodegenToolUsage(BaseModel):
@@ -57,7 +58,7 @@ class LLMService:
                 model=LLM_PLAN_MODEL,
                 temperature=LLM_TEMPERATURE,
                 max_completion_tokens=LLM_PLAN_OUTPUT_MAX_TOKENS,
-                reasoning_effort=LLM_REASONING_EFFORT,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW.value,
                 api_key=settings.openai_api_key,
             )
         return cls._plan_model
@@ -69,7 +70,7 @@ class LLMService:
                 model=LLM_CODE_MODEL,
                 temperature=LLM_TEMPERATURE,
                 max_completion_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
-                reasoning_effort=LLM_REASONING_EFFORT,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW.value,
                 api_key=settings.openai_api_key,
             )
         return cls._codegen_model
@@ -175,9 +176,9 @@ class LLMService:
             else "(No candidate skill documents retrieved.)"
         )
         system_prompt = (
-            CODEGEN_SYSTEM_PROMPT
-            .replace("{core_content}", core_content)
-            .replace("{candidate_metadata}", candidate_metadata)
+            f"{CODEGEN_SYSTEM_PROMPT}\n\n"
+            f"# Core Skill Documents\n\n{core_content}\n\n"
+            f"# Optional Candidate Documents\n\n{candidate_metadata}"
         )
         return system_prompt, plan_text, [SkillRetrievalService.make_load_skill_document(candidate_seeds)]
 

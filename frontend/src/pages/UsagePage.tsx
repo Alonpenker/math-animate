@@ -20,10 +20,10 @@ export function UsagePage() {
       >
         <div className="mb-8">
           <h1 className="text-4xl text-off-white">
-            Token Usage
+            Usage
           </h1>
           <p className="mt-2 text-off-white/50 max-w-xl">
-            MathAnimate is free to use. To keep costs sustainable, there is a shared daily limit of 250,000 tokens. This resets at midnight UTC.
+            MathAnimate uses a shared daily limit of 50 AI calls through OpenRouter. The limit resets at midnight UTC; token counts are informational and do not limit jobs.
           </p>
         </div>
         <UsageSection isLoading={isLoading} error={error} data={data} onClick={refetch}/>

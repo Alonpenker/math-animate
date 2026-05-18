@@ -35,7 +35,7 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
 def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str, operation: WorkerOperation) -> int:
     with get_worker_cursor() as cursor:
         reserved = BudgetService.reserve(
-            cursor, call_id, job_id, stage, LLM_PROVIDER, model, prompt_text
+            cursor, call_id, job_id, stage, LLM_PROVIDER.OPENAI.value, model, prompt_text
         )
     logger.info(WorkerLog(
         operation=operation,

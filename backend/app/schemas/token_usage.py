@@ -6,26 +6,33 @@ class BreakdownEntry(BaseModel):
     provider: str
     model: str
     stage: str
-    consumed: int
-    reserved: int
+    call_type: str
+    calls: int
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    total_tokens: int
+
+
+class TokenTotals(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    total_tokens: int
 
 
 class DailySummary(BaseModel):
-    daily_limit: int
-    consumed: int
-    reserved: int
-    remaining: int
-    remaining_pct: float
-    soft_threshold_exceeded: bool
+    openrouter_calls: int
+    openrouter_call_limit: int
+    openrouter_calls_remaining: int
+    token_totals: TokenTotals
     breakdown: list[BreakdownEntry]
 
 
 class TokenUsageResponse(BaseModel):
     day: date
-    daily_limit: int
-    soft_threshold: int
-    consumed: int
-    reserved: int
-    remaining: int
-    soft_threshold_exceeded: bool
+    openrouter_calls: int
+    openrouter_call_limit: int
+    openrouter_calls_remaining: int
+    token_totals: TokenTotals
     breakdown: list[BreakdownEntry]

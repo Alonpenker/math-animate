@@ -1,13 +1,32 @@
 from pathlib import Path
+from enum import StrEnum
 
 # --- Provider & model defaults ---
-LLM_PROVIDER = "openai"
+class LLM_PROVIDER(StrEnum):
+    OPENAI = "openai"
+    OPENROUTER = "openrouter"
+
+
 LLM_PLAN_MODEL = "gpt-5.2"
 LLM_CODE_MODEL = "gpt-5.1-codex"
 LLM_TEMPERATURE = 0.1
 LLM_PLAN_OUTPUT_MAX_TOKENS = 12_000
 LLM_CODEGEN_OUTPUT_MAX_TOKENS = 42_000
-LLM_REASONING_EFFORT = "low"
+
+class OPENROUTER_MODELS(StrEnum):
+    PLAN_MODEL = "openrouter/owl-alpha"
+    CODING_MODEL = "poolside/laguna-m.1:free"
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_DAILY_CALL_LIMIT = 50
+
+class LLM_REASONING_EFFORT(StrEnum):
+    NONE = "none"
+    MINIMAL = "minimal"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    XHIGH = "xhigh"
 
 # --- Token budget defaults ---
 DAILY_TOKEN_LIMIT = 250_000
@@ -21,7 +40,7 @@ LLM_EMBEDDING_DIMENSIONS = 768
 # --- RAG defaults ---
 RAG_SIMILARITY_TOP_K = 2
 RAG_MAX_EMBED_CHARS = 4_000
-RAG_RULE_CAP = 8
+RAG_RULE_CAP = 15
 RAG_TEMPLATE_CAP = 3
 RAG_EXAMPLE_CAP = 2
 MAX_TOOL_LOADS = 8

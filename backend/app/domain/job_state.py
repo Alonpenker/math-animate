@@ -40,7 +40,7 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
         JobStatus.FAILED_QUOTA_EXCEEDED,
         JobStatus.FAILED_LLM_USAGE,
     }),
-    JobStatus.CODED: frozenset({JobStatus.VERIFYING}),
+    JobStatus.CODED: frozenset({JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION}),
     JobStatus.VERIFYING: frozenset({JobStatus.VERIFIED, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION}),
     JobStatus.VERIFIED: frozenset({JobStatus.RENDERING}),
     JobStatus.FIXING: frozenset({

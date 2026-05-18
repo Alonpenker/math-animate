@@ -4,11 +4,6 @@ from psycopg2.extras import RealDictCursor
 from pgvector.psycopg2 import register_vector
 
 from app.configs.app_settings import settings
-from app.repositories.plans_repository import PlansRepository
-from app.repositories.artifacts_repository import ArtifactsRepository
-from app.repositories.knowledge_repository import KnowledgeRepository
-from app.repositories.token_repository import TokenLedgerRepository
-from app.repositories.job_requests_repository import JobRequestsRepository
 
 db_pool = None
 
@@ -53,19 +48,14 @@ def get_cursor():
 def get_worker_cursor():
     yield from get_cursor()
 
-def init_db_tables() -> None:
+@contextmanager
+def get_db_cursor():
     if db_pool is None:
         raise RuntimeError("DB pool not initialized, Call init_db_pool() first.")
     conn = db_pool.getconn()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        cursor.execute(PlansRepository._create())
-        cursor.execute(ArtifactsRepository._create())
-        cursor.execute(KnowledgeRepository._create())
-        cursor.execute(TokenLedgerRepository._create())
-        TokenLedgerRepository.create_day_index(cursor)
-        cursor.execute(JobRequestsRepository._create())
+        yield cursor
         conn.commit()
     except Exception:
         conn.rollback()
@@ -73,3 +63,10 @@ def init_db_tables() -> None:
     finally:
         cursor.close()
         db_pool.putconn(conn)
+
+def init_db_tables() -> None:
+    from app.scripts.migrate_schema import migrate_repository_schemas
+
+    with get_db_cursor() as cursor:
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        migrate_repository_schemas(cursor)

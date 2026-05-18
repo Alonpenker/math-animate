@@ -5,11 +5,19 @@ from uuid import uuid4
 import tempfile
 import shutil
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor
 from psycopg2.errors import UniqueViolation
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.configs.app_settings import settings
-from app.configs.llm_settings import LLM_PLAN_MODEL, LLM_CODE_MODEL
+from app.configs.llm_settings import (
+    LLM_PROVIDER,
+    LLM_CODE_MODEL,
+    LLM_PLAN_MODEL,
+    LLM_PLAN_OUTPUT_MAX_TOKENS,
+    OPENROUTER_MODELS,
+)
 from app.workers.worker_settings import (
     PathNames,
     DockerCommands,
@@ -24,13 +32,26 @@ from app.dependencies.storage import init_storage
 from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
-from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
+from app.llm_knowledge.skill_documents import (
+    LLMKNOWLEDGE_DIR,
+    REGISTRY,
+)
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
-from app.schemas.jobs import JobUserRequest, JobPlanRequest, JobRequest, Job, JobCodeRequest, JobFixRequest
+from app.schemas.jobs import (
+    Job,
+    JobCodeRequest,
+    JobFixRequest,
+    JobPlanRequest,
+    JobRequest,
+    JobUserRequest,
+)
 from app.schemas.artifact import ArtifactType
-from app.services.llm_service import LLMService
+from app.schemas.video_plan import VideoPlan
+from app.services.agent_service import AgentService
+from app.services.llm_service import CallType, LLMService
+from app.services.openrouter_service import OpenRouterService
 from app.services.rag_service import RAGService
 from app.workers.worker_helpers import (
     transition_job,
@@ -73,7 +94,6 @@ if IS_E2E_MODE:
         operation="e2e_mode",
         event="E2E mode enabled - LLM calls will be stubbed",
     ))
-
 
 @setup_logging.connect
 def _suppress_celery_logging(**kwargs):
@@ -186,6 +206,99 @@ def generate_plan(job_request_payload: dict) -> None:
             event="Planning failed due to unexpected error",
             job_id=str(job_id),
             call_id=str(call_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+
+@app.task()
+def generate_plan_openrouter(job_request_payload: dict) -> None:
+    try:
+        job_request = JobUserRequest(**job_request_payload)
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    job_id = job_request.job.job_id
+
+    try:
+        logger.info(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Planning started",
+            job_id=str(job_id),
+        ))
+        transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
+
+        system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
+        started_at = time.perf_counter()
+        plan, usage = OpenRouterService.invoke_structured(
+            job_id=job_id,
+            stage=JobStatus.PLANNING,
+            call_type=CallType.PLAN,
+            model=OPENROUTER_MODELS.PLAN_MODEL,
+            messages=[
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_query),
+            ],
+            schema=VideoPlan,
+            max_tokens=LLM_PLAN_OUTPUT_MAX_TOKENS,
+        )
+        logger.info(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="OpenRouter call completed",
+            job_id=str(job_id),
+            context={
+                "provider": LLM_PROVIDER.OPENROUTER.value,
+                "model": OPENROUTER_MODELS.PLAN_MODEL.value,
+                "call_type": CallType.PLAN.value,
+                "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                "input_tokens": usage.input_tokens,
+                "reasoning_tokens": usage.reasoning_tokens,
+                "output_tokens": usage.output_tokens,
+                "total_tokens": usage.total_tokens,
+            },
+        ))
+
+        with get_worker_cursor() as cursor:
+            PlansRepository.create_plan(cursor, job_id, plan)
+
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
+        logger.info(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Planning completed",
+            job_id=str(job_id),
+        ))
+
+    except QuotaExceededError as exc:
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
+        logger.error(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Planning quota exceeded",
+            job_id=str(job_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    except LLMUsageException as exc:
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_LLM_USAGE)
+        logger.error(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Planning failed due to LLM usage error",
+            job_id=str(job_id),
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    except Exception as exc:
+        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
+        logger.error(WorkerLog(
+            operation="generate_plan_openrouter",
+            event="Planning failed due to unexpected error",
+            job_id=str(job_id),
             error=Logger.serialize_error(exc),
         ), exc_info=exc)
         raise
@@ -484,6 +597,21 @@ def fix_code(job_request_payload: dict) -> None:
             error=Logger.serialize_error(exc),
         ), exc_info=exc)
         raise
+
+
+@app.task()
+def generate_code_langgraph(job_request_payload: dict) -> None:
+    try:
+        job_request = JobPlanRequest(**job_request_payload)
+    except Exception as exc:
+        logger.error(WorkerLog(
+            operation="generate_code_langgraph",
+            event="Invalid request payload",
+            error=Logger.serialize_error(exc),
+        ), exc_info=exc)
+        raise
+
+    AgentService.run_codegen(job_request)
 
 
 @app.task()

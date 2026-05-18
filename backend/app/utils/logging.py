@@ -15,8 +15,8 @@ class BaseLog(BaseModel):
 
 
 WorkerOperation = Literal[
-    "generate_plan", "generate_code", "verify_code",
-    "fix_code", "generate_render", "seed_knowledge",
+    "generate_plan", "generate_plan_openrouter", "generate_code", "verify_code",
+    "fix_code", "generate_code_langgraph", "generate_render", "seed_knowledge",
     "e2e_mode"
 ]
 
@@ -24,7 +24,7 @@ APIOperation = Literal[
     "health_check", "create_job", "get_job_status", "get_job_plan",
     "approve_job", "cancel_job", "list_artifacts", "get_artifact",
     "download_artifact", "list_knowledge", "get_knowledge_document",
-    "get_usage_summary", "delete_artifact", "seed_knowledge",
+    "get_usage_summary", "delete_artifact", "seed_knowledge", "migrate_schema",
 ]
 
 class WorkerLog(BaseLog):

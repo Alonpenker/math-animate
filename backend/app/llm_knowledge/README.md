@@ -22,12 +22,12 @@ llm_knowledge/
 
 Planning uses `prompts/PLAN_SYSTEM_PROMPT.md` directly and sends the teacher request as the user message. It does not retrieve knowledge documents.
 
-Codegen uses `prompts/CODEGEN_SYSTEM_PROMPT.md` with two injected sections:
+Codegen uses `prompts/CODEGEN_SYSTEM_PROMPT.md` with knowledge passed as separate context:
 
-* Core skill guidance: all registry entries with `priority="core"` are read directly from this folder and inserted into the system prompt.
-* Optional candidate documents: the scene plan is embedded, matching `rule`, `template`, and `example` documents are retrieved from the database by vector similarity, and their metadata is listed in the system prompt.
+* Core skill guidance: all registry entries with `priority="core"` are read directly from this folder and sent with every codegen request.
+* Optional selected documents: the scene plan is embedded, matching `rule`, `template`, and `example` documents are retrieved from the database by vector similarity, and selected document contents are sent with the codegen request.
 
-The LLM can then call `load_skill_document(title)` to load the full content of a retrieved candidate by exact title. The tool reads from this folder, not from the database.
+The document selection step chooses exact titles from the retrieved candidates. Document contents are read from this folder, not from the database.
 
 Code fixing uses `prompts/CODEGEN_FIX_SYSTEM_PROMPT.md` directly and sends the broken code plus verification error as the user message.
 

@@ -25,6 +25,8 @@ dependencies = [
     "pytest>=7.4",
     "slowapi>=0.1.9",
     "structlog>=25.1",
+    "langgraph>=1.1.6",
+    "langchain-openrouter>=0.1.0",
 ]
 
 [tool.pytest.ini_options]
