@@ -333,3 +333,241 @@ def test_invoke_records_empty_usage_when_response_usage_cannot_be_extracted(monk
     assert usage == OpenRouterTokenUsage()
     assert recorded["call_id"] == call_id
     assert recorded["usage"] == OpenRouterTokenUsage()
+
+
+def test_usage_from_response_extracts_all_token_types():
+    # Given
+    class FakeResponse:
+        usage_metadata = {
+            "input_tokens": 25,
+            "output_tokens": 75,
+            "total_tokens": 105,
+            "output_token_details": {"reasoning": 40},
+        }
+
+    # When
+    usage = OpenRouterService._usage_from_response(FakeResponse())
+
+    # Then
+    assert usage.input_tokens == 25
+    assert usage.output_tokens == 75
+    assert usage.reasoning_tokens == 40
+    assert usage.total_tokens == 105
+
+
+def test_usage_from_response_defaults_to_zero_when_fields_missing():
+    # Given
+    class FakeResponse:
+        usage_metadata = {}
+
+    # When
+    usage = OpenRouterService._usage_from_response(FakeResponse())
+
+    # Then
+    assert usage.input_tokens == 0
+    assert usage.output_tokens == 0
+    assert usage.reasoning_tokens == 0
+    assert usage.total_tokens == 0
+
+
+def test_usage_from_response_raises_when_no_usage_metadata():
+    # Given
+    class FakeResponse:
+        usage_metadata = None
+
+    # When / Then
+    with pytest.raises(RuntimeError, match="Could not extract token usage"):
+        OpenRouterService._usage_from_response(FakeResponse())
+
+
+def test_usage_from_exc_extracts_from_dict_usage():
+    # Given
+    class FakeExc(Exception):
+        def __init__(self):
+            self.response = None
+            self.body = {
+                "usage": {
+                    "prompt_tokens": 30,
+                    "completion_tokens": 70,
+                    "total_tokens": 100,
+                    "completion_tokens_details": {"reasoning_tokens": 25},
+                }
+            }
+
+    # When
+    usage = OpenRouterService._usage_from_exc(FakeExc())
+
+    # Then
+    assert usage.input_tokens == 30
+    assert usage.output_tokens == 70
+    assert usage.total_tokens == 100
+    assert usage.reasoning_tokens == 25
+
+
+def test_usage_from_exc_extracts_from_object_usage():
+    # Given
+    class FakeUsage:
+        prompt_tokens = 40
+        completion_tokens = 60
+        total_tokens = 100
+        completion_tokens_details = type('obj', (), {'reasoning_tokens': 20})()
+
+    class FakeExc(Exception):
+        def __init__(self):
+            self.response = None
+            self.body = None
+            self.data = None
+            self.usage = FakeUsage()
+
+    # When
+    usage = OpenRouterService._usage_from_exc(FakeExc())
+
+    # Then
+    assert usage.input_tokens == 40
+    assert usage.output_tokens == 60
+    assert usage.total_tokens == 100
+    assert usage.reasoning_tokens == 20
+
+
+def test_usage_from_exc_raises_when_no_usage_found():
+    # Given
+    class FakeExc(Exception):
+        def __init__(self):
+            self.response = None
+            self.body = None
+            self.data = None
+            self.usage = None
+
+    # When / Then
+    with pytest.raises(RuntimeError, match="Could not extract token usage from OpenRouter exception"):
+        OpenRouterService._usage_from_exc(FakeExc())
+
+
+def test_raise_if_output_limit_hit_raises_when_output_exceeds_max():
+    # Given
+    usage = OpenRouterTokenUsage(
+        input_tokens=10,
+        output_tokens=100,
+        reasoning_tokens=0,
+        total_tokens=110,
+    )
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="hit the max token limit"):
+        OpenRouterService._raise_if_output_limit_hit(
+            call_type=CallType.CODEGEN,
+            usage=usage,
+            max_tokens=100,
+        )
+
+
+def test_raise_if_output_limit_hit_does_not_raise_when_below_limit():
+    # Given
+    usage = OpenRouterTokenUsage(
+        input_tokens=10,
+        output_tokens=50,
+        reasoning_tokens=0,
+        total_tokens=60,
+    )
+
+    # When / Then - should not raise
+    OpenRouterService._raise_if_output_limit_hit(
+        call_type=CallType.CODEGEN,
+        usage=usage,
+        max_tokens=100,
+    )
+
+
+def test_raise_if_output_limit_hit_does_not_raise_when_max_tokens_is_none():
+    # Given
+    usage = OpenRouterTokenUsage(
+        input_tokens=10,
+        output_tokens=5000,
+        reasoning_tokens=0,
+        total_tokens=5010,
+    )
+
+    # When / Then - should not raise
+    OpenRouterService._raise_if_output_limit_hit(
+        call_type=CallType.CODEGEN,
+        usage=usage,
+        max_tokens=None,
+    )
+
+
+def test_content_length_returns_length_for_string():
+    # When
+    result = OpenRouterService._content_length("hello world")
+
+    # Then
+    assert result == 11
+
+
+def test_content_length_returns_sum_for_list():
+    # When
+    result = OpenRouterService._content_length(["hello", " ", "world"])
+
+    # Then
+    assert result == 11
+
+
+def test_content_length_returns_zero_for_none():
+    # When
+    result = OpenRouterService._content_length(None)
+
+    # Then
+    assert result == 0
+
+
+def test_get_client_includes_reasoning_when_effort_provided():
+    # When
+    client = OpenRouterService.get_client(
+        model=OPENROUTER_MODELS.CODING_MODEL,
+        max_tokens=1000,
+        reasoning_effort=None,
+    )
+
+    # Then
+    assert client is not None
+
+
+def test_invoke_raises_llm_usage_exception_on_client_failure(monkeypatch: pytest.MonkeyPatch):
+    # Given
+    from app.services import openrouter_service as service_module
+
+    class FakeClient:
+        def invoke(self, messages):
+            exc = Exception("Client error")
+            exc.response = None
+            exc.body = None
+            exc.data = None
+            exc.usage = None
+            raise exc
+
+    monkeypatch.setattr(
+        OpenRouterService,
+        "claim_call",
+        staticmethod(lambda **kwargs: uuid4()),
+    )
+    monkeypatch.setattr(
+        OpenRouterService,
+        "get_client",
+        staticmethod(lambda **kwargs: FakeClient()),
+    )
+    monkeypatch.setattr(
+        service_module.TokenLedgerRepository,
+        "record_openrouter_usage",
+        staticmethod(lambda cursor, **kwargs: None),
+    )
+    monkeypatch.setattr(service_module, "get_worker_cursor", _cursor_ctx)
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="failed before producing usable output"):
+        OpenRouterService.invoke(
+            job_id=uuid4(),
+            stage=JobStatus.CODEGEN,
+            call_type=CallType.CODEGEN,
+            model=OPENROUTER_MODELS.CODING_MODEL,
+            messages=[HumanMessage(content="test")],
+            max_tokens=100,
+        )
