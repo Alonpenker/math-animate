@@ -1,8 +1,8 @@
 from app.domain.job_state import JobStatus
 from app.schemas.jobs import JobRequest
 from app.workers.worker import (
-    generate_code_langgraph,
-    generate_plan_openrouter,
+    generate_code,
+    generate_plan,
     generate_render,
     seed_knowledge,
 )
@@ -23,11 +23,11 @@ class WorkerRunner:
     
     @staticmethod
     def handle_planning(job_request: JobRequest) -> None:
-        generate_plan_openrouter.delay(job_request.model_dump(mode="json"))
-    
+        generate_plan.delay(job_request.model_dump(mode="json"))
+
     @staticmethod
     def handle_codegen(job_request: JobRequest) -> None:
-        generate_code_langgraph.delay(job_request.model_dump(mode="json"))
+        generate_code.delay(job_request.model_dump(mode="json"))
 
     @staticmethod
     def handle_render(job_request: JobRequest) -> None:

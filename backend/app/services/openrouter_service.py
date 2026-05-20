@@ -1,5 +1,6 @@
 import time
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import TypeVar
 from uuid import UUID, uuid4
 
@@ -22,12 +23,18 @@ from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.token_repository import TokenLedgerRepository
-from app.services.llm_service import CallType
 from app.utils.llm_stubs import IS_E2E_MODE, STUB_BROKEN_CODE, STUB_FIXED_CODE, STUB_PLAN
 from app.utils.logging import Logger, WorkerLog, WorkerOperation
 
 logger = Logger.get_logger("worker")
 StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
+
+
+class CallType(StrEnum):
+    PLAN = "plan"
+    CODEGEN = "codegen"
+    DOCUMENT_SELECTION = "document_selection"
+    FIX = "fix"
 
 
 class OpenRouterTokenUsage(BaseModel):
@@ -312,13 +319,15 @@ class OpenRouterService:
         reasoning_effort: LLM_REASONING_EFFORT | None = LLM_REASONING_EFFORT.HIGH,
     ) -> tuple[BaseMessage, OpenRouterTokenUsage]:
         if IS_E2E_MODE:
+            # E2E mode: return stubbed responses without hitting the OpenRouter API.
+            # Allows testing code generation and fix loops without external API calls.
             content = STUB_FIXED_CODE if call_type == CallType.FIX else STUB_BROKEN_CODE
             return AIMessage(content=content), OpenRouterTokenUsage()
 
         operation: WorkerOperation = (
-            "generate_plan_openrouter"
+            "generate_plan"
             if call_type == CallType.PLAN
-            else "generate_code_langgraph"
+            else "generate_code"
         )
         call_id = OpenRouterService.claim_call(
             job_id=job_id,
@@ -406,11 +415,13 @@ class OpenRouterService:
         max_tokens: int | None = None,
     ) -> tuple[StructuredModel, OpenRouterTokenUsage]:
         operation: WorkerOperation = (
-            "generate_plan_openrouter"
+            "generate_plan"
             if call_type == CallType.PLAN
-            else "generate_code_langgraph"
+            else "generate_code"
         )
         if IS_E2E_MODE:
+            # E2E mode: return stubbed structured responses without hitting the OpenRouter API.
+            # Allows testing structured output parsing without external API calls.
             if schema.__name__ == "VideoPlan":
                 parsed = STUB_PLAN
             else:
