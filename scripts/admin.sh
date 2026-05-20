@@ -146,7 +146,7 @@ case "$CMD" in
     fi
     [[ -n "$DRY_RUN" ]] && args+=(--dry-run)
     [[ -n "$ALLOW_DESTRUCTIVE" ]] && args+=(--allow-destructive)
-    $COMPOSE exec -T api uv run python app/scripts/migrate_schema.py "${args[@]}" ;;
+    $COMPOSE exec -T api uv run python -m app.scripts.migrate_schema "${args[@]}" ;;
 
   raw_get)    api GET    "$RAW_PATH" ;;
   raw_post)   api POST   "$RAW_PATH" "$RAW_DATA" ;;
