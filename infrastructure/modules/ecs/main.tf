@@ -8,8 +8,8 @@ data "aws_secretsmanager_secret" "x_api_key" {
   name = "mathanimate/${var.environment}/x-api-key"
 }
 
-data "aws_secretsmanager_secret" "openai_api_key" {
-  name = "mathanimate/${var.environment}/openai-api-key"
+data "aws_secretsmanager_secret" "openrouter_api_key" {
+  name = "mathanimate/${var.environment}/openrouter-api-key"
 }
 
 # ── CloudWatch Log Group ───────────────────────────────────────────────────────
@@ -91,8 +91,8 @@ resource "aws_ecs_task_definition" "api" {
           valueFrom = data.aws_secretsmanager_secret.x_api_key.arn
         },
         {
-          name      = "OPENAI_API_KEY"
-          valueFrom = data.aws_secretsmanager_secret.openai_api_key.arn
+          name      = "OPENROUTER_API_KEY"
+          valueFrom = data.aws_secretsmanager_secret.openrouter_api_key.arn
         },
       ]
 

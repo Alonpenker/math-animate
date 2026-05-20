@@ -122,7 +122,7 @@ Full secret inventory:
 |---|---|---|
 | `mathanimate/prod/db-password` | Manual (pre-deploy) | RDS master password — read by Terraform (RDS resource), ECS (`DB_PASSWORD`), EC2 `.env` |
 | `mathanimate/prod/x-api-key` | Manual (pre-deploy) | X-API-Key header value — gates REST API access |
-| `mathanimate/prod/openai-api-key` | Manual (pre-deploy) | OpenAI API key for LLM plan and code generation calls |
+| `mathanimate/prod/openrouter-api-key` | Manual (pre-deploy) | OpenRouter API key for LLM plan and code generation calls |
 | `mathanimate/prod/dockerhub-credentials` | Manual (AWS CLI) | JSON `{"username":"...","password":"..."}` — ECS `repositoryCredentials`, EC2 userdata docker login, CI image push |
 | `mathanimate/prod/cloudflare-credentials` | Manual (AWS CLI) | JSON `{"api_token":"...","zone_id":"...","account_id":"..."}` — Terraform Cloudflare provider + zone_id, CI wrangler deploy |
 
@@ -157,7 +157,7 @@ The task definition injects environment variables at definition time:
 Secrets injected via `valueFrom` (using secret name, not ARN — simpler and avoids the random ARN suffix):
 - `X_API_KEY` ← `mathanimate/{env}/x-api-key`
 - `DB_PASSWORD` ← `mathanimate/{env}/db-password`
-- `OPENAI_API_KEY` ← `mathanimate/{env}/openai-api-key`
+- `OPENROUTER_API_KEY` ← `mathanimate/{env}/openrouter-api-key`
 
 The `DATABASE_URL` template passed to ECS is password-free: `postgresql://{username}@{rds_address}:{port}/{db_name}`. The application reads `DB_PASSWORD` separately via the injected secret.
 

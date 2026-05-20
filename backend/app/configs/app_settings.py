@@ -16,7 +16,6 @@ INTERNAL_ROUTER_PREFIX = "/internal"
 class Settings(BaseSettings):
     x_api_key: SecretStr
     openrouter_api_key: SecretStr
-    openai_api_key: SecretStr | None = None
 
     storage_endpoint: str
     storage_access_key: str

@@ -27,8 +27,7 @@ from app.schemas.artifact import ArtifactType
 from app.schemas.jobs import Job, JobPlanRequest, JobRequest
 from app.schemas.knowledge import KnowledgeDocumentSeed
 from app.schemas.video_plan import VideoPlan
-from app.services.llm_service import CallType, LLMService
-from app.services.openrouter_service import OpenRouterService, OpenRouterTokenUsage
+from app.services.openrouter_service import CallType, OpenRouterService, OpenRouterTokenUsage
 from app.services.skill_retrieval_service import SkillRetrievalService
 from app.utils.logging import Logger, WorkerLog
 from app.workers.worker_helpers import (
@@ -87,6 +86,25 @@ class LangGraphCodegenState(TypedDict):
 
 class AgentService:
     @staticmethod
+    def _extract_text_content(response) -> str:
+        """Extract plain text from a response whose content may be a str or a list of typed blocks."""
+        content = response.content
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = [
+                block["text"]
+                for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            if text_parts:
+                return "".join(text_parts)
+        raise ValueError(
+            f"LLM returned non-text response content. "
+            f"type={type(content).__name__!r}, value={content!r}"
+        )
+
+    @staticmethod
     def run_codegen(job_request: JobPlanRequest) -> None:
         job_id = job_request.job.job_id
         current_status = job_request.job.status
@@ -121,7 +139,7 @@ class AgentService:
 
         def log_node_started(name: NodesNames) -> None:
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event=f"Node: {name} started",
                 job_id=str(job_id),
             ))
@@ -152,7 +170,7 @@ class AgentService:
             if extra_context:
                 context.update(extra_context)
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="OpenRouter call completed",
                 job_id=str(job_id),
                 context=context,
@@ -160,7 +178,7 @@ class AgentService:
 
         def extract_code(response: BaseMessage, usage: OpenRouterTokenUsage) -> str:
             try:
-                text = LLMService._extract_text_content(response)
+                text = AgentService._extract_text_content(response)
             except ValueError as exc:
                 raise LLMUsageException(
                     "LLM output validation failed: response did not contain plain text code.",
@@ -250,7 +268,7 @@ class AgentService:
             )
             selected_titles = list(dict.fromkeys(parsed.selected_titles))
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="Document selection completed",
                 job_id=str(job_id),
                 context={
@@ -268,7 +286,7 @@ class AgentService:
             invalid_titles = [title for title in selected_titles if title not in candidates_by_title]
             if invalid_titles:
                 logger.warning(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Ignoring unknown selected skill document titles",
                     job_id=str(job_id),
                     context={"invalid_titles": invalid_titles},
@@ -278,7 +296,7 @@ class AgentService:
                 system_messages = build_system_messages(valid_titles)
             except Exception as exc:
                 logger.error(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Selected skill document load failed",
                     job_id=str(job_id),
                     error=Logger.serialize_error(exc),
@@ -311,7 +329,7 @@ class AgentService:
             code = extract_code(response, usage)
             set_status(JobStatus.CODEGEN, JobStatus.CODED)
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="Code generation completed",
                 job_id=str(job_id),
             ))
@@ -356,7 +374,7 @@ class AgentService:
 
                 if failure is None:
                     logger.info(WorkerLog(
-                        operation="generate_code_langgraph",
+                        operation="generate_code",
                         event="Verification passed",
                         job_id=str(job_id),
                         context={"fix_attempt": state["fix_attempt"]},
@@ -365,7 +383,7 @@ class AgentService:
 
                 failure_summary = summarize_verification_failure(failure)
                 logger.warning(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Verification failed",
                     job_id=str(job_id),
                     context={
@@ -439,7 +457,7 @@ class AgentService:
 
             set_status(JobStatus.VERIFYING, JobStatus.VERIFIED)
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="Verification completed and render enqueued",
                 job_id=str(job_id),
             ))
@@ -452,7 +470,7 @@ class AgentService:
         def node_fail(state: LangGraphCodegenState) -> dict:
             log_node_started(NodesNames.FAIL)
             logger.error(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="Verification failed; job failed",
                 job_id=str(job_id),
                 context={
@@ -467,7 +485,7 @@ class AgentService:
 
         try:
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="LangGraph task started",
                 job_id=str(job_id),
             ))
@@ -507,7 +525,7 @@ class AgentService:
             )
             compiled.invoke(initial_state, config={"recursion_limit": recursion_limit})
             logger.info(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="LangGraph task completed",
                 job_id=str(job_id),
             ))
@@ -516,12 +534,12 @@ class AgentService:
                 mark_failed(quota_failure_statuses)
             except Exception:
                 logger.warning(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Failed to transition job after LangGraph quota exception",
                     job_id=str(job_id),
                 ), exc_info=True)
             logger.error(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="LangGraph quota exceeded",
                 job_id=str(job_id),
                 error=Logger.serialize_error(exc),
@@ -532,12 +550,12 @@ class AgentService:
                 mark_failed(llm_call_failure_statuses)
             except Exception:
                 logger.warning(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Failed to transition job after LangGraph LLM usage exception",
                     job_id=str(job_id),
                 ), exc_info=True)
             logger.error(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="LangGraph failed due to LLM usage error",
                 job_id=str(job_id),
                 error=Logger.serialize_error(exc),
@@ -548,12 +566,12 @@ class AgentService:
                 mark_failed()
             except Exception:
                 logger.warning(WorkerLog(
-                    operation="generate_code_langgraph",
+                    operation="generate_code",
                     event="Failed to transition job after LangGraph exception",
                     job_id=str(job_id),
                 ), exc_info=True)
             logger.error(WorkerLog(
-                operation="generate_code_langgraph",
+                operation="generate_code",
                 event="LangGraph task failed",
                 job_id=str(job_id),
                 error=Logger.serialize_error(exc),

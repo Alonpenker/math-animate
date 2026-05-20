@@ -18,6 +18,5 @@ class TokenLedgerSchema(Schema):
     INPUT_TOKENS = DBColumn(name="input_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
     OUTPUT_TOKENS = DBColumn(name="output_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
     REASONING_TOKENS = DBColumn(name="reasoning_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
-    RESERVED_TOKENS = DBColumn(name="reserved_tokens", type="INTEGER", attributes=["NOT NULL"])
-    CONSUMED_TOKENS = DBColumn(name="consumed_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
+    TOTAL_TOKENS = DBColumn(name="total_tokens", type="INTEGER", attributes=["NOT NULL", "DEFAULT 0"])
     STATE = DBColumn(name="state", type="TEXT", attributes=["NOT NULL", f"DEFAULT '{State.ACTIVE}'"])

@@ -17,6 +17,7 @@ from app.configs.llm_settings import (
     LLM_PLAN_MODEL,
     LLM_PLAN_OUTPUT_MAX_TOKENS,
     OPENROUTER_MODELS,
+    PLAN_SYSTEM_PROMPT,
 )
 from app.workers.worker_settings import (
     PathNames,
@@ -50,14 +51,10 @@ from app.schemas.jobs import (
 from app.schemas.artifact import ArtifactType
 from app.schemas.video_plan import VideoPlan
 from app.services.agent_service import AgentService
-from app.services.llm_service import CallType, LLMService
-from app.services.openrouter_service import OpenRouterService
+from app.services.openrouter_service import CallType, OpenRouterService
 from app.services.rag_service import RAGService
 from app.workers.worker_helpers import (
     transition_job,
-    reserve_budget,
-    reconcile_budget,
-    release_budget_on_error,
     get_storage,
     save_artifact_to_storage,
     store_render_logs,
@@ -141,99 +138,17 @@ def generate_plan(job_request_payload: dict) -> None:
         raise
 
     job_id = job_request.job.job_id
-    call_id = uuid4()
-    reserved = 0
-    total_tokens = 0
 
     try:
         logger.info(WorkerLog(
             operation="generate_plan",
             event="Planning started",
             job_id=str(job_id),
-            call_id=str(call_id),
         ))
         transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
 
-        system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
-        reserved = reserve_budget(
-            call_id, job_id, JobStatus.PLANNING, LLM_PLAN_MODEL,
-            f"{system_prompt}\n{user_query}",
-            operation="generate_plan",
-        )
-
-        plan, total_tokens = LLMService.plan_call(system_prompt, user_query)
-        reconcile_budget(call_id, total_tokens, reserved, operation="generate_plan")
-
-        with get_worker_cursor() as cursor:
-            PlansRepository.create_plan(cursor, job_id, plan)
-
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
-        logger.info(WorkerLog(
-            operation="generate_plan",
-            event="Planning completed",
-            job_id=str(job_id),
-            call_id=str(call_id),
-        ))
-
-    except QuotaExceededError as exc:
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
-        logger.error(WorkerLog(
-            operation="generate_plan",
-            event="Planning quota exceeded",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens, reserved, operation="generate_plan")
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_LLM_USAGE)
-        logger.error(WorkerLog(
-            operation="generate_plan",
-            event="Planning failed due to LLM usage error",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except Exception as exc:
-        release_budget_on_error(call_id, reserved, total_tokens, operation="generate_plan")
-        transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
-        logger.error(WorkerLog(
-            operation="generate_plan",
-            event="Planning failed due to unexpected error",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-
-@app.task()
-def generate_plan_openrouter(job_request_payload: dict) -> None:
-    try:
-        job_request = JobUserRequest(**job_request_payload)
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="generate_plan_openrouter",
-            event="Invalid request payload",
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    job_id = job_request.job.job_id
-
-    try:
-        logger.info(WorkerLog(
-            operation="generate_plan_openrouter",
-            event="Planning started",
-            job_id=str(job_id),
-        ))
-        transition_job(job_id, job_request.job.status, JobStatus.PLANNING)
-
-        system_prompt, user_query = LLMService.render_plan_prompt(job_request.user_request)
+        system_prompt = PLAN_SYSTEM_PROMPT
+        user_query = str(job_request.user_request)
         started_at = time.perf_counter()
         plan, usage = OpenRouterService.invoke_structured(
             job_id=job_id,
@@ -248,7 +163,7 @@ def generate_plan_openrouter(job_request_payload: dict) -> None:
             max_tokens=LLM_PLAN_OUTPUT_MAX_TOKENS,
         )
         logger.info(WorkerLog(
-            operation="generate_plan_openrouter",
+            operation="generate_plan",
             event="OpenRouter call completed",
             job_id=str(job_id),
             context={
@@ -268,7 +183,7 @@ def generate_plan_openrouter(job_request_payload: dict) -> None:
 
         transition_job(job_id, JobStatus.PLANNING, JobStatus.PLANNED)
         logger.info(WorkerLog(
-            operation="generate_plan_openrouter",
+            operation="generate_plan",
             event="Planning completed",
             job_id=str(job_id),
         ))
@@ -276,7 +191,7 @@ def generate_plan_openrouter(job_request_payload: dict) -> None:
     except QuotaExceededError as exc:
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_QUOTA_EXCEEDED)
         logger.error(WorkerLog(
-            operation="generate_plan_openrouter",
+            operation="generate_plan",
             event="Planning quota exceeded",
             job_id=str(job_id),
             error=Logger.serialize_error(exc),
@@ -286,7 +201,7 @@ def generate_plan_openrouter(job_request_payload: dict) -> None:
     except LLMUsageException as exc:
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_LLM_USAGE)
         logger.error(WorkerLog(
-            operation="generate_plan_openrouter",
+            operation="generate_plan",
             event="Planning failed due to LLM usage error",
             job_id=str(job_id),
             error=Logger.serialize_error(exc),
@@ -296,7 +211,7 @@ def generate_plan_openrouter(job_request_payload: dict) -> None:
     except Exception as exc:
         transition_job(job_id, JobStatus.PLANNING, JobStatus.FAILED_PLANNING)
         logger.error(WorkerLog(
-            operation="generate_plan_openrouter",
+            operation="generate_plan",
             event="Planning failed due to unexpected error",
             job_id=str(job_id),
             error=Logger.serialize_error(exc),
@@ -311,301 +226,6 @@ def generate_code(job_request_payload: dict) -> None:
     except Exception as exc:
         logger.error(WorkerLog(
             operation="generate_code",
-            event="Invalid request payload",
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    job_id = job_request.job.job_id
-    call_id = uuid4()
-    reserved = 0
-    total_tokens = 0
-
-    try:
-        logger.info(WorkerLog(
-            operation="generate_code",
-            event="Codegen started",
-            job_id=str(job_id),
-            call_id=str(call_id),
-        ))
-        transition_job(job_id, job_request.job.status, JobStatus.CODEGEN)
-
-        system_prompt, user_query, tools = LLMService.render_codegen_prompt(job_request.plan)
-        reserved = reserve_budget(
-            call_id, job_id, JobStatus.CODEGEN, LLM_CODE_MODEL,
-            f"{system_prompt}\n{user_query}",
-            operation="generate_code",
-        )
-
-        code, total_tokens = LLMService.codegen_call(system_prompt, user_query, tools)
-        reconcile_budget(call_id, total_tokens, reserved, operation="generate_code")
-
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.CODED)
-        logger.info(WorkerLog(
-            operation="generate_code",
-            event="Codegen completed",
-            job_id=str(job_id),
-            call_id=str(call_id),
-        ))
-        verify_code.delay(
-            JobCodeRequest(job=Job(job_id=job_id, status=JobStatus.CODED), code=code).model_dump(mode="json")
-        )
-
-    except QuotaExceededError as exc:
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED)
-        logger.error(WorkerLog(
-            operation="generate_code",
-            event="Codegen quota exceeded",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens, reserved, operation="generate_code")
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE)
-        logger.error(WorkerLog(
-            operation="generate_code",
-            event="Codegen failed due to LLM usage error",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except Exception as exc:
-        release_budget_on_error(call_id, reserved, total_tokens, operation="generate_code")
-        transition_job(job_id, JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN)
-        logger.error(WorkerLog(
-            operation="generate_code",
-            event="Codegen failed",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-
-@app.task()
-def verify_code(job_request_payload: dict) -> None:
-    try:
-        job_request = JobCodeRequest(**job_request_payload)
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="verify_code",
-            event="Invalid request payload",
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    job_id = job_request.job.job_id
-    code = job_request.code
-    fix_attempt = job_request.fix_attempt
-
-    render_root = Path(PathNames.TMP_RENDER_FOLDER)
-    input_dir = render_root / str(job_id) / PathNames.INPUT_FOLDER
-    input_dir.mkdir(parents=True, exist_ok=True)
-    code_path = input_dir / PathNames.MANIM_CODE
-    code_path.write_text(code, encoding="utf-8")
-
-    try:
-        transition_job(job_id, job_request.job.status, JobStatus.VERIFYING)
-        logger.info(WorkerLog(
-            operation="verify_code",
-            event="Verification started",
-            job_id=str(job_id),
-            context={"fix_attempt": fix_attempt},
-        ))
-
-        from app.workers.worker_helpers import verify_code as static_verify
-        failure: str | None = static_verify(code, code_path)
-
-        if failure is None:
-            media_dir = input_dir / PathNames.MEDIA_FOLDER
-            media_dir.mkdir(parents=True, exist_ok=True)
-            media_dir.chmod(0o777)
-            passed, error_output, is_fixable = dry_run_docker(code_path, media_dir)
-            if not passed:
-                if not is_fixable:
-                    logger.error(WorkerLog(
-                        operation="verify_code",
-                        event="Dry-run aborted due to infrastructure error",
-                        job_id=str(job_id),
-                        context={"fix_attempt": fix_attempt, "error_output": error_output},
-                    ))
-                    transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
-                    return
-                failure = f"Dry-run failed:\n{error_output}"
-
-        if failure is None:
-            storage = get_storage()
-            job_dir = Path(PathNames.ARTIFACTS_FOLDER) / str(job_id)
-            job_dir.mkdir(parents=True, exist_ok=True)
-            file_path = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    suffix=f".{ArtifactType.PYTHON_FILE.value}",
-                    dir=job_dir,
-                    delete=False,
-                ) as tmp:
-                    tmp.write(code.encode("utf-8"))
-                    file_path = Path(tmp.name)
-                save_artifact_to_storage(job_id, file_path, ArtifactType.PYTHON_FILE, storage)
-            finally:
-                if job_dir.exists():
-                    shutil.rmtree(job_dir, ignore_errors=True)
-
-            transition_job(job_id, JobStatus.VERIFYING, JobStatus.VERIFIED)
-            logger.info(WorkerLog(
-                operation="verify_code",
-                event="Verification passed",
-                job_id=str(job_id),
-            ))
-            generate_render.delay(
-                JobRequest(job=Job(job_id=job_id, status=JobStatus.VERIFIED)).model_dump(mode="json")
-            )
-        else:
-            failure_summary = summarize_verification_failure(failure)
-            logger.warning(WorkerLog(
-                operation="verify_code",
-                event="Verification failed",
-                job_id=str(job_id),
-                context={"fix_attempt": fix_attempt, "failure_summary": failure_summary},
-            ))
-
-            if fix_attempt >= MAX_FIX_ATTEMPTS:
-                transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
-                logger.error(WorkerLog(
-                    operation="verify_code",
-                    event="Verification exhausted; job failed",
-                    job_id=str(job_id),
-                    context={"fix_attempt": fix_attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
-                ))
-            else:
-                transition_job(job_id, JobStatus.VERIFYING, JobStatus.FIXING)
-                logger.info(WorkerLog(
-                    operation="verify_code",
-                    event="Fix enqueued",
-                    job_id=str(job_id),
-                    context={"fix_attempt": fix_attempt + 1, "max_fix_attempts": MAX_FIX_ATTEMPTS},
-                ))
-                fix_code.delay(
-                    JobFixRequest(
-                        job=Job(job_id=job_id, status=JobStatus.FIXING),
-                        code=code,
-                        error_context=failure,
-                        fix_attempt=fix_attempt + 1,
-                    ).model_dump(mode="json")
-                )
-
-    except Exception as exc:
-        transition_job(job_id, JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION)
-        logger.error(WorkerLog(
-            operation="verify_code",
-            event="Verification task failed unexpectedly",
-            job_id=str(job_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    finally:
-        shutil.rmtree(input_dir, ignore_errors=True)
-
-
-@app.task()
-def fix_code(job_request_payload: dict) -> None:
-    try:
-        job_request = JobFixRequest(**job_request_payload)
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="fix_code",
-            event="Invalid request payload",
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    job_id = job_request.job.job_id
-    call_id = uuid4()
-    reserved = 0
-    total_tokens = 0
-
-    try:
-        logger.info(WorkerLog(
-            operation="fix_code",
-            event="Fix started",
-            job_id=str(job_id),
-            call_id=str(call_id),
-        ))
-
-        system_prompt, user_query = LLMService.render_fix_prompt(job_request.code, job_request.error_context)
-        reserved = reserve_budget(
-            call_id, job_id, JobStatus.FIXING, LLM_CODE_MODEL,
-            f"{system_prompt}\n{user_query}",
-            operation="fix_code",
-        )
-
-        fixed_code, total_tokens = LLMService.fix_call(system_prompt, user_query)
-        reconcile_budget(call_id, total_tokens, reserved, operation="fix_code")
-
-        logger.info(WorkerLog(
-            operation="fix_code",
-            event="Fix completed",
-            job_id=str(job_id),
-            call_id=str(call_id),
-        ))
-        verify_code.delay(
-            JobCodeRequest(
-                job=Job(job_id=job_id, status=JobStatus.FIXING),
-                code=fixed_code,
-                fix_attempt=job_request.fix_attempt,
-            ).model_dump(mode="json")
-        )
-
-    except QuotaExceededError as exc:
-        release_budget_on_error(call_id, reserved, total_tokens, operation="fix_code")
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_QUOTA_EXCEEDED)
-        logger.error(WorkerLog(
-            operation="fix_code",
-            event="Fix quota exceeded",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except LLMUsageException as exc:
-        reconcile_budget(call_id, exc.total_tokens, reserved, operation="fix_code")
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_LLM_USAGE)
-        logger.error(WorkerLog(
-            operation="fix_code",
-            event="Fix failed due to LLM usage error",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-    except Exception as exc:
-        release_budget_on_error(call_id, reserved, total_tokens, operation="fix_code")
-        transition_job(job_id, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION)
-        logger.error(WorkerLog(
-            operation="fix_code",
-            event="Fix task failed",
-            job_id=str(job_id),
-            call_id=str(call_id),
-            error=Logger.serialize_error(exc),
-        ), exc_info=exc)
-        raise
-
-
-@app.task()
-def generate_code_langgraph(job_request_payload: dict) -> None:
-    try:
-        job_request = JobPlanRequest(**job_request_payload)
-    except Exception as exc:
-        logger.error(WorkerLog(
-            operation="generate_code_langgraph",
             event="Invalid request payload",
             error=Logger.serialize_error(exc),
         ), exc_info=exc)

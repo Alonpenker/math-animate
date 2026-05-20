@@ -5,7 +5,6 @@ import pytest
 
 os.environ.setdefault("x_api_key", "test-api-key")
 os.environ.setdefault("openrouter_api_key", "sk-test-openrouter-key")
-os.environ.setdefault("openai_api_key", "sk-test-openai-key")
 os.environ.setdefault("frontend_url", "http://localhost:3000")
 os.environ.setdefault("storage_endpoint", "localhost:9000")
 os.environ.setdefault("storage_access_key", "minioadmin")

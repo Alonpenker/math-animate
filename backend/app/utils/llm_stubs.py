@@ -3,8 +3,10 @@ import os
 from app.schemas.scene_plan import ScenePlan
 from app.schemas.video_plan import VideoPlan
 
+# E2E mode: When enabled, all LLM calls return stubbed responses without hitting external APIs.
 IS_E2E_MODE: bool = os.environ.get("E2E", "").lower() == "true"
 
+# Stub plan response: VideoPlan with 2 sample scenes about circle area.
 STUB_PLAN = VideoPlan(
     scenes=[
         ScenePlan(
@@ -37,6 +39,7 @@ STUB_PLAN = VideoPlan(
     ]
 )
 
+# Stub broken code: Manim Python code with an intentional import error (nonexistent_module_xyz).
 STUB_BROKEN_CODE: str = """\
 import nonexistent_module_xyz
 from manim import *
@@ -48,6 +51,7 @@ class Scene1(Scene):
         self.wait(1)
 """
 
+# Stub fixed code: Corrected Manim Python code with proper imports and two scenes.
 STUB_FIXED_CODE: str = """\
 from manim import *
 

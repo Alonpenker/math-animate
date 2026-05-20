@@ -81,7 +81,7 @@ STORAGE_BUCKET=${artifact_bucket_name}
 STORAGE_ACCESS_KEY=${storage_access_key}
 STORAGE_SECRET_KEY=${storage_secret_key}
 X_API_KEY=$(get_secret "x-api-key")
-OPENAI_API_KEY=$(get_secret "openai-api-key")
+OPENROUTER_API_KEY=$(get_secret "openrouter-api-key")
 EOF
 chmod 600 /opt/mathanimate-worker/.env
 

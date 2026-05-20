@@ -7,7 +7,6 @@ import shutil
 import re
 
 from app.configs.app_settings import settings
-from app.configs.llm_settings import LLM_PROVIDER
 from app.dependencies.db import get_worker_cursor
 from app.dependencies.redis_client import get_worker_redis
 from app.dependencies.storage import get_storage_client
@@ -16,7 +15,6 @@ from app.repositories.jobs_repository import JobsRepository
 from app.repositories.job_requests_repository import JobRequestsRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import Artifact, ArtifactType
-from app.services.budget_service import BudgetService
 from app.services.files_storage_service import FilesStorageService
 from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, DRY_RUN_TIMEOUT_SECONDS, PathNames, DockerCommands
 from app.utils.logging import Logger, WorkerLog, WorkerOperation
@@ -30,44 +28,6 @@ def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None
         JobsRepository.update_job_status(redis_client, job_id, to_status)
     with get_worker_cursor() as cursor:
         JobRequestsRepository.update_status(cursor, job_id, to_status)
-
-
-def reserve_budget(call_id, job_id, stage: JobStatus, model: str, prompt_text: str, operation: WorkerOperation) -> int:
-    with get_worker_cursor() as cursor:
-        reserved = BudgetService.reserve(
-            cursor, call_id, job_id, stage, LLM_PROVIDER.OPENAI.value, model, prompt_text
-        )
-    logger.info(WorkerLog(
-        operation=operation,
-        event="Budget reserved",
-        job_id=str(job_id),
-        call_id=str(call_id),
-        context={"reserved_tokens": reserved},
-    ))
-    return reserved
-
-
-def reconcile_budget(call_id, total_tokens: int, reserved: int, operation: WorkerOperation) -> None:
-    with get_worker_cursor() as cursor:
-        BudgetService.reconcile(cursor, call_id, total_tokens)
-    logger.info(WorkerLog(
-        operation=operation,
-        event="Budget reconciled",
-        call_id=str(call_id),
-        context={"reserved_tokens": reserved, "total_tokens": total_tokens},
-    ))
-
-
-def release_budget_on_error(call_id, reserved: int, total_tokens: int, operation: WorkerOperation) -> None:
-    if reserved:
-        with get_worker_cursor() as cursor:
-            BudgetService.reconcile(cursor, call_id, max(reserved, total_tokens))
-        logger.info(WorkerLog(
-            operation=operation,
-            event="Budget reconciled on error",
-            call_id=str(call_id),
-            context={"reserved_tokens": reserved, "total_tokens": total_tokens},
-        ))
 
 
 def get_storage() -> FilesStorageService:

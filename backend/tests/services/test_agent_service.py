@@ -12,7 +12,7 @@ from app.schemas.jobs import Job, JobPlanRequest
 from app.schemas.video_plan import VideoPlan
 from app.schemas.scene_plan import ScenePlan
 from app.services.agent_service import AgentService, LangGraphCodegenState, NodesNames
-from app.services.llm_service import CallType
+from app.services.openrouter_service import CallType
 from app.services.openrouter_service import OpenRouterTokenUsage
 
 
