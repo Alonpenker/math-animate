@@ -9,7 +9,7 @@ from app.configs.llm_settings import OPENROUTER_DAILY_CALL_LIMIT, OPENROUTER_MOD
 from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
-from app.services.llm_service import CallType
+from app.services.openrouter_service import CallType
 from app.services.openrouter_service import OpenRouterService, OpenRouterTokenUsage
 
 
