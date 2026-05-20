@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import date
 from typing import Any, List
 from uuid import UUID
 
-from app.configs.llm_settings import DAILY_TOKEN_LIMIT, LLM_PROVIDER, OPENROUTER_DAILY_CALL_LIMIT
+from app.configs.llm_settings import LLM_PROVIDER, OPENROUTER_DAILY_CALL_LIMIT
 from app.repositories.repository import Repository
 from app.schemas.token_ledger import TokenLedgerSchema, State
 from app.schemas.token_usage import BreakdownEntry, DailySummary, TokenTotals
@@ -12,50 +12,22 @@ class TokenLedgerRepository(Repository):
 
     TABLE_NAME = "token_ledger"
     SCHEMA = TokenLedgerSchema
-    PRIMARY_KEY = "call_id"
+    PRIMARY_KEY = TokenLedgerSchema.CALL_ID.name
     INDEX_FIELDS = (TokenLedgerSchema.DAY.name,)
-
-    @classmethod
-    def reserve(
-        cls,
-        cursor,
-        call_id: UUID,
-        day: date,
-        job_id: UUID,
-        stage: str,
-        provider: str,
-        model: str,
-        reserved_tokens: int,
-    ) -> None:
-        cursor.execute(
-            cls.insert(),
-            (str(call_id), day, str(job_id), stage, provider, model,
-             "unknown", 0, 0, 0, reserved_tokens, 0, State.ACTIVE),
-        )
-
-    @classmethod
-    def reconcile(cls, cursor, call_id: UUID, consumed_tokens: int) -> None:
-        cursor.execute(
-            f"UPDATE {cls.TABLE_NAME} "
-            f"SET {cls.SCHEMA.CONSUMED_TOKENS.name} = %s, "
-            f"{cls.SCHEMA.RESERVED_TOKENS.name} = 0, "
-            f"{cls.SCHEMA.STATE.name} = '{State.RELEASED}', "
-            f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
-            f"WHERE {cls.SCHEMA.CALL_ID.name} = %s",
-            (consumed_tokens, str(call_id)),
-        )
+    
+    CALLS_COLUMN = "calls"
 
     @classmethod
     def count_openrouter_calls(cls, cursor, day: date) -> int:
         cursor.execute(
-            f"SELECT COUNT(*) AS calls "
+            f"SELECT COUNT(*) AS {cls.CALLS_COLUMN} "
             f"FROM {cls.TABLE_NAME} "
-            f"WHERE {cls.SCHEMA.PROVIDER.name} = %s "
-            f"AND {cls.SCHEMA.DAY.name} = %s",
-            (LLM_PROVIDER.OPENROUTER.value, day),
+            f"WHERE {cls.SCHEMA.DAY.name} = %s "
+            f"AND {cls.SCHEMA.PROVIDER.name} = %s",
+            (day, LLM_PROVIDER.OPENROUTER.value),
         )
         row = cursor.fetchone()
-        return int(row["calls"]) if row else 0
+        return int(row[cls.CALLS_COLUMN]) if row else 0
 
     @classmethod
     def claim_openrouter_call(
@@ -83,7 +55,6 @@ class TokenLedgerRepository(Repository):
                 0,
                 0,
                 0,
-                0,
                 State.ACTIVE,
             ),
         )
@@ -101,8 +72,7 @@ class TokenLedgerRepository(Repository):
             f"SET {cls.SCHEMA.INPUT_TOKENS.name} = %s, "
             f"{cls.SCHEMA.OUTPUT_TOKENS.name} = %s, "
             f"{cls.SCHEMA.REASONING_TOKENS.name} = %s, "
-            f"{cls.SCHEMA.CONSUMED_TOKENS.name} = %s, "
-            f"{cls.SCHEMA.RESERVED_TOKENS.name} = 0, "
+            f"{cls.SCHEMA.TOTAL_TOKENS.name} = %s, "
             f"{cls.SCHEMA.STATE.name} = '{State.RELEASED}', "
             f"{cls.SCHEMA.UPDATED_AT.name} = NOW() "
             f"WHERE {cls.SCHEMA.CALL_ID.name} = %s",
@@ -121,11 +91,11 @@ class TokenLedgerRepository(Repository):
             f"SELECT "
             f"{cls.SCHEMA.PROVIDER.name}, {cls.SCHEMA.MODEL.name}, {cls.SCHEMA.STAGE.name}, "
             f"{cls.SCHEMA.CALL_TYPE.name}, "
-            f"COUNT(*) AS calls, "
+            f"COUNT(*) AS {cls.CALLS_COLUMN}, "
             f"COALESCE(SUM({cls.SCHEMA.INPUT_TOKENS.name}), 0) AS {cls.SCHEMA.INPUT_TOKENS.name}, "
             f"COALESCE(SUM({cls.SCHEMA.OUTPUT_TOKENS.name}), 0) AS {cls.SCHEMA.OUTPUT_TOKENS.name}, "
             f"COALESCE(SUM({cls.SCHEMA.REASONING_TOKENS.name}), 0) AS {cls.SCHEMA.REASONING_TOKENS.name}, "
-            f"COALESCE(SUM({cls.SCHEMA.CONSUMED_TOKENS.name}), 0) AS {cls.SCHEMA.CONSUMED_TOKENS.name} "
+            f"COALESCE(SUM({cls.SCHEMA.TOTAL_TOKENS.name}), 0) AS {cls.SCHEMA.TOTAL_TOKENS.name} "
             f"FROM {cls.TABLE_NAME} "
             f"WHERE {cls.SCHEMA.DAY.name} = %s "
             f"AND {cls.SCHEMA.PROVIDER.name} = %s "
@@ -145,11 +115,11 @@ class TokenLedgerRepository(Repository):
         total_tokens = 0
 
         for row in rows:
-            row_calls = int(row["calls"])
+            row_calls = int(row[cls.CALLS_COLUMN])
             row_input = int(row[cls.SCHEMA.INPUT_TOKENS.name])
             row_output = int(row[cls.SCHEMA.OUTPUT_TOKENS.name])
             row_reasoning = int(row[cls.SCHEMA.REASONING_TOKENS.name])
-            row_total = int(row[cls.SCHEMA.CONSUMED_TOKENS.name])
+            row_total = int(row[cls.SCHEMA.TOTAL_TOKENS.name])
             breakdown.append(
                 BreakdownEntry(
                     provider=row[cls.SCHEMA.PROVIDER.name],
@@ -184,11 +154,10 @@ class TokenLedgerRepository(Repository):
 
     @classmethod
     def get_current_total(cls, cursor) -> int:
-        """Sum of consumed + reserved tokens for today (RELEASED + ACTIVE rows)."""
+        """Sum of total tokens used today (both RELEASED and ACTIVE rows)."""
         cursor.execute(
             f"SELECT "
-            f"COALESCE(SUM({cls.SCHEMA.CONSUMED_TOKENS.name}), 0) "
-            f"+ COALESCE(SUM({cls.SCHEMA.RESERVED_TOKENS.name}), 0) "
+            f"COALESCE(SUM({cls.SCHEMA.TOTAL_TOKENS.name}), 0) "
             f"FROM {cls.TABLE_NAME} "
             f"WHERE {cls.SCHEMA.DAY.name} = current_date "
             f"AND {cls.SCHEMA.STATE.name} IN ('{State.RELEASED}', '{State.ACTIVE}')",
