@@ -300,15 +300,9 @@ LLM_CODE_MODEL = "gpt-5.1-codex"
 Set your key in `.env`:
 
 ```
-API_KEY=sk-...
+OPENROUTER_API_KEY=sk-...
 ```
 
-### Token budget
-
-```python
-DAILY_TOKEN_LIMIT            = 250_000   # hard cap
-SOFT_THRESHOLD_RATIO         = 0.8       # warning threshold
-```
 
 ---
 

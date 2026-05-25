@@ -28,23 +28,10 @@ class LLM_REASONING_EFFORT(StrEnum):
     HIGH = "high"
     XHIGH = "xhigh"
 
-# --- Token budget defaults ---
-DAILY_TOKEN_LIMIT = 250_000
-SOFT_THRESHOLD_RATIO = 0.8
-TOKEN_OUTPUT_BUFFER = 1_000
 
 # --- Embedding defaults ---
 LLM_EMBEDDING_MODEL = "nomic-embed-text"
 LLM_EMBEDDING_DIMENSIONS = 768
-
-# --- RAG defaults ---
-RAG_SIMILARITY_TOP_K = 2
-RAG_MAX_EMBED_CHARS = 4_000
-RAG_RULE_CAP = 15
-RAG_TEMPLATE_CAP = 3
-RAG_EXAMPLE_CAP = 2
-MAX_TOOL_LOADS = 8
-MAX_TOOL_CALL_ITERATIONS = 10
 
 # --- System prompts ---
 llm_prompts_dir = Path(__file__).parent.parent / "llm_knowledge" / "prompts"
@@ -52,3 +39,17 @@ llm_prompts_dir = Path(__file__).parent.parent / "llm_knowledge" / "prompts"
 PLAN_SYSTEM_PROMPT = (llm_prompts_dir / "PLAN_SYSTEM_PROMPT.md").read_text()
 CODEGEN_SYSTEM_PROMPT = (llm_prompts_dir / "CODEGEN_SYSTEM_PROMPT.md").read_text()
 CODEGEN_FIX_SYSTEM_PROMPT = (llm_prompts_dir / "CODEGEN_FIX_SYSTEM_PROMPT.md").read_text()
+
+# --- RAG defaults ---
+from app.llm_knowledge.skill_documents import RuleCategory  
+
+RAG_SIMILARITY_TOP_K = 2
+RAG_MAX_EMBED_CHARS = 4_000
+RAG_RULE_CAP = 15
+RAG_TEMPLATE_CAP = 3
+RAG_EXAMPLE_CAP = 2
+RULE_CATEGORY_MINS: dict[RuleCategory, int] = {
+    RuleCategory.GENERAL: 1,
+    RuleCategory.LAYOUT_SAFETY: 2,
+    RuleCategory.VISUAL_LAYOUT: 2,
+}
