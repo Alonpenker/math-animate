@@ -330,13 +330,13 @@ class AgentService:
                 model=OPENROUTER_MODELS.CODING_MODEL,
                 messages=[*state["messages"], human_message],
                 max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
-                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW,
             )
             log_openrouter_call(
                 CallType.CODEGEN,
                 started_at,
                 usage,
-                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW,
             )
             code = extract_code(response, usage)
             set_status(JobStatus.CODEGEN, JobStatus.CODED)
@@ -431,14 +431,14 @@ class AgentService:
                     model=OPENROUTER_MODELS.CODING_MODEL,
                     messages=[*state["messages"], fix_instruction],
                     max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
-                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                    reasoning_effort=LLM_REASONING_EFFORT.MEDIUM,
                 )
                 log_openrouter_call(
                     CallType.FIX,
                     started_at,
                     usage,
                     {"attempt": attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
-                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                    reasoning_effort=LLM_REASONING_EFFORT.MEDIUM,
                 )
                 fixed_code = extract_code(response, usage)
             except (LLMUsageException, QuotaExceededError):
