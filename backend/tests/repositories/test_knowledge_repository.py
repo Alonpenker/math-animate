@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from uuid import uuid4
 
+from app.llm_knowledge.categories import ExampleCategory, RuleCategory, SkillCategory, TemplateCategory
 from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.schemas.knowledge import (
@@ -18,7 +19,7 @@ def _doc_row(document_id=None, doc_type: str = "rule") -> dict:
         "document_id": str(document_id or uuid4()),
         "doc_type": doc_type,
         "title": "Sample Title",
-        "category": "rules",
+        "category": RuleCategory.GENERAL.value,
         "priority": "recommended",
         "tags": ["foo"],
     }
@@ -60,9 +61,10 @@ def test_knowledge_document_validates_with_metadata_only_no_content_or_path():
         document_id=uuid4(),
         doc_type=KnowledgeType.RULE,
         title="A rule",
+        category=RuleCategory.GENERAL,
     )
 
-    assert doc.category == ""
+    assert doc.category == RuleCategory.GENERAL
     assert doc.priority == "optional"
     assert doc.tags == []
     assert "content" not in KnowledgeDocument.model_fields
@@ -83,6 +85,7 @@ def test_knowledge_document_seed_requires_path_and_has_no_content():
         doc_type=KnowledgeType.SKILL,
         title="Seed",
         priority="core",
+        category=SkillCategory.CORE,
         path="manim_skill/SKILL.md",
     )
 
@@ -95,6 +98,7 @@ def test_knowledge_document_seed_requires_path_and_has_no_content():
             doc_type=KnowledgeType.SKILL,
             title="No path",
             priority="core",
+            category=SkillCategory.CORE,
         )
 
 def test_knowledge_document_schema_has_exactly_seven_columns_with_no_content_or_path():
@@ -127,7 +131,7 @@ def test_create_document_executes_insert_with_seven_params_and_no_content():
         doc_type="rule",
         title="Quadratic Formula",
         embedding=embedding,
-        category="rules",
+        category=RuleCategory.GENERAL,
         priority="recommended",
         tags=["math", "algebra"],
     )
@@ -140,7 +144,7 @@ def test_create_document_executes_insert_with_seven_params_and_no_content():
     assert params[1] == "rule"
     assert params[2] == "recommended"
     assert params[3] == "Quadratic Formula"
-    assert params[4] == "rules"
+    assert params[4] == RuleCategory.GENERAL
     assert params[5] is embedding
     assert params[6] == ["math", "algebra"]
 
@@ -154,12 +158,13 @@ def test_create_document_defaults_tags_to_empty_list_when_none():
         doc_type="rule",
         title="Default tags",
         embedding=embedding,
+        category=RuleCategory.GENERAL,
     )
 
     _, params = cursor.queries[0]
     assert params[6] == []
     assert params[2] == "optional"
-    assert params[4] == ""
+    assert params[4] == RuleCategory.GENERAL
 
 def test_get_document_returns_knowledge_document_when_row_exists():
     # Given
@@ -174,7 +179,7 @@ def test_get_document_returns_knowledge_document_when_row_exists():
     assert str(result.document_id) == str(document_id)
     assert result.doc_type == KnowledgeType.RULE
     assert result.title == "Sample Title"
-    assert result.category == "rules"
+    assert result.category == RuleCategory.GENERAL
     assert result.priority == "recommended"
     assert result.tags == ["foo"]
 

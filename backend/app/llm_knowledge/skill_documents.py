@@ -1,23 +1,7 @@
-from enum import Enum
 from pathlib import Path
 from uuid import UUID
 
-class RuleCategory(str, Enum):
-    LAYOUT_SAFETY = "layout-safety"   # frame safety, labels, arrows, overlap
-    GEOMETRY = "geometry"             # shapes, geometry labels, matrices
-    VISUAL_LAYOUT = "visual-layout"   # composition, grouping, positioning
-    GENERAL = "general"               # animation, styling, axes, text, camera
-
-
-class ExampleCategory(str, Enum):
-    MATHEMATICAL_PROOF = "mathematical-proof"   # Pythagorean, derivatives, theorems
-    VISUALIZATION = "visualization"             # function graphs, transformations
-    CONSTRUCTION = "construction"               # geometric constructions
-
-class TemplateCategory(str, Enum):
-    TEMPLATES = "templates"
-
-
+from app.llm_knowledge.categories import ExampleCategory, RuleCategory, SkillCategory, TemplateCategory
 from app.schemas.knowledge import KnowledgeDocumentSeed, KnowledgeType
 
 
@@ -34,7 +18,7 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         doc_type=KnowledgeType.SKILL,
         priority="core",
         title="Manim Skill Overview",
-        category="core",
+        category=SkillCategory.CORE,
         tags=[],
         path="manim_skill/SKILL.md",
     ),

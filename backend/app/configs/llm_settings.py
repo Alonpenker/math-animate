@@ -41,7 +41,7 @@ CODEGEN_SYSTEM_PROMPT = (llm_prompts_dir / "CODEGEN_SYSTEM_PROMPT.md").read_text
 CODEGEN_FIX_SYSTEM_PROMPT = (llm_prompts_dir / "CODEGEN_FIX_SYSTEM_PROMPT.md").read_text()
 
 # --- RAG defaults ---
-from app.llm_knowledge.skill_documents import RuleCategory  
+from app.llm_knowledge.categories import RuleCategory
 
 RAG_SIMILARITY_TOP_K = 2
 RAG_MAX_EMBED_CHARS = 4_000

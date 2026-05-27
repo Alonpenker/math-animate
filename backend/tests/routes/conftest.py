@@ -88,7 +88,7 @@ def mock_knowledge_repository(
     S = KnowledgeDocumentSchema
 
     def create_document(_cursor, *, document_id, doc_type, title, embedding,
-                        category="", priority="optional", tags=None):
+                        category, priority="optional", tags=None):
         test_store["knowledge"][document_id] = {
             S.DOCUMENT_ID.name: document_id,
             S.DOC_TYPE.name: doc_type,
