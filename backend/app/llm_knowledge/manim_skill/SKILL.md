@@ -73,23 +73,26 @@ exact title.
 When candidate documents are available:
 
 - Load only documents relevant to the current scene plan.
-- Prefer foundational documents first: scenes, mobjects, positioning, MathTex,
-  animations, timing, and educational clarity.
-- Load specialized documents only when the plan needs them, such as graphing,
-  3D, camera movement, updaters, or advanced text animation.
+- Prefer foundational documents first: Scenes, Mobject Layout Basics, Layout
+  Composition, LaTeX, Animation Patterns, and Math Visual Clarity.
+- Load specialized documents only when the plan needs them, such as Axes and
+  Graphing, Camera and 3D, Updaters, Matrix Drawing Patterns, or Geometry
+  Shapes and Labels.
 - Treat templates as starting structures, not mandatory formats.
-- Treat examples as optional references. Examples may be absent.
+- Treat examples as optional references. They show reusable scene helper
+  patterns, but examples may be absent and are not required frameworks.
 
 ## Useful Document Topics
 
 Core Manim topics commonly worth retrieving:
 
 - Scenes and scene lifecycle
-- Mobjects, grouping, positioning, and layout
-- Creation, transform, text, and timing animations
+- Mobject Layout Basics
+- Layout Composition
+- Animation Patterns
 - MathTex and LaTeX reliability
-- Color and styling
-- Axes, graphing, geometry, lines, and arrows
+- Text
+- Visual Styling
 
 Educational topics commonly worth retrieving:
 
@@ -99,16 +102,12 @@ Educational topics commonly worth retrieving:
 
 Specialized topics should be retrieved only when needed:
 
-- Moving camera scenes
-- Three-dimensional scenes
+- Axes and Graphing
+- Lines, Arrows, and Labels
+- Geometry Shapes and Labels
+- Matrix Drawing Patterns
+- Camera and 3D
 - Updaters and ValueTracker patterns
-- CLI and configuration behavior
-
-## ManimCE Version Awareness
-
-Target the Manim Community Edition version used by the caller or runtime. If a
-specific version is given, do not guess newer APIs. Prefer well-established
-ManimCE APIs and avoid deprecated or tutorial-specific patterns unless verified.
 
 ## Common Pitfalls
 

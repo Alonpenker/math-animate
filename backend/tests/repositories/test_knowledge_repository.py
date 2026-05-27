@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from uuid import uuid4
 
+from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.schemas.knowledge import (
     KnowledgeDocument,
@@ -21,6 +22,32 @@ def _doc_row(document_id=None, doc_type: str = "rule") -> dict:
         "priority": "recommended",
         "tags": ["foo"],
     }
+
+def test_skill_document_registry_paths_ids_and_titles_are_integral():
+    paths = [entry.path for entry in REGISTRY]
+    document_ids = [entry.document_id for entry in REGISTRY]
+    titles = [entry.title for entry in REGISTRY]
+
+    assert all((LLMKNOWLEDGE_DIR / path).exists() for path in paths)
+    assert len(document_ids) == len(set(document_ids))
+    assert len(titles) == len(set(titles))
+
+def test_registered_rule_files_have_front_matter_and_cover_rules_directory():
+    rule_paths = {
+        entry.path
+        for entry in REGISTRY
+        if entry.doc_type == KnowledgeType.RULE
+    }
+    actual_rule_paths = {
+        path.relative_to(LLMKNOWLEDGE_DIR).as_posix()
+        for path in (LLMKNOWLEDGE_DIR / "manim_skill/rules").glob("*.md")
+    }
+
+    assert actual_rule_paths == rule_paths
+
+    for path in rule_paths:
+        content = (LLMKNOWLEDGE_DIR / path).read_text(encoding="utf-8")
+        assert content.splitlines()[0] == "---"
 
 def test_knowledge_type_enum_has_exactly_four_values():
     values = {member.value for member in KnowledgeType}

@@ -50,6 +50,6 @@ RAG_TEMPLATE_CAP = 3
 RAG_EXAMPLE_CAP = 2
 RULE_CATEGORY_MINS: dict[RuleCategory, int] = {
     RuleCategory.GENERAL: 1,
-    RuleCategory.LAYOUT_SAFETY: 2,
-    RuleCategory.VISUAL_LAYOUT: 2,
+    RuleCategory.LAYOUT_SAFETY: 1,
+    RuleCategory.VISUAL_LAYOUT: 1
 }
