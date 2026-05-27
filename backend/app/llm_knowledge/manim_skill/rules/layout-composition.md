@@ -70,6 +70,35 @@ idea into another scene instead of shrinking everything.
 No major object should be created, moved, or animated to a position where part of
 it is outside the frame unless that offscreen motion is intentional and brief.
 
+Use `config.frame_width` and `config.frame_height` when checking frame fit:
+
+```python
+safe_width = config.frame_width - 1.0
+if group.get_width() > safe_width:
+    group.scale_to_fit_width(safe_width)
+```
+
+## Text And Frame Safety
+
+Text, equations, and label groups must fit before they are animated. Keep titles,
+subtitles, captions, and major equation groups compact enough that their
+bounding boxes stay inside the frame.
+
+Use safe edge buffers when anchoring text:
+
+```python
+title.to_edge(UP, buff=0.35)
+caption.to_edge(DOWN, buff=0.4)
+```
+
+Reserve vertical space below title/subtitle pairs before placing the main
+content. A compact title plus subtitle often consumes about `1.5` Manim units,
+so place the primary group below the subtitle with visible clearance.
+
+Avoid off-frame absolute placement such as `move_to(RIGHT * 7)` or `UP * 4`
+unless the object is intentionally entering or leaving the frame. Prefer
+`to_edge`, `to_corner`, `next_to`, group placement, and frame-fit checks.
+
 ## Visibility Budget
 
 The screen should show only:

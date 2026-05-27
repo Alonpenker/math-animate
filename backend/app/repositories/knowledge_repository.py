@@ -24,7 +24,7 @@ class KnowledgeRepository(Repository):
         doc_type: str,
         title: str,
         embedding: np.ndarray,
-        category: str = "",
+        category: str,
         priority: str = "optional",
         tags: list[str] | None = None,
     ) -> None:

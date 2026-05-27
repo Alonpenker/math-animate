@@ -17,6 +17,7 @@ from app.configs.llm_settings import (
     LLM_CODEGEN_OUTPUT_MAX_TOKENS,
     LLM_PROVIDER,
     OPENROUTER_MODELS,
+    RULE_CATEGORY_MINS,
 )
 from app.dependencies.db import get_worker_cursor
 from app.domain.job_state import JobStatus
@@ -233,12 +234,23 @@ class AgentService:
                 if candidate_documents
                 else "(No candidate skill documents retrieved.)"
             )
+            category_guidance = "\n".join(
+                f"- at least {n} from category={category.value}"
+                for category, n in RULE_CATEGORY_MINS.items()
+            )
             selection_prompt = (
                 "From this list, return only the document titles needed to generate "
-                "reliable Manim code for the lesson plan. Prefer the smallest useful "
-                "set, usually 6 to 8 documents. Select more only when the plan clearly "
-                "needs multiple Manim APIs, animation techniques, or reliability risk "
-                "areas.\n\n"
+                "reliable Manim code for the lesson plan. Prefer around 8 documents, "
+                "using the smallest useful set when fewer are enough. Select more only "
+                "when the plan clearly needs multiple Manim APIs, animation techniques, "
+                "or reliability risk areas.\n\n"
+                "Select at most 1 template, choosing the most specific matching template. "
+                "Select at most 1 example, and only when it closely matches the lesson "
+                "structure or math domain.\n\n"
+                "For rule documents, aim for this minimum category distribution "
+                "(if relevant candidates from that category are available). After that, "
+                "you may choose any other relevant rule documents:\n"
+                f"{category_guidance}\n\n"
                 f"Lesson plan JSON:\n{plan_text}\n\n"
                 f"Candidate documents:\n{candidate_metadata}\n\n"
                 "Return exact titles from the list. Select an empty list if none are useful."
@@ -318,13 +330,13 @@ class AgentService:
                 model=OPENROUTER_MODELS.CODING_MODEL,
                 messages=[*state["messages"], human_message],
                 max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
-                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW,
             )
             log_openrouter_call(
                 CallType.CODEGEN,
                 started_at,
                 usage,
-                reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                reasoning_effort=LLM_REASONING_EFFORT.LOW,
             )
             code = extract_code(response, usage)
             set_status(JobStatus.CODEGEN, JobStatus.CODED)
@@ -419,14 +431,14 @@ class AgentService:
                     model=OPENROUTER_MODELS.CODING_MODEL,
                     messages=[*state["messages"], fix_instruction],
                     max_tokens=LLM_CODEGEN_OUTPUT_MAX_TOKENS,
-                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                    reasoning_effort=LLM_REASONING_EFFORT.MEDIUM,
                 )
                 log_openrouter_call(
                     CallType.FIX,
                     started_at,
                     usage,
                     {"attempt": attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
-                    reasoning_effort=LLM_REASONING_EFFORT.XHIGH,
+                    reasoning_effort=LLM_REASONING_EFFORT.MEDIUM,
                 )
                 fixed_code = extract_code(response, usage)
             except (LLMUsageException, QuotaExceededError):

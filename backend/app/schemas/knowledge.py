@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.configs.llm_settings import LLM_EMBEDDING_DIMENSIONS
+from app.llm_knowledge.categories import DocumentCategory
 from app.schemas.db_column import DBColumn
 from app.schemas.schema import Schema
 
@@ -24,7 +25,7 @@ class KnowledgeDocument(BaseModel):
     document_id: UUID
     doc_type: KnowledgeType
     title: str
-    category: str = ""
+    category: DocumentCategory
     priority: PriorityType = "optional"
     tags: list[str] = Field(default_factory=list)
 

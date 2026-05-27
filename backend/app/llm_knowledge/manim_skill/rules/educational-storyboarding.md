@@ -46,6 +46,21 @@ When one mathematical form becomes another, preserve continuity:
 
 Avoid teleporting important objects without a visible transition.
 
+## Scene Architecture
+
+Reusable helpers can make a generated scene clearer, but they are guidance, not
+a required framework.
+
+Useful patterns include:
+
+- A `setup_*_scene` method for constants, data, and background setup.
+- A `self.colors` role map so the same concept keeps the same color.
+- Small helpers such as `make_title`, `make_caption`, and `replace_caption`.
+- Semantic helper methods for repeated structures, such as graph groups,
+  matrix displays, construction marks, or equation rows.
+- Grouped cleanup with `FadeOut(VGroup(...))` so stale scene content leaves
+  together.
+
 ## Final State
 
 End each scene with a visually stable conclusion. The final frame should make the

@@ -120,16 +120,8 @@ case "$CMD" in
       -U "${POSTGRES_USER:-mathanimate}" \
       -d "${POSTGRES_DB:-mathanimate}" \
       -c "DROP TABLE IF EXISTS knowledge_documents;"
-    $COMPOSE restart api
-    for _ in {1..30}; do
-      if api GET /health >/dev/null; then
-        $COMPOSE restart worker
-        exit 0
-      fi
-      sleep 2
-    done
-    echo "ERROR: API health did not recover after resetting knowledge_documents." >&2
-    exit 1 ;;
+    $COMPOSE exec -T api uv run python -m app.scripts.migrate_schema --table knowledge_documents
+    api POST /internal/knowledge/seed ;;
 
   db_console)
     $COMPOSE exec postgres psql \

@@ -39,6 +39,8 @@ During worker startup, `seed_knowledge()` reads every registry file, embeds its 
 
 The database is therefore a retrieval index, not the content store. Updating knowledge content means editing the files in this directory and reseeding the database so embeddings match the new content.
 
+After editing rule document content or registry entries, reset and reseed knowledge embeddings before evaluating retrieval quality.
+
 ## Manim local environment
 
 To set up a local Manim environment matching the version used by the application (v0.19.2):

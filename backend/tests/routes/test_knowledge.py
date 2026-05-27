@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from app.llm_knowledge.categories import RuleCategory, TemplateCategory
 from app.routes import knowledge as knowledge_routes
 from app.schemas.knowledge import KnowledgeDocumentSchema, KnowledgeType
 
@@ -18,7 +19,7 @@ def test_get_document_returns_matching_document(
         S.DOCUMENT_ID.name: doc_id,
         S.DOC_TYPE.name: KnowledgeType.RULE.value,
         S.TITLE.name: "Test Rule",
-        S.CATEGORY.name: "rules",
+        S.CATEGORY.name: RuleCategory.GENERAL.value,
         S.PRIORITY.name: "recommended",
         S.TAGS.name: ["foo"],
     }
@@ -32,7 +33,7 @@ def test_get_document_returns_matching_document(
     assert response.document.document_id == doc_id
     assert response.document.title == "Test Rule"
     assert response.document.doc_type == KnowledgeType.RULE
-    assert response.document.category == "rules"
+    assert response.document.category == RuleCategory.GENERAL
     assert response.document.priority == "recommended"
     assert response.document.tags == ["foo"]
 
@@ -65,7 +66,7 @@ def test_get_documents_by_type_returns_only_matching_type(
         S.DOCUMENT_ID.name: rule_id,
         S.DOC_TYPE.name: KnowledgeType.RULE.value,
         S.TITLE.name: "Rule Doc",
-        S.CATEGORY.name: "rules",
+        S.CATEGORY.name: RuleCategory.GENERAL.value,
         S.PRIORITY.name: "recommended",
         S.TAGS.name: [],
     }
@@ -73,7 +74,7 @@ def test_get_documents_by_type_returns_only_matching_type(
         S.DOCUMENT_ID.name: template_id,
         S.DOC_TYPE.name: KnowledgeType.TEMPLATE.value,
         S.TITLE.name: "Template Doc",
-        S.CATEGORY.name: "templates",
+        S.CATEGORY.name: TemplateCategory.TEMPLATES.value,
         S.PRIORITY.name: "recommended",
         S.TAGS.name: [],
     }

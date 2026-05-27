@@ -43,6 +43,20 @@ Use color sparingly and consistently:
 - Return attention to the full expression after a local highlight.
 - Avoid coloring many unrelated parts at once.
 
+## Emphasis
+
+Emphasis is temporary attention guidance, not decoration.
+
+- Emphasize one target per step.
+- Use `Indicate` for small symbols/terms.
+- Use `Circumscribe` or `SurroundingRectangle` for final equations, answers,
+  cells, or compact groups.
+- Use object pulses with `rate_func=there_and_back` for regions/shapes.
+- Use short temporary guide lines/dashed lines to connect evidence to conclusion.
+- Fade or remove emphasis objects after they stop supporting the step.
+- Reserve strong yellow/final-answer emphasis for conclusions or critical
+  transitions.
+
 ## Text
 
 Prefer mathematical notation and visual structure over explanatory sentences in
