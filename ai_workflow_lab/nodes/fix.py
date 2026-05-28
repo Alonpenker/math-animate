@@ -3,7 +3,6 @@ import time
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lab_logging import LabLog
-from llm_client import invoke
 from runtime.context import ExperimentContext
 from services.code_extractor import extract_code
 from settings import (
@@ -62,7 +61,7 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             },
         ))
         started_at = time.perf_counter()
-        response, usage = invoke(
+        response, usage = ctx.llm.invoke(
             model=OPENROUTER_CODE_MODEL,
             messages=fix_messages,
             max_tokens=CODEGEN_OUTPUT_MAX_TOKENS,

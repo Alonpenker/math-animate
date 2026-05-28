@@ -1,8 +1,8 @@
 import json
 
 from lab_logging import LabLog
-from llm_client import TokenUsage
 from runtime.files import RunFiles
+from services.llm import TokenUsage
 from settings import UsageFileNames
 
 

@@ -1,6 +1,6 @@
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
-from verify_render import summarize_verification_failure
+from services.rendering import summarize_verification_failure
 from workflow_state import NodeName, WorkflowState
 
 

@@ -4,7 +4,6 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lab_logging import LabLog
-from llm_client import invoke_structured
 from runtime.context import ExperimentContext
 from schemas import VideoPlan
 from settings import (
@@ -54,7 +53,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             },
         ))
         started_at = time.perf_counter()
-        plan, usage = invoke_structured(
+        plan, usage = ctx.llm.invoke_structured(
             model=OPENROUTER_PLAN_MODEL,
             messages=[
                 SystemMessage(content=system_prompt),

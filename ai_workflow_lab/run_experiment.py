@@ -30,6 +30,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Run folder name under runs/. Defaults to a timestamp.",
     )
+    parser.add_argument(
+        "--e2e",
+        action="store_true",
+        help="Run the workflow with fake LLM calls and overwrite runs/e2e.",
+    )
     return parser.parse_args()
 
 
@@ -44,6 +49,11 @@ def resolve_input_path(path: Path | None) -> Path | None:
 
 def main() -> None:
     args = parse_args()
+    if args.e2e and args.name is not None:
+        raise SystemExit("--e2e always writes runs/e2e and cannot be combined with --name.")
+    if args.e2e and args.plan is not None:
+        raise SystemExit("--e2e uses fake local planning and cannot be combined with --plan.")
+
     request_path = resolve_input_path(args.request)
     if request_path is None:
         raise RuntimeError("--request is required.")
@@ -51,6 +61,7 @@ def main() -> None:
         request_path=request_path,
         name=args.name,
         provided_plan_path=resolve_input_path(args.plan),
+        e2e=args.e2e,
     )
     print(f"Run complete: {run_dir}")
     print(f"Summary: {run_dir / RunFileNames.SUMMARY}")

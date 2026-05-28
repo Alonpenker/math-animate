@@ -2,12 +2,12 @@ import time
 
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
-from settings import LogFileNames
-from verify_render import (
+from services.rendering import (
     dry_run_docker,
     summarize_verification_failure,
     verify_code_static,
 )
+from settings import LogFileNames
 from workflow_state import NodeName, VerificationResult, WorkflowState
 
 

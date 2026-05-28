@@ -2,8 +2,8 @@ import time
 
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
+from services.rendering import render_docker
 from settings import LogFileNames
-from verify_render import render_docker
 from workflow_state import NodeName, WorkflowState
 
 

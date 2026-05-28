@@ -5,6 +5,8 @@ from typing import Any
 from lab_logging import LabLog, logger
 from runtime.files import RunFiles
 from runtime.usage import UsageTracker
+from services.llm import LlmGateway, create_llm_gateway
+from settings import E2E_RUN_NAME
 
 
 @dataclass(frozen=True)
@@ -12,6 +14,8 @@ class ExperimentContext:
     request_path: Path
     request_text: str
     provided_plan_path: Path | None
+    e2e: bool
+    llm: LlmGateway
     files: RunFiles
     usage: UsageTracker
     run_logger: Any
@@ -23,14 +27,18 @@ class ExperimentContext:
         request_path: Path,
         name: str | None,
         provided_plan_path: Path | None,
+        e2e: bool = False,
     ) -> "ExperimentContext":
         request_text = request_path.read_text(encoding="utf-8").strip()
-        files = RunFiles.create(name)
+        run_name = E2E_RUN_NAME if e2e else name
+        files = RunFiles.create(run_name, overwrite=e2e)
         files.write_request(request_text)
         ctx = cls(
             request_path=request_path,
             request_text=request_text,
             provided_plan_path=provided_plan_path,
+            e2e=e2e,
+            llm=create_llm_gateway(e2e=e2e),
             files=files,
             usage=UsageTracker(files),
             run_logger=logger.bind(run_dir=files.run_dir),
@@ -42,6 +50,7 @@ class ExperimentContext:
                 "run_dir": str(files.run_dir),
                 "request_path": str(request_path),
                 "provided_plan_path": str(provided_plan_path) if provided_plan_path else "",
+                "e2e": e2e,
             },
         ))
         return ctx

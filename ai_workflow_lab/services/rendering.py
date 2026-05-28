@@ -62,14 +62,6 @@ def extract_traceback(stderr: str) -> str:
     return stderr
 
 
-def _decode_output(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    return value.decode("utf-8", errors="replace")
-
-
 def summarize_verification_failure(failure: str) -> str:
     lines = [line.strip() for line in failure.strip().splitlines() if line.strip()]
     if not lines:
@@ -80,28 +72,6 @@ def summarize_verification_failure(failure: str) -> str:
         if exception_line.search(lines[index]):
             return " ".join(lines[index:])
     return lines[-1]
-
-
-def _container_path(host_path: Path, run_dir: Path) -> PurePosixPath:
-    relative = host_path.resolve().relative_to(run_dir.resolve())
-    return CONTAINER_RUN_DIR.joinpath(*relative.parts)
-
-
-def _is_infrastructure_failure(error_output: str) -> bool:
-    normalized = error_output.replace("\\", "/")
-    return (
-        "FileNotFoundError:" in error_output
-        and "/workspace/" in normalized
-        and "code.py not found" in normalized
-    )
-
-
-def _prepare_writable_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    try:
-        path.chmod(0o777)
-    except OSError:
-        pass
 
 
 def dry_run_docker(
@@ -220,3 +190,33 @@ def render_docker(
             f"got {len(output_files)}."
         )
     return output_files, stdout, stderr
+
+
+def _decode_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return value.decode("utf-8", errors="replace")
+
+
+def _container_path(host_path: Path, run_dir: Path) -> PurePosixPath:
+    relative = host_path.resolve().relative_to(run_dir.resolve())
+    return CONTAINER_RUN_DIR.joinpath(*relative.parts)
+
+
+def _is_infrastructure_failure(error_output: str) -> bool:
+    normalized = error_output.replace("\\", "/")
+    return (
+        "FileNotFoundError:" in error_output
+        and "/workspace/" in normalized
+        and "code.py not found" in normalized
+    )
+
+
+def _prepare_writable_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.chmod(0o777)
+    except OSError:
+        pass

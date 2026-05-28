@@ -29,6 +29,15 @@ Reuse a saved plan for faster codegen experiments:
 uv run python run_experiment.py --request inputs/pythagoras_request.txt --plan runs/baseline/plan.txt --name codegen-v2
 ```
 
+Run the local end-to-end workflow without real API calls:
+
+```bash
+uv run python run_experiment.py --e2e
+```
+
+E2E mode always overwrites `runs/e2e`. It uses deterministic fake LLM responses,
+but still runs real static verification, Docker dry-run, and Docker render.
+
 Each run writes:
 
 ```text
@@ -74,6 +83,7 @@ token_usage_summary.json
 - Workflow configuration: `settings.py`
 - Workflow order: `workflow.py`
 - Node behavior: `nodes/`
+- LLM and rendering helpers: `services/`
 - Model names, token limits, Docker settings, and fix attempts: `settings.py`
 - Knowledge files: `llm_knowledge/manim_skill/`
 

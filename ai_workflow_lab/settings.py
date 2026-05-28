@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 RUNS_DIR = ROOT_DIR / "runs"
 PROMPTS_DIR = ROOT_DIR / "llm_knowledge" / "prompts"
+E2E_RUN_NAME = "e2e"
 
 
 def load_env_file(path: Path = ROOT_DIR / ".env") -> None:
@@ -115,10 +116,6 @@ class LogFileNames:
     WORKFLOW = "workflow.log"
     RENDER_STDOUT = "render_stdout.log"
     RENDER_STDERR = "render_stderr.log"
-    SMOKE_DRY_RUN_STDOUT = "smoke_dry_run_stdout.log"
-    SMOKE_DRY_RUN_STDERR = "smoke_dry_run_stderr.log"
-    SMOKE_RENDER_STDOUT = "smoke_render_stdout.log"
-    SMOKE_RENDER_STDERR = "smoke_render_stderr.log"
 
     @staticmethod
     def attempt_verify(attempt: int) -> str:

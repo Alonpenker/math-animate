@@ -14,11 +14,13 @@ def run_experiment(
     request_path: Path,
     name: str | None = None,
     provided_plan_path: Path | None = None,
+    e2e: bool = False,
 ) -> Path:
     ctx = ExperimentContext.create(
         request_path=request_path,
         name=name,
         provided_plan_path=provided_plan_path,
+        e2e=e2e,
     )
     graph = build_graph(ctx)
     compiled = graph.compile()

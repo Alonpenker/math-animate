@@ -1,9 +1,11 @@
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 
 from schemas import VideoPlan
 from settings import (
+    E2E_RUN_NAME,
     PROMPTS_DIR,
     RUNS_DIR,
     PathNames,
@@ -17,13 +19,18 @@ class RunFiles:
         self.run_dir = run_dir
 
     @classmethod
-    def create(cls, name: str | None) -> "RunFiles":
+    def create(cls, name: str | None, *, overwrite: bool = False) -> "RunFiles":
         run_name = name or datetime.now().strftime("%Y%m%d-%H%M%S")
+        if overwrite and run_name != E2E_RUN_NAME:
+            raise ValueError("Run overwrite is only allowed for the e2e run.")
         run_dir = RUNS_DIR / run_name
         if run_dir.exists():
-            raise FileExistsError(
-                f"Run folder already exists: {run_dir}. Choose a new --name."
-            )
+            if overwrite:
+                shutil.rmtree(run_dir)
+            else:
+                raise FileExistsError(
+                    f"Run folder already exists: {run_dir}. Choose a new --name."
+                )
         run_dir.mkdir(parents=True)
         files = cls(run_dir)
         files.ensure_layout()
