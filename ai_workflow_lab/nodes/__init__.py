@@ -1,5 +1,5 @@
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any, Protocol
 
 from runtime.context import ExperimentContext
 from workflow_state import NodeName, WorkflowState
@@ -13,8 +13,14 @@ from nodes.render import make_render_node
 from nodes.verify import make_verify_node
 
 
-NodeHandler = Callable[[WorkflowState], dict]
-NodeFactory = Callable[[ExperimentContext, NodeName], NodeHandler]
+class NodeHandler(Protocol):
+    def __call__(self, state: WorkflowState) -> dict[str, Any]:
+        ...
+
+
+class NodeFactory(Protocol):
+    def __call__(self, ctx: ExperimentContext, name: NodeName) -> NodeHandler:
+        ...
 
 
 @dataclass(frozen=True)
