@@ -1,0 +1,7 @@
+Topic: Pythagoras theorem proof
+Misconceptions:
+- Students may think the theorem works for every triangle, not only right triangles.
+- Students may confuse the hypotenuse with whichever side looks longest, instead of the side opposite the right angle.
+Constraints:
+- Use a visual area-based proof suitable for 8th grade, with minimal algebra.
+Number of scenes: 2
