@@ -35,6 +35,14 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             content=(
                 f"Attempt {attempt} of {MAX_FIX_ATTEMPTS}: verification failed.\n\n"
                 f"{verification.failure}\n\n"
+                "Teacher request:\n"
+                f"{state['request_text']}\n\n"
+                "Video plan JSON:\n"
+                f"{state['plan'].to_prompt_text() if state['plan'] else '(missing plan)'}\n\n"
+                "Current Python code to fix:\n"
+                "```python\n"
+                f"{state['code']}\n"
+                "```\n\n"
                 "Return a complete corrected Python script only."
             )
         )
@@ -47,7 +55,6 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             SystemMessage(
                 content=ctx.files.read_prompt(PromptFiles.CODEGEN_FIX_SYSTEM).strip()
             ),
-            *state["messages"],
             fix_instruction,
         ]
         ctx.run_logger.info(LabLog(

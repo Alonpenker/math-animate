@@ -6,7 +6,7 @@ from typing import Protocol, TypeVar
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from pydantic import BaseModel
 
-from schemas import VideoPlan
+from schemas import CodeQaReport, VideoPlan
 from settings import (
     OPENROUTER_APP_TITLE,
     OPENROUTER_BASE_URL,
@@ -43,6 +43,7 @@ class LlmGateway(Protocol):
         model: str,
         schema: type[StructuredModel],
         max_tokens: int | None = None,
+        reasoning_effort: str | None = "high",
     ) -> tuple[StructuredModel, TokenUsage]:
         ...
 
@@ -71,11 +72,12 @@ class RealLlmGateway:
         model: str,
         schema: type[StructuredModel],
         max_tokens: int | None = None,
+        reasoning_effort: str | None = "high",
     ) -> tuple[StructuredModel, TokenUsage]:
         client = self._get_client(
             model=model,
             max_tokens=max_tokens,
-            reasoning_effort=None,
+            reasoning_effort=reasoning_effort,
             require_parameters=True,
         )
         structured_client = client.with_structured_output(
@@ -196,7 +198,7 @@ class FakeE2ELlmGateway:
         else:
             raise RuntimeError("E2E fake LLM received an unexpected unstructured prompt.")
 
-        return AIMessage(content=content), _fake_usage(content)
+        return AIMessage(content=content), _zero_usage()
 
     def invoke_structured(
         self,
@@ -205,7 +207,23 @@ class FakeE2ELlmGateway:
         model: str,
         schema: type[StructuredModel],
         max_tokens: int | None = None,
+        reasoning_effort: str | None = "high",
     ) -> tuple[StructuredModel, TokenUsage]:
+        if schema is CodeQaReport:
+            all_text = _all_message_text(messages)
+            _require(
+                "Line-numbered Manim code:" in all_text,
+                "E2E code QA prompt did not include line-numbered code.",
+            )
+            report_json = json.dumps({
+                "decision": "pass",
+                "summary": "E2E fake QA passes generated code.",
+                "issues": [],
+                "fix_instructions": "No QA fixes required.",
+            })
+            report = schema.model_validate_json(report_json)
+            return report, _zero_usage()
+
         if schema is not VideoPlan:
             raise RuntimeError(f"E2E fake LLM does not support schema {schema.__name__}.")
         request_text = _last_human_text(messages)
@@ -228,7 +246,7 @@ class FakeE2ELlmGateway:
             ]
         })
         plan = schema.model_validate_json(plan_json)
-        return plan, _fake_usage(plan_json)
+        return plan, _zero_usage()
 
 
 def create_llm_gateway(*, e2e: bool) -> LlmGateway:
@@ -252,9 +270,8 @@ def usage_from_response(response: object) -> TokenUsage:
     )
 
 
-def _fake_usage(content: str) -> TokenUsage:
-    output_tokens = max(1, len(content) // 4)
-    return TokenUsage(input_tokens=20, output_tokens=output_tokens, total_tokens=20 + output_tokens)
+def _zero_usage() -> TokenUsage:
+    return TokenUsage()
 
 
 def _last_human_text(messages: list[BaseMessage]) -> str:

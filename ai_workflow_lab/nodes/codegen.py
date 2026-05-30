@@ -7,6 +7,7 @@ from runtime.context import ExperimentContext
 from services.code_extractor import extract_code
 from settings import (
     CODEGEN_OUTPUT_MAX_TOKENS,
+    CODGEN_REASONING_EFFORT,
     OPENROUTER_CODE_MODEL,
     ArchivedPromptFiles,
     UsageFileNames,
@@ -38,7 +39,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
             context={
                 "model": OPENROUTER_CODE_MODEL,
                 "max_tokens": CODEGEN_OUTPUT_MAX_TOKENS,
-                "reasoning_effort": "low",
+                "reasoning_effort": CODGEN_REASONING_EFFORT,
                 "plan_chars": len(plan_prompt_text),
             },
         ))
@@ -65,7 +66,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
             usage=usage,
             cumulative_usage=cumulative_usage,
             extra_context={
-                "reasoning_effort": "low",
+                "reasoning_effort": CODGEN_REASONING_EFFORT,
                 "code_chars": len(code),
                 "attempt": 0,
             },

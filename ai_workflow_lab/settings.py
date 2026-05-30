@@ -25,15 +25,18 @@ load_env_file()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_PLAN_MODEL = "openrouter/owl-alpha"
-OPENROUTER_CODE_MODEL = "poolside/laguna-m.1:free"
+OPENROUTER_CODE_MODEL = "openai/gpt-oss-120b:free"
+OPENROUTER_QA_MODEL = "openrouter/owl-alpha"
 OPENROUTER_HTTP_REFERER = "http://localhost"
 OPENROUTER_APP_TITLE = "AI Workflow Lab"
 
 
 PLAN_OUTPUT_MAX_TOKENS = 12_000
 CODEGEN_OUTPUT_MAX_TOKENS = 42_000
+CODE_QA_OUTPUT_MAX_TOKENS = 12_000
+CODGEN_REASONING_EFFORT = "low"
 
-MAX_FIX_ATTEMPTS = 3
+MAX_FIX_ATTEMPTS = 5
 DRY_RUN_TIMEOUT_SECONDS = 90
 RENDER_TIMEOUT_SECONDS = 600
 
@@ -98,6 +101,7 @@ class PromptFiles:
     PLAN_SYSTEM = "PLAN_SYSTEM_PROMPT.md"
     CODEGEN_SYSTEM = "CODEGEN_SYSTEM_PROMPT.md"
     CODEGEN_FIX_SYSTEM = "CODEGEN_FIX_SYSTEM_PROMPT.md"
+    CODE_QA_SYSTEM = "CODE_QA_SYSTEM_PROMPT.md"
 
 
 class ArchivedPromptFiles:
@@ -105,11 +109,16 @@ class ArchivedPromptFiles:
     GENERATE_PLAN_USER = "generate_plan_user.txt"
     GENERATE_CODE_SYSTEM = "generate_code_system.md"
     GENERATE_CODE_USER = "generate_code_user.txt"
+    CODE_QA_SYSTEM = "code_qa_system.md"
     FIX_SYSTEM = "fix_system.md"
 
     @staticmethod
     def fix_attempt_user(attempt: int) -> str:
         return f"fix_attempt_{attempt}_user.txt"
+
+    @staticmethod
+    def code_qa_attempt_user(attempt: int) -> str:
+        return f"code_qa_attempt_{attempt}_user.txt"
 
 
 class LogFileNames:
@@ -129,6 +138,10 @@ class LogFileNames:
     def attempt_dry_run_stderr(attempt: int) -> str:
         return f"attempt_{attempt}_dry_run_stderr.log"
 
+    @staticmethod
+    def code_qa_attempt(attempt: int) -> str:
+        return f"code_qa_attempt_{attempt}.json"
+
 
 class UsageFileNames:
     GENERATE_PLAN = "generate_plan_usage.json"
@@ -139,6 +152,10 @@ class UsageFileNames:
     @staticmethod
     def fix_attempt(attempt: int) -> str:
         return f"fix_attempt_{attempt}_usage.json"
+
+    @staticmethod
+    def code_qa_attempt(attempt: int) -> str:
+        return f"code_qa_attempt_{attempt}_usage.json"
 
 
 class DockerCommands:

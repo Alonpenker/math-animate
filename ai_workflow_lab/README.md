@@ -17,7 +17,7 @@ Set `OPENROUTER_API_KEY` in `.env` or export it in your shell.
 
 ## Run
 
-Generate a fresh plan, code, verify/fix, and render:
+Generate a fresh plan, code, verify/fix, one visual QA review, and render:
 
 ```bash
 uv run python run_experiment.py --request inputs/pythagoras_request.txt --name baseline
@@ -36,7 +36,8 @@ uv run python run_experiment.py --e2e
 ```
 
 E2E mode always overwrites `runs/e2e`. It uses deterministic fake LLM responses,
-but still runs real static verification, Docker dry-run, and Docker render.
+including a fake code QA pass after verification succeeds, but still runs real
+static verification, Docker dry-run, and Docker render.
 
 Each run writes:
 
@@ -46,10 +47,13 @@ runs/<name>/
   plan.txt
   selected_documents.json
   prompts/
+  prompts/code_qa_system.md
+  prompts/code_qa_attempt_N_user.txt
   attempts/0/code.py
   attempts/N/code.py
   final/code.py
   logs/
+  logs/code_qa_attempt_N.json
   media/
   summary.json
 ```
@@ -72,10 +76,36 @@ under `runs/<name>/logs/`:
 ```text
 generate_plan_usage.json
 generate_code_usage.json
+code_qa_attempt_N_usage.json
 fix_attempt_N_usage.json
 token_usage.jsonl
 token_usage_summary.json
 ```
+
+## Workflow Nodes
+
+The normal graph order is:
+
+```text
+generate_plan -> load_static_knowledge -> generate_code -> verify -> code_qa -> render
+```
+
+Verification owns syntax, static safety checks, Manim API/runtime errors, and
+Docker dry-run behavior. If verification blocks the code, the workflow routes
+through `fix_code` and then returns to verification:
+
+```text
+fix_code -> verify
+```
+
+After code passes verification, `code_qa` runs at most once. It uses
+`llm_knowledge/prompts/CODE_QA_SYSTEM_PROMPT.md` to review verified Manim code
+for high-confidence code-visible visual defects such as detached semantic
+groups, stale labels after movement, fake square-on-side geometry, unreadable
+contrast, and missing `VGroup` tracking for major objects. Warning-only reports
+continue to render. Blocker reports are written to `logs/code_qa_attempt_N.json`
+and sent to `fix_code`; after that QA is skipped and the normal fix/verify loop
+continues until render or failure.
 
 ## What To Edit
 

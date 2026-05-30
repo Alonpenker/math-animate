@@ -4,6 +4,7 @@ from typing import Any, Protocol
 from runtime.context import ExperimentContext
 from workflow_state import NodeName, WorkflowState
 
+from nodes.code_qa import make_code_qa_node
 from nodes.codegen import make_generate_code_node
 from nodes.fail import make_fail_node
 from nodes.fix import make_fix_code_node
@@ -33,6 +34,7 @@ NODE_SPECS: tuple[NodeSpec, ...] = (
     NodeSpec(NodeName.GENERATE_PLAN, make_generate_plan_node),
     NodeSpec(NodeName.LOAD_STATIC_KNOWLEDGE, make_load_static_knowledge_node),
     NodeSpec(NodeName.GENERATE_CODE, make_generate_code_node),
+    NodeSpec(NodeName.CODE_QA, make_code_qa_node),
     NodeSpec(NodeName.VERIFY, make_verify_node),
     NodeSpec(NodeName.FIX_CODE, make_fix_code_node),
     NodeSpec(NodeName.RENDER, make_render_node),

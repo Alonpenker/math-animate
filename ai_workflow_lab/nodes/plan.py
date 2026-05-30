@@ -61,6 +61,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             ],
             schema=VideoPlan,
             max_tokens=PLAN_OUTPUT_MAX_TOKENS,
+            reasoning_effort=None,
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         plan_prompt_text = plan.to_prompt_text()
