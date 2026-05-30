@@ -27,11 +27,13 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_PLAN_MODEL = "openrouter/owl-alpha"
 OPENROUTER_CODE_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_QA_MODEL = "openrouter/owl-alpha"
+OPENROUTER_CODE_PLAN_MODEL = OPENROUTER_PLAN_MODEL
 OPENROUTER_HTTP_REFERER = "http://localhost"
 OPENROUTER_APP_TITLE = "AI Workflow Lab"
 
 
 PLAN_OUTPUT_MAX_TOKENS = 12_000
+CODE_PLAN_OUTPUT_MAX_TOKENS = 16_000
 CODEGEN_OUTPUT_MAX_TOKENS = 42_000
 CODE_QA_OUTPUT_MAX_TOKENS = 12_000
 CODGEN_REASONING_EFFORT = "low"
@@ -93,12 +95,14 @@ class RunFolderNames:
 class RunFileNames:
     REQUEST = "request.txt"
     PLAN = "plan.txt"
+    CODE_PLAN = "code_plan.json"
     SELECTED_DOCUMENTS = "selected_documents.json"
     SUMMARY = "summary.json"
 
 
 class PromptFiles:
     PLAN_SYSTEM = "PLAN_SYSTEM_PROMPT.md"
+    CODE_PLAN_SYSTEM = "CODE_PLAN_SYSTEM_PROMPT.md"
     CODEGEN_SYSTEM = "CODEGEN_SYSTEM_PROMPT.md"
     CODEGEN_FIX_SYSTEM = "CODEGEN_FIX_SYSTEM_PROMPT.md"
     CODE_QA_SYSTEM = "CODE_QA_SYSTEM_PROMPT.md"
@@ -107,6 +111,8 @@ class PromptFiles:
 class ArchivedPromptFiles:
     GENERATE_PLAN_SYSTEM = "generate_plan_system.md"
     GENERATE_PLAN_USER = "generate_plan_user.txt"
+    GENERATE_CODE_PLAN_SYSTEM = "generate_code_plan_system.md"
+    GENERATE_CODE_PLAN_USER = "generate_code_plan_user.txt"
     GENERATE_CODE_SYSTEM = "generate_code_system.md"
     GENERATE_CODE_USER = "generate_code_user.txt"
     CODE_QA_SYSTEM = "code_qa_system.md"
@@ -123,6 +129,7 @@ class ArchivedPromptFiles:
 
 class LogFileNames:
     WORKFLOW = "workflow.log"
+    CODE_PLAN_VALIDATION_ERROR = "code_plan_validation_error.json"
     RENDER_STDOUT = "render_stdout.log"
     RENDER_STDERR = "render_stderr.log"
 
@@ -145,6 +152,7 @@ class LogFileNames:
 
 class UsageFileNames:
     GENERATE_PLAN = "generate_plan_usage.json"
+    GENERATE_CODE_PLAN = "generate_code_plan_usage.json"
     GENERATE_CODE = "generate_code_usage.json"
     TOKEN_USAGE_JSONL = "token_usage.jsonl"
     TOKEN_USAGE_SUMMARY = "token_usage_summary.json"

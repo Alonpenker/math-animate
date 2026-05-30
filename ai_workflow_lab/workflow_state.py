@@ -5,12 +5,13 @@ from typing import Annotated, TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from schemas import VideoPlan
+from schemas import CodePlan, VideoPlan
 
 
 class NodeName(StrEnum):
     GENERATE_PLAN = "generate_plan"
     LOAD_STATIC_KNOWLEDGE = "load_static_knowledge"
+    GENERATE_CODE_PLAN = "generate_code_plan"
     GENERATE_CODE = "generate_code"
     CODE_QA = "code_qa"
     VERIFY = "verify"
@@ -43,6 +44,7 @@ class VerificationResult:
 class WorkflowState(TypedDict):
     request_text: str
     plan: VideoPlan | None
+    code_plan: CodePlan | None
     messages: Annotated[list[BaseMessage], add_messages]
     code: str
     verification: VerificationResult
@@ -55,6 +57,7 @@ def initial_state(request_text: str) -> WorkflowState:
     return {
         "request_text": request_text,
         "plan": None,
+        "code_plan": None,
         "messages": [],
         "code": "",
         "verification": VerificationResult(),

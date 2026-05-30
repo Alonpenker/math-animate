@@ -19,6 +19,75 @@ class VideoPlan(BaseModel):
         return self.model_dump_json(indent=2)
 
 
+class RegionPlan(BaseModel):
+    role: str = Field(..., max_length=120)
+    position: str = Field(..., max_length=240)
+    max_width: str = Field(..., max_length=160)
+    max_height: str = Field(..., max_length=160)
+    fit_instruction: str = Field(..., max_length=500)
+
+
+class LayoutPlan(BaseModel):
+    primary_region: RegionPlan
+    reserved_regions: list[RegionPlan] = Field(default_factory=list, max_length=6)
+    forbidden_layout: list[str] = Field(default_factory=list, max_length=8)
+
+
+class VisualBlock(BaseModel):
+    id: str = Field(..., max_length=120)
+    type: str = Field(..., max_length=120)
+    contains: list[str] = Field(default_factory=list, max_length=20)
+    placement: str = Field(..., max_length=400)
+    visual_priority: str = Field(..., max_length=240)
+
+
+class TextBudget(BaseModel):
+    max_visible_text_blocks: int = Field(..., ge=0, le=12)
+    longest_text_allowed: str = Field(..., max_length=240)
+    overflow_strategy: str = Field(..., max_length=500)
+
+
+class AnimationBeat(BaseModel):
+    beat: str = Field(..., max_length=600)
+    visible_after: list[str] = Field(default_factory=list, max_length=30)
+
+
+class SubsceneBlueprint(BaseModel):
+    id: str = Field(..., max_length=120)
+    visual_goal: str = Field(..., max_length=600)
+    layout: LayoutPlan
+    visual_blocks: list[VisualBlock] = Field(..., min_length=1, max_length=12)
+    text_budget: TextBudget
+    animation_beats: list[AnimationBeat] = Field(..., min_length=1, max_length=12)
+    clear_after: list[str] = Field(default_factory=list, max_length=30)
+
+
+class SceneCodeBlueprint(BaseModel):
+    scene_number: int = Field(..., ge=1, le=3)
+    scene_goal: str = Field(..., max_length=600)
+    creative_direction: str = Field(..., max_length=600)
+    subscene_split_rationale: str = Field(..., max_length=800)
+    subscenes: list[SubsceneBlueprint] = Field(..., min_length=1, max_length=8)
+
+
+class HelperContract(BaseModel):
+    name: str = Field(..., max_length=120)
+    purpose: str = Field(..., max_length=500)
+    use_case: str = Field(..., max_length=500)
+    inputs: list[str] = Field(default_factory=list, max_length=12)
+    returns: list[str] = Field(default_factory=list, max_length=12)
+    rules: list[str] = Field(default_factory=list, max_length=8)
+
+
+class CodePlan(BaseModel):
+    scene_blueprints: list[SceneCodeBlueprint] = Field(..., min_length=1, max_length=3)
+    shared_helpers_needed: list[HelperContract] = Field(default_factory=list, max_length=8)
+    codegen_priorities: list[str] = Field(default_factory=list, max_length=10)
+
+    def to_prompt_text(self) -> str:
+        return self.model_dump_json(indent=2)
+
+
 CodeQaDecision = Literal["pass", "block"]
 CodeQaSeverity = Literal["blocker", "warning"]
 CodeQaCategory = Literal[

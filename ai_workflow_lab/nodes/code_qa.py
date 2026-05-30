@@ -25,6 +25,10 @@ def make_code_qa_node(ctx: ExperimentContext, name: NodeName):
         plan = state["plan"]
         if plan is None:
             raise RuntimeError("Cannot run code QA without a plan.")
+        code_plan = state["code_plan"]
+        if code_plan is None:
+            raise RuntimeError("Cannot run code QA without a code implementation plan.")
+        code_plan_prompt_text = code_plan.to_prompt_text()
 
         ctx.run_logger.info(LabLog(
             operation=operation,
@@ -39,6 +43,7 @@ def make_code_qa_node(ctx: ExperimentContext, name: NodeName):
         user_prompt = _build_user_prompt(
             request_text=state["request_text"],
             plan_json=plan.to_prompt_text(),
+            code_plan_json=code_plan_prompt_text,
             attempt=attempt,
             code=state["code"],
         )
@@ -55,6 +60,7 @@ def make_code_qa_node(ctx: ExperimentContext, name: NodeName):
                 "max_tokens": CODE_QA_OUTPUT_MAX_TOKENS,
                 "attempt": attempt,
                 "code_chars": len(state["code"]),
+                "code_plan_chars": len(code_plan_prompt_text),
             },
         ))
         started_at = time.perf_counter()
@@ -133,6 +139,7 @@ def _build_user_prompt(
     *,
     request_text: str,
     plan_json: str,
+    code_plan_json: str,
     attempt: int,
     code: str,
 ) -> str:
@@ -145,6 +152,12 @@ def _build_user_prompt(
         f"{request_text}\n\n"
         "Video plan JSON:\n"
         f"{plan_json}\n\n"
+        "Code implementation plan JSON:\n"
+        f"{code_plan_json}\n\n"
+        "Use the code implementation plan to check whether object ownership, "
+        "layout budgets, subscene cleanup, and visible_after lifecycle contracts "
+        "were followed. Do not invent new requirements beyond the video plan and "
+        "code plan.\n\n"
         "Line-numbered Manim code:\n"
         f"{_line_number_code(code)}"
     )

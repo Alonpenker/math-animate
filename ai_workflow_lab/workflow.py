@@ -57,7 +57,8 @@ def build_graph(ctx: ExperimentContext) -> StateGraph:
 
     graph.set_entry_point(NodeName.GENERATE_PLAN)
     graph.add_edge(NodeName.GENERATE_PLAN, NodeName.LOAD_STATIC_KNOWLEDGE)
-    graph.add_edge(NodeName.LOAD_STATIC_KNOWLEDGE, NodeName.GENERATE_CODE)
+    graph.add_edge(NodeName.LOAD_STATIC_KNOWLEDGE, NodeName.GENERATE_CODE_PLAN)
+    graph.add_edge(NodeName.GENERATE_CODE_PLAN, NodeName.GENERATE_CODE)
     graph.add_edge(NodeName.GENERATE_CODE, NodeName.VERIFY)
     graph.add_conditional_edges(NodeName.CODE_QA, route_after_code_qa)
     graph.add_conditional_edges(NodeName.VERIFY, route_after_verify)

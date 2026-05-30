@@ -23,10 +23,23 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
         plan = state["plan"]
         if plan is None:
             raise RuntimeError("Cannot generate code without a plan.")
+        code_plan = state["code_plan"]
+        if code_plan is None:
+            raise RuntimeError("Cannot generate code without a code implementation plan.")
 
         plan_prompt_text = plan.to_prompt_text()
+        code_plan_prompt_text = code_plan.to_prompt_text()
         human_message = HumanMessage(
-            content=f"Generate Manim code for this lesson plan:\n\n{plan_prompt_text}"
+            content=(
+                "Generate Manim code for this lesson plan. The video plan is the "
+                "educational intent. The code implementation plan is the concrete "
+                "implementation contract for staging, layout, object ownership, "
+                "animation beats, helpers, and cleanup.\n\n"
+                "Video plan JSON:\n"
+                f"{plan_prompt_text}\n\n"
+                "Code implementation plan JSON:\n"
+                f"{code_plan_prompt_text}"
+            )
         )
         ctx.files.write_prompt(
             ArchivedPromptFiles.GENERATE_CODE_USER,
@@ -41,6 +54,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
                 "max_tokens": CODEGEN_OUTPUT_MAX_TOKENS,
                 "reasoning_effort": CODGEN_REASONING_EFFORT,
                 "plan_chars": len(plan_prompt_text),
+                "code_plan_chars": len(code_plan_prompt_text),
             },
         ))
         started_at = time.perf_counter()
@@ -48,7 +62,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
             model=OPENROUTER_CODE_MODEL,
             messages=[*state["messages"], human_message],
             max_tokens=CODEGEN_OUTPUT_MAX_TOKENS,
-            reasoning_effort="low",
+            reasoning_effort=CODGEN_REASONING_EFFORT,
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         code = extract_code(response)

@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from schemas import VideoPlan
+from schemas import CodePlan, VideoPlan
 from settings import (
     E2E_RUN_NAME,
     PROMPTS_DIR,
@@ -73,6 +73,12 @@ class RunFiles:
 
     def save_plan(self, plan: VideoPlan) -> None:
         self.write_text(self.run_dir / RunFileNames.PLAN, plan.to_prompt_text())
+
+    def save_code_plan(self, code_plan: CodePlan) -> None:
+        self.write_text(
+            self.run_dir / RunFileNames.CODE_PLAN,
+            code_plan.to_prompt_text(),
+        )
 
     def write_selected_documents(self, metadata: dict) -> None:
         self.write_json(self.run_dir / RunFileNames.SELECTED_DOCUMENTS, metadata)

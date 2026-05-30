@@ -6,7 +6,7 @@ from typing import Protocol, TypeVar
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from pydantic import BaseModel
 
-from schemas import CodeQaReport, VideoPlan
+from schemas import CodePlan, CodeQaReport, VideoPlan
 from settings import (
     OPENROUTER_APP_TITLE,
     OPENROUTER_BASE_URL,
@@ -166,10 +166,17 @@ class FakeE2ELlmGateway:
         last_human_text = _last_human_text(messages)
         all_text = _all_message_text(messages)
 
-        if last_human_text.startswith("Generate Manim code for this lesson plan:"):
+        if last_human_text.startswith("Generate Manim code for this lesson plan"):
             if self._codegen_completed:
                 raise RuntimeError("E2E fake LLM received duplicate codegen call.")
-            _require('"scenes"' in last_human_text, "E2E codegen prompt did not include plan JSON.")
+            _require(
+                "Video plan JSON:" in last_human_text and '"scenes"' in last_human_text,
+                "E2E codegen prompt did not include video plan JSON.",
+            )
+            _require(
+                "Code implementation plan JSON:" in last_human_text,
+                "E2E codegen prompt did not include code implementation plan JSON.",
+            )
             _require(
                 "# Core Skill Documents" in all_text
                 and "# Selected Skill Documents" in all_text,
@@ -215,6 +222,10 @@ class FakeE2ELlmGateway:
                 "Line-numbered Manim code:" in all_text,
                 "E2E code QA prompt did not include line-numbered code.",
             )
+            _require(
+                "Code implementation plan JSON:" in all_text,
+                "E2E code QA prompt did not include code implementation plan JSON.",
+            )
             report_json = json.dumps({
                 "decision": "pass",
                 "summary": "E2E fake QA passes generated code.",
@@ -223,6 +234,98 @@ class FakeE2ELlmGateway:
             })
             report = schema.model_validate_json(report_json)
             return report, _zero_usage()
+
+        if schema is CodePlan:
+            all_text = _all_message_text(messages)
+            _require(
+                "Teacher request:" in all_text and "Video plan JSON:" in all_text,
+                "E2E code plan prompt did not include request and video plan.",
+            )
+            _require(
+                "Required code-plan coverage:" in all_text
+                and "Required scene count:" in all_text
+                and "Required scene_number values:" in all_text,
+                "E2E code plan prompt did not include required scene coverage.",
+            )
+            _require(
+                "# Core Skill Documents" in all_text
+                and "# Selected Skill Documents" in all_text,
+                "E2E code plan call did not include loaded knowledge messages.",
+            )
+            code_plan_json = json.dumps({
+                "scene_blueprints": [
+                    {
+                        "scene_number": 1,
+                        "scene_goal": "Render one clear confirmation scene.",
+                        "creative_direction": (
+                            "Keep the scene simple but staged: title first, then a green "
+                            "confirmation line with a clean final hold."
+                        ),
+                        "subscene_split_rationale": (
+                            "The E2E plan has one visual idea, so one subscene is enough."
+                        ),
+                        "subscenes": [
+                            {
+                                "id": "scene1_confirmation",
+                                "visual_goal": "Show the title and final confirmation line.",
+                                "layout": {
+                                    "primary_region": {
+                                        "role": "main confirmation",
+                                        "position": "center of frame below title",
+                                        "max_width": "80% frame width",
+                                        "max_height": "40% frame height",
+                                        "fit_instruction": "Fit the confirmation group before FadeIn.",
+                                    },
+                                    "reserved_regions": [
+                                        {
+                                            "role": "title",
+                                            "position": "top center",
+                                            "max_width": "90% frame width",
+                                            "max_height": "15% frame height",
+                                            "fit_instruction": "Keep title on one line.",
+                                        }
+                                    ],
+                                    "forbidden_layout": [
+                                        "Do not add extra explanatory text."
+                                    ],
+                                },
+                                "visual_blocks": [
+                                    {
+                                        "id": "confirmation_group",
+                                        "type": "takeaway_group",
+                                        "contains": ["title", "green_confirmation_line"],
+                                        "placement": "centered with title at top and confirmation below",
+                                        "visual_priority": "green confirmation line is dominant",
+                                    }
+                                ],
+                                "text_budget": {
+                                    "max_visible_text_blocks": 2,
+                                    "longest_text_allowed": "Workflow verified",
+                                    "overflow_strategy": "Reduce font size to fit frame width.",
+                                },
+                                "animation_beats": [
+                                    {
+                                        "beat": "Write the title.",
+                                        "visible_after": ["title"],
+                                    },
+                                    {
+                                        "beat": "Fade in the green confirmation line.",
+                                        "visible_after": ["title", "green_confirmation_line"],
+                                    },
+                                ],
+                                "clear_after": ["title", "green_confirmation_line"],
+                            }
+                        ],
+                    }
+                ],
+                "shared_helpers_needed": [],
+                "codegen_priorities": [
+                    "Use the code plan as the implementation contract.",
+                    "Keep final visible objects easy to fade out together.",
+                ],
+            })
+            code_plan = schema.model_validate_json(code_plan_json)
+            return code_plan, _zero_usage()
 
         if schema is not VideoPlan:
             raise RuntimeError(f"E2E fake LLM does not support schema {schema.__name__}.")

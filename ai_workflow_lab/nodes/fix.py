@@ -22,6 +22,7 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
     def node(state: WorkflowState) -> dict:
         attempt = state["fix_attempt"] + 1
         verification = state["verification"]
+        code_plan = state["code_plan"]
         ctx.run_logger.info(LabLog(
             operation=operation,
             event="Node started",
@@ -39,6 +40,11 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
                 f"{state['request_text']}\n\n"
                 "Video plan JSON:\n"
                 f"{state['plan'].to_prompt_text() if state['plan'] else '(missing plan)'}\n\n"
+                "Code plan JSON:\n"
+                f"{code_plan.to_prompt_text() if code_plan else '(missing code plan)'}\n\n"
+                "Preserve the code plan's object lifecycle, subscene cleanup, "
+                "visual block ownership, helper contracts, and layout budgets "
+                "while fixing the reported failure.\n\n"
                 "Current Python code to fix:\n"
                 "```python\n"
                 f"{state['code']}\n"

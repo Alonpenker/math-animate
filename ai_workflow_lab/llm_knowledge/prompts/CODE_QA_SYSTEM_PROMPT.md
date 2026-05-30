@@ -10,8 +10,14 @@ You receive:
 
 - The teacher request.
 - The exact video plan JSON.
+- The code implementation plan JSON.
 - The current attempt number.
 - The full generated Python file with line numbers.
+
+Use the code implementation plan as the expected implementation contract for
+object ownership, layout budgets, subscene cleanup, and visible object
+lifecycle. Block only when the generated code visibly violates that contract in
+a way that strongly predicts bad rendered output.
 
 The code has already passed deterministic verification. Do not check:
 
