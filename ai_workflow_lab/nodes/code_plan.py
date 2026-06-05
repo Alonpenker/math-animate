@@ -1,7 +1,7 @@
 import time
 from collections import Counter
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
@@ -64,7 +64,7 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
                 SystemMessage(
                     content=ctx.files.read_prompt(PromptFiles.CODE_PLAN_SYSTEM).strip()
                 ),
-                *_knowledge_messages(state["messages"]),
+                *state["messages"],
                 HumanMessage(content=user_prompt),
             ],
             schema=CodePlan,
@@ -74,7 +74,7 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         code_plan_prompt_text = code_plan.to_prompt_text()
         ctx.files.save_code_plan(code_plan)
-        validation_errors = _validate_code_plan(
+        validation_warnings = _validate_code_plan(
             code_plan=code_plan,
             required_scene_numbers=required_scene_numbers,
         )
@@ -94,10 +94,10 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
                 "scene_blueprint_count": len(code_plan.scene_blueprints),
                 "helper_count": len(code_plan.shared_helpers_needed),
                 "code_plan_chars": len(code_plan_prompt_text),
-                "validation_error_count": len(validation_errors),
+                "validation_warning_count": len(validation_warnings),
             },
         )
-        if validation_errors:
+        if validation_warnings:
             actual_scene_numbers = [
                 scene.scene_number for scene in code_plan.scene_blueprints
             ]
@@ -106,21 +106,18 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
                 {
                     "expected_scene_numbers": required_scene_numbers,
                     "actual_scene_numbers": actual_scene_numbers,
-                    "errors": validation_errors,
+                    "warnings": validation_warnings,
                 },
             )
             ctx.run_logger.warning(LabLog(
                 operation=operation,
-                event="Code plan validation failed",
+                event="Code plan validation warnings",
                 context={
                     "expected_scene_numbers": required_scene_numbers,
                     "actual_scene_numbers": actual_scene_numbers,
-                    "error_count": len(validation_errors),
+                    "warning_count": len(validation_warnings),
                 },
             ))
-            raise RuntimeError(
-                "Code plan validation failed: " + "; ".join(validation_errors)
-            )
         return {"code_plan": code_plan}
 
     return node
@@ -133,16 +130,8 @@ def _build_user_prompt(
     required_scene_numbers: list[int],
 ) -> str:
     return (
-        "Create a Manim code implementation plan for this lesson. The video plan "
-        "is the educational intent; your output must be a concrete code blueprint "
-        "with staging, visual blocks, layout budgets, text budgets, helper "
-        "contracts, animation beats, and cleanup lists.\n\n"
-        "Required code-plan coverage:\n"
-        f"- Required scene count: {len(required_scene_numbers)}\n"
-        f"- Required scene_number values: {required_scene_numbers}\n"
-        "- Return exactly one scene_blueprint for each required scene_number.\n"
-        "- Do not skip, merge, summarize, or provide a representative subset of "
-        "the scenes.\n\n"
+        "Create a Manim code implementation plan for this lesson.\n\n"
+        f"Required scene_number values: {required_scene_numbers}\n\n"
         "Teacher request:\n"
         f"{request_text}\n\n"
         "Video plan JSON:\n"
@@ -150,16 +139,8 @@ def _build_user_prompt(
     )
 
 
-def _knowledge_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
-    # The first loaded message is the codegen system prompt; skip it here so the
-    # structured code-plan call receives only Manim knowledge, not "output code".
-    if not messages:
-        return []
-    return list(messages[1:])
-
-
 def _required_scene_numbers(plan: VideoPlan) -> list[int]:
-    return [scene.scene_number for scene in plan.scenes if scene.scene_number >= 1]
+    return sorted({scene.scene_number for scene in plan.scenes if scene.scene_number >= 1})
 
 
 def _validate_code_plan(
@@ -196,13 +177,5 @@ def _validate_code_plan(
             "Unexpected scene_blueprints for scene_number(s): "
             f"{extra_scene_numbers}."
         )
-
-    for scene in code_plan.scene_blueprints:
-        for subscene in scene.subscenes:
-            if not subscene.visual_blocks:
-                errors.append(
-                    f"Scene {scene.scene_number} subscene {subscene.id!r} has no "
-                    "visual_blocks."
-                )
 
     return errors

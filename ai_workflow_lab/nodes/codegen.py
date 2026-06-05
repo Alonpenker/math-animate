@@ -1,6 +1,6 @@
 import time
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
@@ -10,6 +10,7 @@ from settings import (
     CODGEN_REASONING_EFFORT,
     OPENROUTER_CODE_MODEL,
     ArchivedPromptFiles,
+    PromptFiles,
     UsageFileNames,
 )
 from workflow_state import NodeName, WorkflowState
@@ -26,15 +27,16 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
         code_plan = state["code_plan"]
         if code_plan is None:
             raise RuntimeError("Cannot generate code without a code implementation plan.")
+        ctx.files.archive_prompt_file(
+            PromptFiles.CODEGEN_SYSTEM,
+            ArchivedPromptFiles.GENERATE_CODE_SYSTEM,
+        )
 
         plan_prompt_text = plan.to_prompt_text()
         code_plan_prompt_text = code_plan.to_prompt_text()
         human_message = HumanMessage(
             content=(
-                "Generate Manim code for this lesson plan. The video plan is the "
-                "educational intent. The code implementation plan is the concrete "
-                "implementation contract for staging, layout, object ownership, "
-                "animation beats, helpers, and cleanup.\n\n"
+                "Generate Manim code from these JSON contracts.\n\n"
                 "Video plan JSON:\n"
                 f"{plan_prompt_text}\n\n"
                 "Code implementation plan JSON:\n"
@@ -60,13 +62,20 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
         started_at = time.perf_counter()
         response, usage = ctx.llm.invoke(
             model=OPENROUTER_CODE_MODEL,
-            messages=[*state["messages"], human_message],
+            messages=[
+                SystemMessage(
+                    content=ctx.files.read_prompt(PromptFiles.CODEGEN_SYSTEM).strip()
+                ),
+                *state["messages"],
+                human_message,
+            ],
             max_tokens=CODEGEN_OUTPUT_MAX_TOKENS,
             reasoning_effort=CODGEN_REASONING_EFFORT,
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         code = extract_code(response)
-        ctx.files.save_attempt_code(0, code)
+        attempt = state["attempt"]
+        ctx.files.save_attempt_code(attempt, code)
         cumulative_usage = ctx.usage.record(
             UsageFileNames.GENERATE_CODE,
             usage,
@@ -82,7 +91,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
             extra_context={
                 "reasoning_effort": CODGEN_REASONING_EFFORT,
                 "code_chars": len(code),
-                "attempt": 0,
+                "attempt": attempt,
             },
         )
         return {"messages": [human_message, response], "code": code}

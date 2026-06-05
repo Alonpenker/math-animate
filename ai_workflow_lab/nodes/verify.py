@@ -15,7 +15,7 @@ def make_verify_node(ctx: ExperimentContext, name: NodeName):
     operation = name.value
 
     def node(state: WorkflowState) -> dict:
-        attempt = state["fix_attempt"]
+        attempt = state["attempt"]
         code_path = ctx.files.save_attempt_code(attempt, state["code"])
         ctx.run_logger.info(LabLog(
             operation=operation,

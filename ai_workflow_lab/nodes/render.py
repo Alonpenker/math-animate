@@ -4,7 +4,7 @@ from lab_logging import LabLog
 from runtime.context import ExperimentContext
 from services.rendering import render_docker
 from settings import LogFileNames
-from workflow_state import NodeName, WorkflowState
+from workflow_state import INITIAL_ATTEMPT, NodeName, WorkflowState
 
 
 def make_render_node(ctx: ExperimentContext, name: NodeName):
@@ -34,10 +34,12 @@ def make_render_node(ctx: ExperimentContext, name: NodeName):
         ctx.files.write_log(LogFileNames.RENDER_STDOUT, stdout)
         ctx.files.write_log(LogFileNames.RENDER_STDERR, stderr)
         rendered_files = ctx.files.relative_paths(output_files)
+        attempt = state["attempt"]
         ctx.write_summary({
             "status": "rendered",
             "run_dir": str(ctx.files.run_dir),
-            "fix_attempts": state["fix_attempt"],
+            "attempts": attempt,
+            "fix_attempts": max(0, attempt - INITIAL_ATTEMPT),
             "rendered_files": rendered_files,
         })
         ctx.run_logger.info(LabLog(

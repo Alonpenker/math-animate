@@ -51,7 +51,60 @@ def verify_code_static(code: str) -> str | None:
         return f"Forbidden imports: {', '.join(sorted(set(forbidden_imports)))}"
     if dangerous_calls:
         return f"Dangerous builtin calls: {', '.join(sorted(set(dangerous_calls)))}"
+    visual_kit_failure = _verify_visual_kit_contract(tree)
+    if visual_kit_failure is not None:
+        return visual_kit_failure
     return None
+
+
+def _verify_visual_kit_contract(tree: ast.AST) -> str | None:
+    renderable_scenes = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and re.fullmatch(r"Scene\d+", node.name)
+    ]
+    if not renderable_scenes:
+        return None
+
+    has_visual_kit_import = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] == "visual_kit" for alias in node.names):
+                has_visual_kit_import = True
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] == "visual_kit":
+                has_visual_kit_import = True
+
+    if not has_visual_kit_import:
+        return "Missing visual_kit import. Generated code must use from visual_kit import *."
+
+    raw_scene_classes: list[str] = []
+    missing_safe_scene_classes: list[str] = []
+    for scene_class in renderable_scenes:
+        base_names = {_base_name(base) for base in scene_class.bases}
+        if "Scene" in base_names and "SafeScene" not in base_names:
+            raw_scene_classes.append(scene_class.name)
+        if "SafeScene" not in base_names:
+            missing_safe_scene_classes.append(scene_class.name)
+
+    if raw_scene_classes:
+        return (
+            "Renderable scene classes must inherit SafeScene, not raw Scene: "
+            + ", ".join(raw_scene_classes)
+        )
+    if missing_safe_scene_classes:
+        return (
+            "Renderable scene classes must inherit SafeScene: "
+            + ", ".join(missing_safe_scene_classes)
+        )
+    return None
+
+
+def _base_name(base: ast.expr) -> str:
+    if isinstance(base, ast.Name):
+        return base.id
+    if isinstance(base, ast.Attribute):
+        return base.attr
+    return ""
 
 
 def extract_traceback(stderr: str) -> str:

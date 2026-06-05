@@ -8,6 +8,7 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-openrouter>=0.1.0",
     "langgraph>=1.1.6",
+    "manim==0.19.2",
     "openrouter>=0.9.1",
     "pydantic>=2.5",
 ]

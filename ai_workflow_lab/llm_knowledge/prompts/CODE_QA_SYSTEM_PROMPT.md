@@ -19,6 +19,22 @@ object ownership, layout budgets, subscene cleanup, and visible object
 lifecycle. Block only when the generated code visibly violates that contract in
 a way that strongly predicts bad rendered output.
 
+The generated code is expected to use the visual-kit runtime with
+`from visual_kit import *`, `SafeScene` subclasses, and visual-kit shell/layout
+methods for major screen placement. Topic-specific lesson content should be
+built inline in `code.py`, optionally adapted from reference templates.
+Minor captions that sit near the main visual should be owned by a visual-kit
+layout such as `show_center_with_caption`, not manually placed below an already
+fitted diagram when bottom text is also visible.
+Formula replacements that start in a fitted layout region and target a new
+formula at the default scene center are visual blockers because the formula will
+drift into the main visual. Move target formulas into place before transforming.
+Repeatedly fading/writing the same object immediately after a visual-kit
+`show_*` helper is a visual blocker when it causes blinking or ghosted content.
+When a proof claims rearrangement of the same pieces, prefer code that displays
+the source through `show_*` and changes to the target through a matching
+`transform_*` helper or equivalent explicit object transforms.
+
 The code has already passed deterministic verification. Do not check:
 
 - Python syntax or imports.
@@ -126,15 +142,16 @@ Block only high-confidence visual defects from this rubric:
    for major geometry, labels, equations, or layout groups. `buff=0` is not a
    negative buffer and must not be blocked by itself.
 
-7. Fake square-on-side geometry.
-   A square that is supposed to be built on a triangle side or segment is made
-   from arbitrary `Square(...)`, `next_to(...)`, or unrelated hand-written
-   polygon coordinates instead of deriving its vertices from the side endpoints.
+7. Fake square-on-side geometry or dependent geometry.
+   A shape that is supposed to be built from a mathematical object, such as a
+   square on a segment or a tangent at a point, is made from arbitrary placement
+   or unrelated hand-written coordinates instead of deriving its geometry from
+   the source object.
 
 8. Invalid mathematical object claim.
-   A shape is labeled `a^2`, `b^2`, `c^2`, "hypotenuse square", "area", or
-   similar, but its dimensions are not derived from the claimed length or
-   mathematical object.
+   A visible object is labeled as a specific mathematical object, area, length,
+   tangent, derivative, matrix entry, graph feature, or similar, but its
+   geometry or value is not derived from the claimed mathematical object.
 
 9. Fake proof continuity.
    The plan requires rearranging, preserving, or transforming the same pieces,

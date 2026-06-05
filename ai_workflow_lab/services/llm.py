@@ -166,7 +166,7 @@ class FakeE2ELlmGateway:
         last_human_text = _last_human_text(messages)
         all_text = _all_message_text(messages)
 
-        if last_human_text.startswith("Generate Manim code for this lesson plan"):
+        if last_human_text.startswith("Generate Manim code from these JSON contracts"):
             if self._codegen_completed:
                 raise RuntimeError("E2E fake LLM received duplicate codegen call.")
             _require(
@@ -176,6 +176,10 @@ class FakeE2ELlmGateway:
             _require(
                 "Code implementation plan JSON:" in last_human_text,
                 "E2E codegen prompt did not include code implementation plan JSON.",
+            )
+            _require(
+                "visual_kit" in all_text and "SafeScene" in all_text,
+                "E2E codegen prompt did not include loaded visual-kit context.",
             )
             _require(
                 "# Core Skill Documents" in all_text
@@ -197,8 +201,12 @@ class FakeE2ELlmGateway:
                 "E2E fix call did not include the prior invalid assistant response.",
             )
             _require(
-                "Return a complete corrected Python script only." in last_human_text,
+                "Return the complete corrected Python script." in last_human_text,
                 "E2E fix prompt did not include the complete-script instruction.",
+            )
+            _require(
+                "visual_kit" in all_text and "SafeScene" in all_text,
+                "E2E fix prompt did not include visual-kit runtime reference.",
             )
             self._fix_completed = True
             content = _E2E_FIXED_CODE
@@ -242,9 +250,7 @@ class FakeE2ELlmGateway:
                 "E2E code plan prompt did not include request and video plan.",
             )
             _require(
-                "Required code-plan coverage:" in all_text
-                and "Required scene count:" in all_text
-                and "Required scene_number values:" in all_text,
+                "Required scene_number values:" in all_text,
                 "E2E code plan prompt did not include required scene coverage.",
             )
             _require(
@@ -256,6 +262,7 @@ class FakeE2ELlmGateway:
                 "scene_blueprints": [
                     {
                         "scene_number": 1,
+                        "scene_title": "E2E workflow",
                         "scene_goal": "Render one clear confirmation scene.",
                         "creative_direction": (
                             "Keep the scene simple but staged: title first, then a green "
@@ -268,6 +275,14 @@ class FakeE2ELlmGateway:
                             {
                                 "id": "scene1_confirmation",
                                 "visual_goal": "Show the title and final confirmation line.",
+                                "layout_template": "show_center",
+                                "content_template_refs": [],
+                                "content_build_steps": [
+                                    "Create confirmation_line with Text, font_size=30, color=GREEN.",
+                                    "Pass confirmation_line to self.show_center(...).",
+                                ],
+                                "bottom_text": "The local workflow reached the visual-kit render path.",
+                                "clear_main_before": True,
                                 "layout": {
                                     "primary_region": {
                                         "role": "main confirmation",
@@ -293,7 +308,7 @@ class FakeE2ELlmGateway:
                                     {
                                         "id": "confirmation_group",
                                         "type": "takeaway_group",
-                                        "contains": ["title", "green_confirmation_line"],
+                                        "contains": ["confirmation_line"],
                                         "placement": "centered with title at top and confirmation below",
                                         "visual_priority": "green confirmation line is dominant",
                                     }
@@ -419,14 +434,14 @@ class Scene1(Scene):
 
 
 _E2E_FIXED_CODE = """from manim import *
+from visual_kit import *
 
 
-class Scene1(Scene):
+class Scene1(SafeScene):
     def construct(self):
-        title = Text("E2E workflow", font_size=42)
-        result = Text("Plan -> code -> verify -> fix -> render", font_size=28, color=GREEN)
-        result.next_to(title, DOWN, buff=0.5)
-        self.play(Write(title))
-        self.play(FadeIn(result))
+        self.show_title("E2E workflow")
+        result = Text("Plan -> code -> verify -> fix -> render", font_size=30, color=GREEN)
+        self.show_center(result)
+        self.set_bottom_text("The local workflow reached the visual-kit render path.")
         self.wait(0.5)
 """

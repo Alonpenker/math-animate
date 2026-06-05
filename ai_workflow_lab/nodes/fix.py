@@ -7,8 +7,10 @@ from runtime.context import ExperimentContext
 from services.code_extractor import extract_code
 from settings import (
     CODEGEN_OUTPUT_MAX_TOKENS,
-    MAX_FIX_ATTEMPTS,
+    FIX_REASONING_EFFORT,
+    MAX_ATTEMPTS,
     OPENROUTER_CODE_MODEL,
+    VISUAL_KIT_SOURCE,
     ArchivedPromptFiles,
     PromptFiles,
     UsageFileNames,
@@ -20,21 +22,23 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
     operation = name.value
 
     def node(state: WorkflowState) -> dict:
-        attempt = state["fix_attempt"] + 1
+        attempt = state["attempt"] + 1
         verification = state["verification"]
         code_plan = state["code_plan"]
         ctx.run_logger.info(LabLog(
             operation=operation,
             event="Node started",
-            context={"attempt": attempt, "max_fix_attempts": MAX_FIX_ATTEMPTS},
+            context={"attempt": attempt, "max_attempts": MAX_ATTEMPTS},
         ))
         ctx.files.archive_prompt_file(
             PromptFiles.CODEGEN_FIX_SYSTEM,
             ArchivedPromptFiles.FIX_SYSTEM,
         )
+        visual_kit_source = VISUAL_KIT_SOURCE.read_text(encoding="utf-8")
         fix_instruction = HumanMessage(
             content=(
-                f"Attempt {attempt} of {MAX_FIX_ATTEMPTS}: verification failed.\n\n"
+                f"Attempt {attempt} of {MAX_ATTEMPTS}: verification failed.\n\n"
+                "Failure:\n"
                 f"{verification.failure}\n\n"
                 "Teacher request:\n"
                 f"{state['request_text']}\n\n"
@@ -42,14 +46,15 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
                 f"{state['plan'].to_prompt_text() if state['plan'] else '(missing plan)'}\n\n"
                 "Code plan JSON:\n"
                 f"{code_plan.to_prompt_text() if code_plan else '(missing code plan)'}\n\n"
-                "Preserve the code plan's object lifecycle, subscene cleanup, "
-                "visual block ownership, helper contracts, and layout budgets "
-                "while fixing the reported failure.\n\n"
+                "Runtime reference visual_kit.py:\n"
+                "```python\n"
+                f"{visual_kit_source}\n"
+                "```\n\n"
                 "Current Python code to fix:\n"
                 "```python\n"
                 f"{state['code']}\n"
                 "```\n\n"
-                "Return a complete corrected Python script only."
+                "Return the complete corrected Python script."
             )
         )
         ctx.files.write_prompt(
@@ -69,7 +74,7 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             context={
                 "model": OPENROUTER_CODE_MODEL,
                 "max_tokens": CODEGEN_OUTPUT_MAX_TOKENS,
-                "reasoning_effort": "medium",
+                "reasoning_effort": FIX_REASONING_EFFORT,
                 "attempt": attempt,
             },
         ))
@@ -78,7 +83,7 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             model=OPENROUTER_CODE_MODEL,
             messages=fix_messages,
             max_tokens=CODEGEN_OUTPUT_MAX_TOKENS,
-            reasoning_effort="medium",
+            reasoning_effort=FIX_REASONING_EFFORT,
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         fixed_code = extract_code(response)
@@ -96,15 +101,16 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
             usage=usage,
             cumulative_usage=cumulative_usage,
             extra_context={
-                "reasoning_effort": "medium",
+                "reasoning_effort": FIX_REASONING_EFFORT,
                 "attempt": attempt,
                 "code_chars": len(fixed_code),
+                "visual_kit_chars": len(visual_kit_source),
             },
         )
         return {
             "messages": [fix_instruction, response],
             "code": fixed_code,
-            "fix_attempt": attempt,
+            "attempt": attempt,
         }
 
     return node

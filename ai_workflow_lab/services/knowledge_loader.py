@@ -4,7 +4,7 @@ from langchain_core.messages import SystemMessage
 
 from llm_knowledge.skill_documents import CORE_DOCUMENTS, REGISTRY, read_knowledge_file
 from schemas import KnowledgeDocumentSeed
-from settings import DEFAULT_SELECTED_DOCUMENT_TITLES
+from settings import BASE_SELECTED_DOCUMENT_TITLES, STATIC_DOCUMENT_SELECTION_PROFILES
 
 
 @dataclass(frozen=True)
@@ -14,11 +14,15 @@ class KnowledgeBundle:
     selected_titles: list[str]
 
 
-def load_static_knowledge(codegen_system_prompt: str) -> KnowledgeBundle:
+def load_static_knowledge(
+    *,
+    request_text: str,
+    plan_text: str,
+) -> KnowledgeBundle:
     registry_by_title = {entry.title: entry for entry in REGISTRY}
 
     selected_docs: list[KnowledgeDocumentSeed] = []
-    for title in DEFAULT_SELECTED_DOCUMENT_TITLES:
+    for title in _select_document_titles(request_text=request_text, plan_text=plan_text):
         doc = registry_by_title.get(title)
         if doc is not None:
             selected_docs.append(doc)
@@ -42,7 +46,6 @@ def load_static_knowledge(codegen_system_prompt: str) -> KnowledgeBundle:
         "selected_documents": [_doc_metadata(doc) for doc in selected_docs],
     }
     messages = [
-        SystemMessage(content=codegen_system_prompt.strip()),
         SystemMessage(content=f"# Core Skill Documents\n\n{core_content}"),
         SystemMessage(content=f"# Selected Skill Documents\n\n{selected_content}"),
     ]
@@ -51,6 +54,25 @@ def load_static_knowledge(codegen_system_prompt: str) -> KnowledgeBundle:
         metadata=metadata,
         selected_titles=[doc.title for doc in selected_docs],
     )
+
+
+def _select_document_titles(*, request_text: str, plan_text: str) -> list[str]:
+    selected_titles = list(BASE_SELECTED_DOCUMENT_TITLES)
+    searchable_text = f"{request_text}\n{plan_text}".lower()
+    for keywords, titles in STATIC_DOCUMENT_SELECTION_PROFILES:
+        if any(keyword in searchable_text for keyword in keywords):
+            selected_titles.extend(titles)
+    return _dedupe_preserving_order(selected_titles)
+
+
+def _dedupe_preserving_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            deduped.append(value)
+    return deduped
 
 
 def _doc_metadata(doc: KnowledgeDocumentSeed) -> dict[str, str | list[str]]:

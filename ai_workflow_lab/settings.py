@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 RUNS_DIR = ROOT_DIR / "runs"
 PROMPTS_DIR = ROOT_DIR / "llm_knowledge" / "prompts"
+VISUAL_KIT_SOURCE = ROOT_DIR / "llm_knowledge" / "manim_skill" / "visual_kit.py"
 E2E_RUN_NAME = "e2e"
 
 
@@ -37,8 +38,9 @@ CODE_PLAN_OUTPUT_MAX_TOKENS = 16_000
 CODEGEN_OUTPUT_MAX_TOKENS = 42_000
 CODE_QA_OUTPUT_MAX_TOKENS = 12_000
 CODGEN_REASONING_EFFORT = "low"
+FIX_REASONING_EFFORT = "medium"
 
-MAX_FIX_ATTEMPTS = 5
+MAX_ATTEMPTS = 5
 DRY_RUN_TIMEOUT_SECONDS = 90
 RENDER_TIMEOUT_SECONDS = 600
 
@@ -50,6 +52,14 @@ ALLOWED_IMPORTS: frozenset[str] = frozenset({
     "scipy",
     "random",
     "typing",
+    "visual_kit",
+})
+
+VISUAL_KIT_LAYOUT_TEMPLATES: frozenset[str] = frozenset({
+    "show_center",
+    "show_center_with_caption",
+    "show_left_right",
+    "show_stack",
 })
 
 DANGEROUS_BUILTINS: frozenset[str] = frozenset({
@@ -60,7 +70,7 @@ DANGEROUS_BUILTINS: frozenset[str] = frozenset({
     "compile",
 })
 
-DEFAULT_SELECTED_DOCUMENT_TITLES: tuple[str, ...] = (
+BASE_SELECTED_DOCUMENT_TITLES: tuple[str, ...] = (
     "Layout Composition",
     "Scenes",
     "Mobject Layout Basics",
@@ -72,12 +82,35 @@ DEFAULT_SELECTED_DOCUMENT_TITLES: tuple[str, ...] = (
     "Educational Storyboarding",
     "Lines, Arrows, and Labels",
     "Geometry Shapes and Labels",
-    "Pythagorean Theorem Proof",
+)
+
+STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        ("pythagoras", "pythagorean", "right triangle", "hypotenuse"),
+        ("Pythagorean Area Template",),
+    ),
+    (
+        ("derivative", "derivatives", "limit", "limits", "tangent line"),
+        ("Axes and Graphing", "Equation Transitions", "Derivatives From Limits"),
+    ),
+    (
+        ("function", "functions", "graph", "graphs", "transformation", "transformations"),
+        ("Axes and Graphing", "Function Transformations"),
+    ),
+    (
+        ("matrix", "matrices", "dot product", "linear algebra"),
+        ("Matrix Drawing Patterns", "Matrix Multiplication"),
+    ),
+    (
+        ("circle", "tangent", "construction", "compass"),
+        ("External Circle Tangent Construction",),
+    ),
 )
 
 
 class PathNames:
     MANIM_CODE = "code.py"
+    VISUAL_KIT = "visual_kit.py"
     MEDIA_FOLDER = "media"
     VIDEOS_FOLDER = "videos"
     RESOLUTION_FOLDER = "720p30"

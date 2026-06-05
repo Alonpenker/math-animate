@@ -5,7 +5,7 @@ from langgraph.graph import END, StateGraph
 from lab_logging import LabLog
 from nodes import NODE_SPECS
 from runtime.context import ExperimentContext
-from settings import MAX_FIX_ATTEMPTS
+from settings import MAX_ATTEMPTS
 from workflow_state import (
     NodeName,
     WorkflowState,
@@ -29,7 +29,7 @@ def run_experiment(
     )
     graph = build_graph(ctx)
     compiled = graph.compile()
-    recursion_limit = workflow_recursion_limit(MAX_FIX_ATTEMPTS)
+    recursion_limit = workflow_recursion_limit(MAX_ATTEMPTS)
 
     try:
         compiled.invoke(
@@ -60,7 +60,6 @@ def build_graph(ctx: ExperimentContext) -> StateGraph:
     graph.add_edge(NodeName.LOAD_STATIC_KNOWLEDGE, NodeName.GENERATE_CODE_PLAN)
     graph.add_edge(NodeName.GENERATE_CODE_PLAN, NodeName.GENERATE_CODE)
     graph.add_edge(NodeName.GENERATE_CODE, NodeName.VERIFY)
-    graph.add_conditional_edges(NodeName.CODE_QA, route_after_code_qa)
     graph.add_conditional_edges(NodeName.VERIFY, route_after_verify)
     graph.add_edge(NodeName.FIX_CODE, NodeName.VERIFY)
     graph.add_edge(NodeName.RENDER, END)
@@ -74,7 +73,7 @@ def route_after_code_qa(state: WorkflowState) -> NodeName:
         return NodeName.RENDER
     if not verification.fixable:
         return NodeName.FAIL
-    if state["fix_attempt"] >= MAX_FIX_ATTEMPTS:
+    if state["attempt"] >= MAX_ATTEMPTS:
         return NodeName.FAIL
     return NodeName.FIX_CODE
 
@@ -82,11 +81,9 @@ def route_after_code_qa(state: WorkflowState) -> NodeName:
 def route_after_verify(state: WorkflowState) -> NodeName:
     verification = state["verification"]
     if verification.passed:
-        if not state["code_qa_completed"]:
-            return NodeName.CODE_QA
         return NodeName.RENDER
     if not verification.fixable:
         return NodeName.FAIL
-    if state["fix_attempt"] >= MAX_FIX_ATTEMPTS:
+    if state["attempt"] >= MAX_ATTEMPTS:
         return NodeName.FAIL
     return NodeName.FIX_CODE

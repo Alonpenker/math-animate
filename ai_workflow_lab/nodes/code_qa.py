@@ -21,7 +21,7 @@ def make_code_qa_node(ctx: ExperimentContext, name: NodeName):
     operation = name.value
 
     def node(state: WorkflowState) -> dict:
-        attempt = state["fix_attempt"]
+        attempt = state["attempt"]
         plan = state["plan"]
         if plan is None:
             raise RuntimeError("Cannot run code QA without a plan.")

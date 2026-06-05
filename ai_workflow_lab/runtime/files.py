@@ -8,6 +8,7 @@ from settings import (
     E2E_RUN_NAME,
     PROMPTS_DIR,
     RUNS_DIR,
+    VISUAL_KIT_SOURCE,
     PathNames,
     RunFileNames,
     RunFolderNames,
@@ -91,6 +92,7 @@ class RunFiles:
     def save_attempt_code(self, attempt: int, code: str) -> Path:
         path = self.attempt_dir(attempt) / PathNames.MANIM_CODE
         self.write_text(path, code)
+        self.copy_visual_kit(path.parent)
         return path
 
     def dry_run_media_dir(self, attempt: int) -> Path:
@@ -115,7 +117,13 @@ class RunFiles:
     def save_final_code(self, code: str) -> Path:
         path = self.run_dir / RunFolderNames.FINAL / PathNames.MANIM_CODE
         self.write_text(path, code)
+        self.copy_visual_kit(path.parent)
         return path
+
+    def copy_visual_kit(self, target_dir: Path) -> Path:
+        target = target_dir / PathNames.VISUAL_KIT
+        shutil.copy2(VISUAL_KIT_SOURCE, target)
+        return target
 
     def relative_paths(self, paths: list[Path]) -> list[str]:
         return [str(path.relative_to(self.run_dir)) for path in paths]

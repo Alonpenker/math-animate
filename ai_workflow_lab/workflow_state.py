@@ -25,10 +25,13 @@ FIX_RETRY_PATH: tuple[NodeName, ...] = (
     NodeName.VERIFY,
 )
 
+INITIAL_ATTEMPT = 1
 
-def workflow_recursion_limit(max_fix_attempts: int) -> int:
+
+def workflow_recursion_limit(max_attempts: int) -> int:
     """Return the LangGraph node-visit budget implied by the workflow paths."""
-    return len(tuple(NodeName)) + max_fix_attempts * len(FIX_RETRY_PATH)
+    retry_count = max(0, max_attempts - INITIAL_ATTEMPT)
+    return len(tuple(NodeName)) + retry_count * len(FIX_RETRY_PATH)
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ class WorkflowState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     code: str
     verification: VerificationResult
-    fix_attempt: int
+    attempt: int
     code_qa_completed: bool
     rendered_files: list[str]
 
@@ -61,7 +64,7 @@ def initial_state(request_text: str) -> WorkflowState:
         "messages": [],
         "code": "",
         "verification": VerificationResult(),
-        "fix_attempt": 0,
+        "attempt": INITIAL_ATTEMPT,
         "code_qa_completed": False,
         "rendered_files": [],
     }

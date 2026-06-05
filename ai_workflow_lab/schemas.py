@@ -52,9 +52,30 @@ class AnimationBeat(BaseModel):
     visible_after: list[str] = Field(default_factory=list, max_length=30)
 
 
+VisualKitLayoutTemplate = Literal[
+    "show_center",
+    "show_center_with_caption",
+    "show_left_right",
+    "show_stack",
+]
+
+
+class ContentTemplateRef(BaseModel):
+    title: str = Field(..., max_length=120)
+    use_for: str = Field(..., max_length=400)
+
+
 class SubsceneBlueprint(BaseModel):
     id: str = Field(..., max_length=120)
     visual_goal: str = Field(..., max_length=600)
+    layout_template: VisualKitLayoutTemplate
+    content_template_refs: list[ContentTemplateRef] = Field(
+        default_factory=list,
+        max_length=6,
+    )
+    content_build_steps: list[str] = Field(..., min_length=1, max_length=12)
+    bottom_text: str = Field(..., max_length=120)
+    clear_main_before: bool
     layout: LayoutPlan
     visual_blocks: list[VisualBlock] = Field(..., min_length=1, max_length=12)
     text_budget: TextBudget
@@ -64,6 +85,7 @@ class SubsceneBlueprint(BaseModel):
 
 class SceneCodeBlueprint(BaseModel):
     scene_number: int = Field(..., ge=1, le=3)
+    scene_title: str = Field(..., max_length=120)
     scene_goal: str = Field(..., max_length=600)
     creative_direction: str = Field(..., max_length=600)
     subscene_split_rationale: str = Field(..., max_length=800)
