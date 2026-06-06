@@ -14,8 +14,8 @@ llm_knowledge/
 │   ├── CODEGEN_SYSTEM_PROMPT.md
 │   └── CODEGEN_FIX_SYSTEM_PROMPT.md
 ├── manim_skill/
-│   ├── SKILL.md              # Core guidance always injected into codegen
-│   ├── visual_kit.py         # Shell/layout runtime copied beside code.py
+│   ├── SKILL.md              # Core guidance shared by code planning and codegen
+│   ├── visual_kit.py         # Authoritative helper prepended to code.py
 │   ├── rules/                # Optional rule documents selected per request
 │   └── templates/            # Optional code templates selected per request
 ├── skill_documents.py        # Registry of every knowledge document
@@ -24,29 +24,38 @@ llm_knowledge/
 
 ## How knowledge is used
 
-Planning uses `prompts/PLAN_SYSTEM_PROMPT.md` directly and sends the teacher request as the user message. It does not retrieve knowledge documents.
+Planning uses `prompts/PLAN_SYSTEM_PROMPT.md` directly and sends the teacher
+request as the user message. It does not receive knowledge-document contents.
+For matching templates, it receives only their plain-language
+`planning_capability` summaries, never template titles or source.
 
-Codegen uses `prompts/CODEGEN_SYSTEM_PROMPT.md` with knowledge passed as separate context:
+After planning, the lab loads one shared Manim knowledge bundle:
 
-* Core skill guidance: all registry entries with `priority="core"` are read directly from this folder and sent with every codegen request.
-* Optional selected documents: the lab uses static keyword profiles to choose
-  matching `rule`, `template`, and `example` documents. Selected document
-  contents are sent with the codegen request.
+* Compact core documents for scene structure and the visual-kit API.
+* General recommended documents configured for every request.
+* The full ordered document set from the first matching static topic profile.
+
+Code planning receives its prompt, the teacher request, the video plan, and this
+knowledge bundle. Codegen receives its prompt, both plans, and the same bundle.
+This lets the implementation plan use available Manim patterns and references
+before code is written.
+
+Each code-plan subscene records matching exact titles in `references`. Codegen
+and fixing must copy and preserve those referenced construction and state
+patterns instead of recreating complex geometry.
 
 The document selection step chooses exact titles from the registry. Document
 contents are read from this folder.
 
-Code fixing uses `prompts/CODEGEN_FIX_SYSTEM_PROMPT.md` directly and sends the broken code plus verification error as the user message.
+Code fixing uses `prompts/CODEGEN_FIX_SYSTEM_PROMPT.md` directly and sends the
+broken code plus verification error as the user message. It also receives the
+same core and selected knowledge messages used by code planning and codegen.
 
-`manim_skill/visual_kit.py` is runtime code, not just prompt context. The
-workflow copies it beside every generated attempt and final `code.py`, and
-generated code imports it with `from visual_kit import *`. It is intentionally
-limited to scene shell, fixed regions, cleanup, and layout methods. Topic
-content belongs in generated `code.py`, guided by reference templates from
-`manim_skill/templates/`. The matching LLM API documentation lives in
-`manim_skill/rules/visual-kit-api.md`. Reference templates are not copied beside
-generated code; codegen should copy the useful construction helpers inline when
-the code plan names them.
+`manim_skill/visual_kit.py` is the authoritative helper source. Models produce
+only lesson-body code and never import or reproduce the helper. The application
+prepends the exact source to every attempt and final `code.py`, producing one
+standalone renderable script. The matching compact API contract lives in
+`manim_skill/rules/visual-kit-api.md`.
 
 ## Registry and seeding
 

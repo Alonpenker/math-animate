@@ -1,14 +1,14 @@
 from enum import Enum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
 class ScenePlan(BaseModel):
-    learning_objective: str
-    visual_storyboard: str
-    voice_notes: str
+    learning_objective: str = Field(..., max_length=400)
+    visual_storyboard: str = Field(..., max_length=3000)
+    voice_notes: str = Field(..., max_length=3000)
     scene_number: int = Field(..., ge=-1, le=3)
 
 
@@ -19,92 +19,39 @@ class VideoPlan(BaseModel):
         return self.model_dump_json(indent=2)
 
 
-class RegionPlan(BaseModel):
-    role: str = Field(..., max_length=120)
-    position: str = Field(..., max_length=240)
-    max_width: str = Field(..., max_length=160)
-    max_height: str = Field(..., max_length=160)
-    fit_instruction: str = Field(..., max_length=500)
-
-
-class LayoutPlan(BaseModel):
-    primary_region: RegionPlan
-    reserved_regions: list[RegionPlan] = Field(default_factory=list, max_length=6)
-    forbidden_layout: list[str] = Field(default_factory=list, max_length=8)
-
-
-class VisualBlock(BaseModel):
-    id: str = Field(..., max_length=120)
-    type: str = Field(..., max_length=120)
-    contains: list[str] = Field(default_factory=list, max_length=20)
-    placement: str = Field(..., max_length=400)
-    visual_priority: str = Field(..., max_length=240)
-
-
-class TextBudget(BaseModel):
-    max_visible_text_blocks: int = Field(..., ge=0, le=12)
-    longest_text_allowed: str = Field(..., max_length=240)
-    overflow_strategy: str = Field(..., max_length=500)
-
-
-class AnimationBeat(BaseModel):
-    beat: str = Field(..., max_length=600)
-    visible_after: list[str] = Field(default_factory=list, max_length=30)
-
-
 VisualKitLayoutTemplate = Literal[
-    "show_center",
-    "show_center_with_caption",
-    "show_left_right",
-    "show_stack",
+    "center",
+    "split",
+]
+SubsceneTransition = Literal[
+    "show",
+    "transform",
 ]
 
 
-class ContentTemplateRef(BaseModel):
-    title: str = Field(..., max_length=120)
-    use_for: str = Field(..., max_length=400)
-
-
 class SubsceneBlueprint(BaseModel):
-    id: str = Field(..., max_length=120)
-    visual_goal: str = Field(..., max_length=600)
-    layout_template: VisualKitLayoutTemplate
-    content_template_refs: list[ContentTemplateRef] = Field(
-        default_factory=list,
+    id: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$", max_length=80)
+    purpose: str = Field(..., max_length=400)
+    builder_name: str = Field(..., pattern=r"^build_[a-z][a-z0-9_]*$", max_length=80)
+    builder_shape: str = Field(..., max_length=1200)
+    layout: VisualKitLayoutTemplate
+    transition: SubsceneTransition
+    references: list[Annotated[str, Field(max_length=120)]] = Field(
+        ...,
         max_length=6,
     )
-    content_build_steps: list[str] = Field(..., min_length=1, max_length=12)
-    bottom_text: str = Field(..., max_length=120)
-    clear_main_before: bool
-    layout: LayoutPlan
-    visual_blocks: list[VisualBlock] = Field(..., min_length=1, max_length=12)
-    text_budget: TextBudget
-    animation_beats: list[AnimationBeat] = Field(..., min_length=1, max_length=12)
-    clear_after: list[str] = Field(default_factory=list, max_length=30)
+    caption: str | None = Field(default=None, max_length=120)
+    bottom_text: str | None = Field(default=None, max_length=120)
 
 
 class SceneCodeBlueprint(BaseModel):
     scene_number: int = Field(..., ge=1, le=3)
     scene_title: str = Field(..., max_length=120)
-    scene_goal: str = Field(..., max_length=600)
-    creative_direction: str = Field(..., max_length=600)
-    subscene_split_rationale: str = Field(..., max_length=800)
     subscenes: list[SubsceneBlueprint] = Field(..., min_length=1, max_length=8)
 
 
-class HelperContract(BaseModel):
-    name: str = Field(..., max_length=120)
-    purpose: str = Field(..., max_length=500)
-    use_case: str = Field(..., max_length=500)
-    inputs: list[str] = Field(default_factory=list, max_length=12)
-    returns: list[str] = Field(default_factory=list, max_length=12)
-    rules: list[str] = Field(default_factory=list, max_length=8)
-
-
 class CodePlan(BaseModel):
-    scene_blueprints: list[SceneCodeBlueprint] = Field(..., min_length=1, max_length=3)
-    shared_helpers_needed: list[HelperContract] = Field(default_factory=list, max_length=8)
-    codegen_priorities: list[str] = Field(default_factory=list, max_length=10)
+    scenes: list[SceneCodeBlueprint] = Field(..., min_length=1, max_length=3)
 
     def to_prompt_text(self) -> str:
         return self.model_dump_json(indent=2)
@@ -179,3 +126,4 @@ class KnowledgeDocument(BaseModel):
 
 class KnowledgeDocumentSeed(KnowledgeDocument):
     path: str
+    planning_capability: str | None = None

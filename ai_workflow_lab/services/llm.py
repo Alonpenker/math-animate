@@ -178,7 +178,7 @@ class FakeE2ELlmGateway:
                 "E2E codegen prompt did not include code implementation plan JSON.",
             )
             _require(
-                "visual_kit" in all_text and "SafeScene" in all_text,
+                "Visual Kit API" in all_text and "SafeScene" in all_text,
                 "E2E codegen prompt did not include loaded visual-kit context.",
             )
             _require(
@@ -201,12 +201,12 @@ class FakeE2ELlmGateway:
                 "E2E fix call did not include the prior invalid assistant response.",
             )
             _require(
-                "Return the complete corrected Python script." in last_human_text,
-                "E2E fix prompt did not include the complete-script instruction.",
+                "Return the complete corrected lesson body." in last_human_text,
+                "E2E fix prompt did not include the complete-body instruction.",
             )
             _require(
-                "visual_kit" in all_text and "SafeScene" in all_text,
-                "E2E fix prompt did not include visual-kit runtime reference.",
+                "Visual-kit API contract:" in all_text and "SafeScene" in all_text,
+                "E2E fix prompt did not include the visual-kit API contract.",
             )
             self._fix_completed = True
             content = _E2E_FIXED_CODE
@@ -227,7 +227,7 @@ class FakeE2ELlmGateway:
         if schema is CodeQaReport:
             all_text = _all_message_text(messages)
             _require(
-                "Line-numbered Manim code:" in all_text,
+                "Line-numbered lesson-body Manim code:" in all_text,
                 "E2E code QA prompt did not include line-numbered code.",
             )
             _require(
@@ -259,84 +259,40 @@ class FakeE2ELlmGateway:
                 "E2E code plan call did not include loaded knowledge messages.",
             )
             code_plan_json = json.dumps({
-                "scene_blueprints": [
+                "scenes": [
                     {
                         "scene_number": 1,
                         "scene_title": "E2E workflow",
-                        "scene_goal": "Render one clear confirmation scene.",
-                        "creative_direction": (
-                            "Keep the scene simple but staged: title first, then a green "
-                            "confirmation line with a clean final hold."
-                        ),
-                        "subscene_split_rationale": (
-                            "The E2E plan has one visual idea, so one subscene is enough."
-                        ),
                         "subscenes": [
                             {
-                                "id": "scene1_confirmation",
-                                "visual_goal": "Show the title and final confirmation line.",
-                                "layout_template": "show_center",
-                                "content_template_refs": [],
-                                "content_build_steps": [
-                                    "Create confirmation_line with Text, font_size=30, color=GREEN.",
-                                    "Pass confirmation_line to self.show_center(...).",
-                                ],
+                                "id": "confirmation_start",
+                                "purpose": "Show one clear confirmation line.",
+                                "builder_name": "build_confirmation_start",
+                                "builder_shape": (
+                                    "Return one centered green confirmation line."
+                                ),
+                                "layout": "center",
+                                "transition": "show",
+                                "references": [],
+                                "caption": None,
+                                "bottom_text": None,
+                            },
+                            {
+                                "id": "confirmation_complete",
+                                "purpose": "Reveal that rendering completed.",
+                                "builder_name": "build_confirmation_complete",
+                                "builder_shape": (
+                                    "Return the confirmation line plus a second arranged "
+                                    "green completion line."
+                                ),
+                                "layout": "center",
+                                "transition": "transform",
+                                "references": [],
+                                "caption": None,
                                 "bottom_text": "The local workflow reached the visual-kit render path.",
-                                "clear_main_before": True,
-                                "layout": {
-                                    "primary_region": {
-                                        "role": "main confirmation",
-                                        "position": "center of frame below title",
-                                        "max_width": "80% frame width",
-                                        "max_height": "40% frame height",
-                                        "fit_instruction": "Fit the confirmation group before FadeIn.",
-                                    },
-                                    "reserved_regions": [
-                                        {
-                                            "role": "title",
-                                            "position": "top center",
-                                            "max_width": "90% frame width",
-                                            "max_height": "15% frame height",
-                                            "fit_instruction": "Keep title on one line.",
-                                        }
-                                    ],
-                                    "forbidden_layout": [
-                                        "Do not add extra explanatory text."
-                                    ],
-                                },
-                                "visual_blocks": [
-                                    {
-                                        "id": "confirmation_group",
-                                        "type": "takeaway_group",
-                                        "contains": ["confirmation_line"],
-                                        "placement": "centered with title at top and confirmation below",
-                                        "visual_priority": "green confirmation line is dominant",
-                                    }
-                                ],
-                                "text_budget": {
-                                    "max_visible_text_blocks": 2,
-                                    "longest_text_allowed": "Workflow verified",
-                                    "overflow_strategy": "Reduce font size to fit frame width.",
-                                },
-                                "animation_beats": [
-                                    {
-                                        "beat": "Write the title.",
-                                        "visible_after": ["title"],
-                                    },
-                                    {
-                                        "beat": "Fade in the green confirmation line.",
-                                        "visible_after": ["title", "green_confirmation_line"],
-                                    },
-                                ],
-                                "clear_after": ["title", "green_confirmation_line"],
-                            }
+                            },
                         ],
                     }
-                ],
-                "shared_helpers_needed": [],
-                "codegen_priorities": [
-                    "Use the code plan as the implementation contract.",
-                    "Keep final visible objects easy to fade out together.",
                 ],
             })
             code_plan = schema.model_validate_json(code_plan_json)
@@ -434,14 +390,33 @@ class Scene1(Scene):
 
 
 _E2E_FIXED_CODE = """from manim import *
-from visual_kit import *
+
+
+def build_confirmation_start() -> VGroup:
+    return VGroup(Text("Plan -> code -> verify -> fix", font_size=30, color=GREEN))
+
+
+def build_confirmation_complete() -> VGroup:
+    first = Text("Plan -> code -> verify -> fix", font_size=30, color=GREEN)
+    second = Text("Render complete", font_size=28, color=GREEN)
+    return VGroup(first, second).arrange(DOWN, buff=0.4)
 
 
 class Scene1(SafeScene):
     def construct(self):
         self.show_title("E2E workflow")
-        result = Text("Plan -> code -> verify -> fix -> render", font_size=30, color=GREEN)
-        self.show_center(result)
+        self._subscene_confirmation_start()
+        self._subscene_confirmation_complete()
+        self.fade_out_all()
+
+    def _subscene_confirmation_start(self):
+        self.clear_content()
+        self.show_main(build_confirmation_start(), layout=Layout.CENTER)
+        self.set_bottom_text(None)
+        self.wait(0.25)
+
+    def _subscene_confirmation_complete(self):
+        self.transform_main(build_confirmation_complete(), layout=Layout.CENTER)
         self.set_bottom_text("The local workflow reached the visual-kit render path.")
         self.wait(0.5)
 """

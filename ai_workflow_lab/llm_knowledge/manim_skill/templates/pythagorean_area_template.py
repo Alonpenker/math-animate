@@ -5,17 +5,17 @@ from manim import *
 
 
 def make_pythagorean_area_model(
+    state: Literal["c_square", "ab_squares"] = "c_square",
     leg_a: float = 1.35,
     leg_b: float = 2.15,
-    arrangement: Literal["c_square", "ab_squares"] = "c_square",
     include_side_labels: bool = True,
 ) -> VGroup:
     points = _square_points(leg_a=leg_a, leg_b=leg_b)
-    if arrangement == "c_square":
+    if state == "c_square":
         return _build_c_square_arrangement(points, include_side_labels)
-    if arrangement == "ab_squares":
+    if state == "ab_squares":
         return _build_ab_squares_arrangement(points)
-    raise ValueError("arrangement must be 'c_square' or 'ab_squares'.")
+    raise ValueError("state must be 'c_square' or 'ab_squares'.")
 
 
 def _square_points(*, leg_a: float, leg_b: float) -> dict[str, np.ndarray]:
@@ -62,11 +62,11 @@ def _build_c_square_arrangement(
         fill_color=GREEN_E,
         fill_opacity=0.42,
     )
-    c_area_label = MathTex("c^2", font_size=34).move_to(c_square.get_center())
-    model = VGroup(outer, triangles, c_square, c_area_label)
+    labels = VGroup(MathTex("c^2", font_size=34).move_to(c_square.get_center()))
     if include_side_labels:
-        model.add(_c_square_side_labels(points))
-    return model
+        labels.add(_c_square_side_labels(points))
+    hidden_second_region = c_square.copy().set_opacity(0)
+    return VGroup(outer, triangles, c_square, hidden_second_region, labels)
 
 
 def _build_ab_squares_arrangement(points: dict[str, np.ndarray]) -> VGroup:
@@ -158,11 +158,3 @@ def _label_outside_segment(
 
 def _midpoint(start: np.ndarray, end: np.ndarray) -> np.ndarray:
     return (start + end) / 2
-
-
-class PythagoreanAreaTemplate(Scene):
-    def construct(self):
-        model = make_pythagorean_area_model(arrangement="c_square")
-        model.scale(1.1)
-        self.play(FadeIn(model))
-        self.wait()

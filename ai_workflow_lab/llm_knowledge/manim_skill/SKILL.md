@@ -1,122 +1,34 @@
----
-name: manim-best-practices
-description: |
-  Trigger when generating, reviewing, or fixing Manim Community Edition code,
-  especially educational math animations using Scene, MathTex, mobjects,
-  animations, graphing, camera control, or ManimCE-specific APIs.
+# Manim Scene Structure
 
-  Durable guidance for producing clear, reliable, self-contained ManimCE scenes.
-  NOT for ManimGL/3b1b version, which uses `manimlib` imports and the `manimgl`
-  CLI.
----
+Write simple, reliable Manim Community scenes that teach through clear visual
+snapshots.
 
-# ManimCE Best Practices
+## Required Shape
 
-Use this skill as stable core guidance for Manim Community Edition animation
-generation. The active system prompt and runtime policy provide the hard
-constraints for each call; this skill provides durable ManimCE and educational
-animation judgment.
+- Build lesson visuals in named functions before scene classes.
+- Every builder takes no arguments and returns one fully arranged snapshot
+  `VGroup`.
+- Keep labels, markers, and annotations grouped with the object they describe.
+- Use `.arrange(...)`, `.next_to(...)`, and geometry-derived positions inside
+  builders. Layout fitting does not arrange a group's children.
+- Keep persistent semantic children in compatible order across snapshots that
+  transform into each other.
+- Keep one complete visual and explanation snapshot per subscene.
+- When a subscene names references, copy and use their validated construction
+  and public state patterns instead of rebuilding complex geometry.
 
-## Authority
+Each `SafeScene.construct()` only shows the title, calls ordered subscene
+methods, and fades out. A show subscene clears existing content before showing
+its snapshot. A transform subscene preserves existing content and smoothly
+replaces the current main snapshot.
 
-If the active system prompt, tool policy, runtime, verifier, or caller restricts
-imports, APIs, assets, scene structure, output format, file access, or execution
-behavior, obey that stricter instruction over this skill or any retrieved skill
-document.
+## Reliable Manim Choices
 
-Use this skill only for Manim Community Edition. Prefer `from manim import *`
-and ManimCE APIs. Do not use ManimGL patterns such as `from manimlib import *`,
-`InteractiveScene`, or `manimgl`.
-
-## Generation Priorities
-
-1. Produce code that renders reliably in a clean ManimCE environment.
-2. Keep scenes self-contained unless external assets are explicitly allowed.
-3. Prefer simple, readable Manim primitives before complex camera, 3D, updater,
-   plugin, or custom abstraction patterns.
-4. Make visual changes explicit: create objects, position them, animate them,
-   then wait long enough for the viewer to understand the change.
-5. Use color, motion, and spatial layout to clarify the math, not to decorate it.
-6. Keep each scene focused on one instructional idea.
-
-## Reliability Guidance
-
-Reliability is part of creative Manim work. Prefer expressive choices that stay
-inside stable ManimCE APIs and render cleanly in the target runtime. When using
-LaTeX, text objects, transforms, layout helpers, camera behavior, or object
-indexing, choose the simpler reliable construct unless the advanced construct is
-necessary for the lesson.
-
-## Educational Animation Guidance
-
-Good generated Manim scenes should teach through visible structure:
-
-- Reveal one conceptual step at a time.
-- Preserve visual continuity when transforming one expression or diagram into
-  another.
-- Avoid clutter by removing or fading content once it no longer supports the
-  current idea.
-- Use consistent color meaning inside a scene.
-- Prefer mathematical notation, diagrams, arrows, and transformations over long
-  explanatory text in the visual frame.
-- Choose representations that fit the topic: equations for symbolic work,
-  number lines for one-dimensional quantity, axes for functions, geometry for
-  shape relationships, and dynamic motion only when change over time matters.
-
-## Retrieved Skill Documents
-
-Additional rules, templates, and examples are not assumed to be available through
-filesystem paths. In this application, non-core skill documents are exposed as
-candidate metadata and may be loaded with the provided document-loading tool by
-exact title.
-
-When candidate documents are available:
-
-- Load only documents relevant to the current scene plan.
-- Prefer foundational documents first: Scenes, Mobject Layout Basics, Layout
-  Composition, LaTeX, Animation Patterns, and Math Visual Clarity.
-- Load specialized documents only when the plan needs them, such as Axes and
-  Graphing, Camera and 3D, Updaters, Matrix Drawing Patterns, or Geometry
-  Shapes and Labels.
-- Treat templates as starting structures, not mandatory formats.
-- Treat examples as optional references. They show reusable scene helper
-  patterns, but examples may be absent and are not required frameworks.
-
-## Useful Document Topics
-
-Core Manim topics commonly worth retrieving:
-
-- Scenes and scene lifecycle
-- Mobject Layout Basics
-- Layout Composition
-- Animation Patterns
-- MathTex and LaTeX reliability
-- Text
-- Visual Styling
-
-Educational topics commonly worth retrieving:
-
-- Educational storyboarding
-- Math visual clarity
-- Equation transitions
-
-Specialized topics should be retrieved only when needed:
-
-- Axes and Graphing
-- Lines, Arrows, and Labels
-- Geometry Shapes and Labels
-- Matrix Drawing Patterns
-- Camera and 3D
-- Updaters and ValueTracker patterns
-
-## Common Pitfalls
-
-Avoid these unless the active prompt explicitly allows them:
-
-- Mixing ManimCE with ManimGL APIs.
-- Depending on external files, fonts, plugins, or network resources.
-- Using advanced APIs when a simple mobject or transform would communicate the
-  idea more clearly.
-- Leaving transformed-out objects visible or logically duplicated.
-- Adding visual text that explains what a clearer diagram or transformation
-  could show directly.
+- Prefer stable ManimCE primitives, `Text`, `MathTex`, `VGroup`, and safe-scene
+  whole-group transforms.
+- Use diagrams and notation instead of long explanatory text.
+- Remove stale content before showing a new idea.
+- Preserve continuity across snapshot transforms when objects represent the same
+  semantic roles.
+- Avoid advanced camera work, 3D, updaters, plugins, external files, and custom
+  choreography unless the lesson clearly requires them.

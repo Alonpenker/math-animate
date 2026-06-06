@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
 from schemas import VideoPlan
+from services.knowledge_loader import load_planning_capabilities
 from settings import (
     OPENROUTER_PLAN_MODEL,
     PLAN_OUTPUT_MAX_TOKENS,
@@ -45,6 +46,13 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             return {"plan": plan}
 
         system_prompt = ctx.files.read_prompt(PromptFiles.PLAN_SYSTEM)
+        capabilities = load_planning_capabilities(request_text=request_text)
+        planner_request = (
+            f"{request_text}\n\n{capabilities}"
+            if capabilities
+            else request_text
+        )
+        ctx.files.write_prompt(ArchivedPromptFiles.GENERATE_PLAN_USER, planner_request)
         ctx.run_logger.info(LabLog(
             operation=operation,
             event="OpenRouter call started",
@@ -58,7 +66,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             model=OPENROUTER_PLAN_MODEL,
             messages=[
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=request_text),
+                HumanMessage(content=planner_request),
             ],
             schema=VideoPlan,
             max_tokens=PLAN_OUTPUT_MAX_TOKENS,
@@ -82,6 +90,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             extra_context={
                 "scene_count": len(plan.scenes),
                 "plan_chars": len(plan_prompt_text),
+                "capability_chars": len(capabilities),
             },
         )
         _raise_for_invalid_plan(plan)

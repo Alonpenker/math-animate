@@ -65,18 +65,6 @@ def _verify_visual_kit_contract(tree: ast.AST) -> str | None:
     if not renderable_scenes:
         return None
 
-    has_visual_kit_import = False
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            if any(alias.name.split(".")[0] == "visual_kit" for alias in node.names):
-                has_visual_kit_import = True
-        elif isinstance(node, ast.ImportFrom):
-            if node.module and node.module.split(".")[0] == "visual_kit":
-                has_visual_kit_import = True
-
-    if not has_visual_kit_import:
-        return "Missing visual_kit import. Generated code must use from visual_kit import *."
-
     raw_scene_classes: list[str] = []
     missing_safe_scene_classes: list[str] = []
     for scene_class in renderable_scenes:
@@ -136,6 +124,7 @@ def dry_run_docker(
     _prepare_writable_dir(media_dir)
     container_code_path = _container_path(code_path, run_dir)
     container_media_dir = _container_path(media_dir, run_dir)
+    scene_names = _scene_names(code_path)
     command = [
         *DockerCommands.BIN,
         *DockerCommands.INTERACTIVE,
@@ -148,11 +137,11 @@ def dry_run_docker(
         *DockerCommands.IMAGE,
         "manim",
         "-ql",
-        "-a",
         "--dry_run",
         "--media_dir",
         str(container_media_dir),
         str(container_code_path),
+        *scene_names,
     ]
 
     try:
@@ -193,6 +182,7 @@ def render_docker(
     _prepare_writable_dir(media_dir)
     container_code_path = _container_path(code_path, run_dir)
     container_media_dir = _container_path(media_dir, run_dir)
+    scene_names = _scene_names(code_path)
     command = [
         *DockerCommands.BIN,
         *DockerCommands.NETWORK,
@@ -204,10 +194,10 @@ def render_docker(
         *DockerCommands.IMAGE,
         "manim",
         "-qm",
-        "-a",
         "--media_dir",
         str(container_media_dir),
         str(container_code_path),
+        *scene_names,
     ]
 
     try:
@@ -256,6 +246,15 @@ def _decode_output(value: str | bytes | None) -> str:
 def _container_path(host_path: Path, run_dir: Path) -> PurePosixPath:
     relative = host_path.resolve().relative_to(run_dir.resolve())
     return CONTAINER_RUN_DIR.joinpath(*relative.parts)
+
+
+def _scene_names(code_path: Path) -> list[str]:
+    tree = ast.parse(code_path.read_text(encoding="utf-8"))
+    return sorted(
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and re.fullmatch(r"Scene\d+", node.name)
+    )
 
 
 def _is_infrastructure_failure(error_output: str) -> bool:

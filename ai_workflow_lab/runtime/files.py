@@ -91,8 +91,7 @@ class RunFiles:
 
     def save_attempt_code(self, attempt: int, code: str) -> Path:
         path = self.attempt_dir(attempt) / PathNames.MANIM_CODE
-        self.write_text(path, code)
-        self.copy_visual_kit(path.parent)
+        self.write_text(path, self.assemble_code(code))
         return path
 
     def dry_run_media_dir(self, attempt: int) -> Path:
@@ -116,14 +115,14 @@ class RunFiles:
 
     def save_final_code(self, code: str) -> Path:
         path = self.run_dir / RunFolderNames.FINAL / PathNames.MANIM_CODE
-        self.write_text(path, code)
-        self.copy_visual_kit(path.parent)
+        self.write_text(path, self.assemble_code(code))
         return path
 
-    def copy_visual_kit(self, target_dir: Path) -> Path:
-        target = target_dir / PathNames.VISUAL_KIT
-        shutil.copy2(VISUAL_KIT_SOURCE, target)
-        return target
+    @staticmethod
+    def assemble_code(lesson_body: str) -> str:
+        visual_kit = VISUAL_KIT_SOURCE.read_text(encoding="utf-8").rstrip()
+        body = lesson_body.strip()
+        return f"{visual_kit}\n\n\n# Lesson-specific generated code\n\n{body}\n"
 
     def relative_paths(self, paths: list[Path]) -> list[str]:
         return [str(path.relative_to(self.run_dir)) for path in paths]

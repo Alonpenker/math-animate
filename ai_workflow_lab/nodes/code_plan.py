@@ -91,15 +91,14 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
             usage=usage,
             cumulative_usage=cumulative_usage,
             extra_context={
-                "scene_blueprint_count": len(code_plan.scene_blueprints),
-                "helper_count": len(code_plan.shared_helpers_needed),
+                "scene_blueprint_count": len(code_plan.scenes),
                 "code_plan_chars": len(code_plan_prompt_text),
                 "validation_warning_count": len(validation_warnings),
             },
         )
         if validation_warnings:
             actual_scene_numbers = [
-                scene.scene_number for scene in code_plan.scene_blueprints
+                scene.scene_number for scene in code_plan.scenes
             ]
             ctx.files.write_log_json(
                 LogFileNames.CODE_PLAN_VALIDATION_ERROR,
@@ -150,7 +149,7 @@ def _validate_code_plan(
 ) -> list[str]:
     errors: list[str] = []
     expected = set(required_scene_numbers)
-    actual_scene_numbers = [scene.scene_number for scene in code_plan.scene_blueprints]
+    actual_scene_numbers = [scene.scene_number for scene in code_plan.scenes]
     actual = set(actual_scene_numbers)
 
     duplicate_scene_numbers = sorted(
@@ -160,22 +159,30 @@ def _validate_code_plan(
     )
     if duplicate_scene_numbers:
         errors.append(
-            "Duplicate scene_blueprints for scene_number(s): "
+            "Duplicate code-plan scenes for scene_number(s): "
             f"{duplicate_scene_numbers}."
         )
 
     missing_scene_numbers = sorted(expected - actual)
     if missing_scene_numbers:
         errors.append(
-            "Missing scene_blueprints for scene_number(s): "
+            "Missing code-plan scenes for scene_number(s): "
             f"{missing_scene_numbers}."
         )
 
     extra_scene_numbers = sorted(actual - expected)
     if extra_scene_numbers:
         errors.append(
-            "Unexpected scene_blueprints for scene_number(s): "
+            "Unexpected code-plan scenes for scene_number(s): "
             f"{extra_scene_numbers}."
         )
+
+    for scene in code_plan.scenes:
+        if scene.subscenes and scene.subscenes[0].transition == "transform":
+            errors.append(
+                f"Scene {scene.scene_number} starts with transform subscene "
+                f"'{scene.subscenes[0].id}'; the first subscene should show a "
+                "snapshot because no previous main content exists."
+            )
 
     return errors

@@ -14,26 +14,28 @@ You receive:
 - The current attempt number.
 - The full generated Python file with line numbers.
 
-Use the code implementation plan as the expected implementation contract for
-object ownership, layout budgets, subscene cleanup, and visible object
-lifecycle. Block only when the generated code visibly violates that contract in
-a way that strongly predicts bad rendered output.
+Use the code implementation plan as the expected contract for snapshot builders,
+internal arrangement, subscene cleanup, and show/transform transitions.
+Block only when the generated code visibly violates that contract in a way that
+strongly predicts bad rendered output.
 
-The generated code is expected to use the visual-kit runtime with
-`from visual_kit import *`, `SafeScene` subclasses, and visual-kit shell/layout
-methods for major screen placement. Topic-specific lesson content should be
-built inline in `code.py`, optionally adapted from reference templates.
+The reviewed code is the lesson body. The application prepends the visual-kit
+runtime later. Renderable classes must inherit `SafeScene`, and lesson-specific
+content must be built inline in `code.py`.
 Minor captions that sit near the main visual should be owned by a visual-kit
-layout such as `show_center_with_caption`, not manually placed below an already
-fitted diagram when bottom text is also visible.
+layout through `show_main(..., caption=...)`, not manually placed below an
+already fitted diagram when bottom text is also visible.
 Formula replacements that start in a fitted layout region and target a new
 formula at the default scene center are visual blockers because the formula will
 drift into the main visual. Move target formulas into place before transforming.
 Repeatedly fading/writing the same object immediately after a visual-kit
-`show_*` helper is a visual blocker when it causes blinking or ghosted content.
+`show_main` helper is a visual blocker when it causes blinking or ghosted content.
 When a proof claims rearrangement of the same pieces, prefer code that displays
-the source through `show_*` and changes to the target through a matching
-`transform_*` helper or equivalent explicit object transforms.
+the source through `show_main` and changes to the target through `transform_main`
+or equivalent explicit object transforms.
+Each subscene owns its optional bottom text. Code should call
+`set_bottom_text(...)` after every planned main transition, including with
+`None` when previous bottom text must be cleared.
 
 The code has already passed deterministic verification. Do not check:
 

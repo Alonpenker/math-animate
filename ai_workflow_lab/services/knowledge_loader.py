@@ -14,6 +14,25 @@ class KnowledgeBundle:
     selected_titles: list[str]
 
 
+def load_planning_capabilities(*, request_text: str) -> str:
+    registry_by_title = {entry.title: entry for entry in REGISTRY}
+    capabilities = [
+        doc.planning_capability
+        for title in _select_document_titles(request_text=request_text, plan_text="")
+        if (doc := registry_by_title.get(title)) is not None
+        and doc.planning_capability
+    ]
+    if not capabilities:
+        return ""
+    return (
+        "Validated visual capabilities available to the implementation stages:\n"
+        + "\n".join(f"- {capability}" for capability in capabilities)
+        + "\n\nUse these capabilities when they support the lesson, but keep the "
+        "video plan human-readable. Do not mention templates, function names, "
+        "classes, APIs, or implementation details."
+    )
+
+
 def load_static_knowledge(
     *,
     request_text: str,
@@ -47,7 +66,18 @@ def load_static_knowledge(
     }
     messages = [
         SystemMessage(content=f"# Core Skill Documents\n\n{core_content}"),
-        SystemMessage(content=f"# Selected Skill Documents\n\n{selected_content}"),
+        SystemMessage(
+            content=(
+                "# Selected Skill Documents\n\n"
+                "Each section heading is its exact reference title. Code plans "
+                "record matching titles in `references`; codegen and fixing "
+                "must copy and preserve those validated construction and state "
+                "patterns inline. The active workflow contract overrides "
+                "reference scene classes and animation examples: do not import "
+                "references or copy direct `self.play(...)` choreography.\n\n"
+                f"{selected_content}"
+            )
+        ),
     ]
     return KnowledgeBundle(
         messages=messages,
@@ -62,6 +92,7 @@ def _select_document_titles(*, request_text: str, plan_text: str) -> list[str]:
     for keywords, titles in STATIC_DOCUMENT_SELECTION_PROFILES:
         if any(keyword in searchable_text for keyword in keywords):
             selected_titles.extend(titles)
+            break
     return _dedupe_preserving_order(selected_titles)
 
 

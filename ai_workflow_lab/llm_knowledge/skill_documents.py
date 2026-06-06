@@ -25,7 +25,7 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
     KnowledgeDocumentSeed(
         document_id=UUID("4ea2e34e-32c1-58ae-9060-8ae705d0eb3c"),
         doc_type=KnowledgeType.RULE,
-        priority="core",
+        priority="recommended",
         title="Layout Composition",
         category=RuleCategory.VISUAL_LAYOUT,
         tags=["layout", "composition", "frame", "positioning", "readability"],
@@ -176,6 +176,46 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/rules/updaters.md",
     ),
     KnowledgeDocumentSeed(
+        document_id=UUID("6b2d8d1a-4e5f-4f20-9c31-2a7f90c51101"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Right Triangle Diagram Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=["right-triangle", "geometry", "labels", "right-angle", "hypotenuse"],
+        path="manim_skill/templates/right_triangle_diagram_template.py",
+        planning_capability=(
+            "A mathematically valid right triangle can be shown with a correct "
+            "right-angle marker, outward side labels, and a highlighted "
+            "hypotenuse opposite the right angle."
+        ),
+    ),
+    KnowledgeDocumentSeed(
+        document_id=UUID("7c3e9e2b-5f60-4a31-8d42-3b8091d62202"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Triangle Comparison Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=["triangle", "comparison", "right-triangle", "non-right-triangle"],
+        path="manim_skill/templates/triangle_comparison_template.py",
+        planning_capability=(
+            "A right triangle and a non-right triangle can be compared side by "
+            "side with correct labels and clear valid or invalid emphasis."
+        ),
+    ),
+    KnowledgeDocumentSeed(
+        document_id=UUID("8d4faf3c-6071-4b42-9e53-4c91a2e73303"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Squares On Triangle Sides Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=["triangle", "squares", "area", "geometry", "labels"],
+        path="manim_skill/templates/squares_on_triangle_sides_template.py",
+        planning_capability=(
+            "Squares can be constructed outward from every side of a valid "
+            "right triangle with correct area labels and no inward overlap."
+        ),
+    ),
+    KnowledgeDocumentSeed(
         document_id=UUID("3d8f9c2a-45f2-5525-92f5-2f1e8b94b6ad"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
@@ -183,6 +223,12 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         category=TemplateCategory.TEMPLATES,
         tags=["pythagorean", "geometry", "template", "area-proof"],
         path="manim_skill/templates/pythagorean_area_template.py",
+        planning_capability=(
+            "Four identical right triangles can be rearranged inside the same "
+            "outer square, first revealing one central square and then two "
+            "smaller squares, so the unchanged area visually proves their "
+            "relationship."
+        ),
     ),
     KnowledgeDocumentSeed(
         document_id=UUID("f6a7b8c9-d0e1-2345-f012-456789012345"),
