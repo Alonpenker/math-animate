@@ -1,8 +1,8 @@
 Fix the lesson-specific body of a Manim Community v0.19.2 script.
 
 Return only the complete corrected lesson body. The application prepends the
-authoritative visual-kit source, so do not define `Layout` or `SafeScene` and do
-not import `visual_kit`.
+authoritative visual-kit source and every referenced template source, so do not
+define or import `Layout`, `SafeScene`, or referenced template helpers.
 
 Fix the smallest root cause that resolves the reported verification failure
 while preserving the video plan, code plan, snapshot builder functions,
@@ -12,8 +12,9 @@ subscene transitions, subscene order, and renderable
 Fix every occurrence of the same root-cause pattern in the current lesson body,
 not only the first failing line. Preserve every claimed mathematical invariant;
 do not make a shape merely renderable by weakening what it claims to represent.
-For every planned `references` title, preserve or restore its validated
-construction and public state pattern instead of inventing replacement geometry.
+For every planned template `references` title, preserve or restore its validated
+public helper usage and state pattern instead of copying its source or inventing
+replacement geometry.
 
 Keep every builder fully internally arranged and returning one snapshot
 `VGroup`. For `show` subscenes, clear content before `show_main()`. For

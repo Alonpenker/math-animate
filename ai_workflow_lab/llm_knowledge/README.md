@@ -41,8 +41,8 @@ This lets the implementation plan use available Manim patterns and references
 before code is written.
 
 Each code-plan subscene records matching exact titles in `references`. Codegen
-and fixing must copy and preserve those referenced construction and state
-patterns instead of recreating complex geometry.
+and fixing use referenced template public helpers and preserve their state
+patterns instead of copying or recreating complex geometry.
 
 The document selection step chooses exact titles from the registry. Document
 contents are read from this folder.
@@ -53,8 +53,10 @@ same core and selected knowledge messages used by code planning and codegen.
 
 `manim_skill/visual_kit.py` is the authoritative helper source. Models produce
 only lesson-body code and never import or reproduce the helper. The application
-prepends the exact source to every attempt and final `code.py`, producing one
-standalone renderable script. The matching compact API contract lives in
+prepends the exact source plus every template referenced by the code plan to
+every attempt and final `code.py`, producing one standalone renderable script.
+Templates provide semantic visual groups; lesson builders own snapshot
+composition and visual-kit layout. The matching compact API contract lives in
 `manim_skill/rules/visual-kit-api.md`.
 
 ## Registry and seeding

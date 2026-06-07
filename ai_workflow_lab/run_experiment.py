@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--request",
         type=Path,
-        default=Path("inputs/pythagoras_request.txt"),
+        default=Path("inputs/function_translation_request.txt"),
         help="Path to the model-facing teacher request text.",
     )
     parser.add_argument(

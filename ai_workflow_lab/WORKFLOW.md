@@ -131,9 +131,9 @@ Each no-argument builder returns one complete, internally arranged snapshot
 `VGroup(left_panel, right_panel)`. Validation only warns about missing,
 duplicate, or extra scene numbers and a scene whose first subscene transforms.
 
-`references` contains exact loaded template or example titles. When a reference
-provides a required complex visual, codegen copies and uses its validated
-construction and state pattern instead of recreating the geometry.
+`references` contains exact loaded template or example titles. Referenced
+templates are prepended authoritatively, and codegen calls their public helpers
+instead of copying or recreating their geometry.
 
 ### Generate Code
 
@@ -186,12 +186,13 @@ whole-group show or transform transitions and do not call lesson-specific
 
 ### Assemble Standalone Code
 
-`llm_knowledge/manim_skill/visual_kit.py` is the authoritative maintained helper
-source. Models never reproduce or import it.
+`llm_knowledge/manim_skill/visual_kit.py` and code-plan-referenced templates are
+authoritative maintained helper sources. Models never reproduce or import them.
 
-When an attempt or final artifact is saved, the application prepends the exact
-helper source to the lesson body. The result is one standalone `code.py` that
-can be rendered without a neighboring helper module.
+When an attempt or final artifact is saved, the application prepends the visual
+kit followed by each uniquely referenced template in first-use order. The
+result is one standalone `code.py` that can be rendered without neighboring
+helper modules.
 
 ### Verify
 
@@ -217,8 +218,8 @@ visual-kit API, shared core and selected knowledge, and current lesson body.
 
 **Output:** complete corrected lesson body only. The fixer repairs every
 occurrence of the reported root-cause pattern while preserving mathematical
-invariants and referenced template constructions. The application assembles it
-with the authoritative helper before the next verification attempt.
+invariants and referenced template helper usage. The application assembles it
+with the authoritative helpers before the next verification attempt.
 
 ### Render
 

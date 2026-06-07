@@ -38,6 +38,7 @@ PLAN_OUTPUT_MAX_TOKENS = 4_000
 CODE_PLAN_OUTPUT_MAX_TOKENS = 4_000
 CODEGEN_OUTPUT_MAX_TOKENS = 8_000
 CODE_QA_OUTPUT_MAX_TOKENS = 4_000
+PLAN_REQUEST_TIMEOUT_MS = 90_000
 CODGEN_REASONING_EFFORT = "low"
 FIX_REASONING_EFFORT = "medium"
 
@@ -92,7 +93,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
     ),
     (
         ("function", "functions", "graph", "graphs", "transformation", "transformations"),
-        ("Function Transformations", "Axes and Graphing"),
+        ("Function Translation Template", "Axes and Graphing"),
     ),
     (
         ("matrix", "matrices", "dot product", "linear algebra"),

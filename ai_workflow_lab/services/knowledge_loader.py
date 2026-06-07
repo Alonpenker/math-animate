@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from langchain_core.messages import SystemMessage
 
 from llm_knowledge.skill_documents import CORE_DOCUMENTS, REGISTRY, read_knowledge_file
-from schemas import KnowledgeDocumentSeed
+from schemas import CodePlan, KnowledgeDocumentSeed, KnowledgeType
 from settings import BASE_SELECTED_DOCUMENT_TITLES, STATIC_DOCUMENT_SELECTION_PROFILES
 
 
@@ -71,8 +71,10 @@ def load_static_knowledge(
                 "# Selected Skill Documents\n\n"
                 "Each section heading is its exact reference title. Code plans "
                 "record matching titles in `references`; codegen and fixing "
-                "must copy and preserve those validated construction and state "
-                "patterns inline. The active workflow contract overrides "
+                "must use and preserve those validated construction and state "
+                "patterns. Referenced template sources are prepended "
+                "authoritatively; use their public helpers without copying, "
+                "redefining, or importing them. The active workflow contract overrides "
                 "reference scene classes and animation examples: do not import "
                 "references or copy direct `self.play(...)` choreography.\n\n"
                 f"{selected_content}"
@@ -84,6 +86,24 @@ def load_static_knowledge(
         metadata=metadata,
         selected_titles=[doc.title for doc in selected_docs],
     )
+
+
+def resolve_referenced_templates(code_plan: CodePlan) -> list[KnowledgeDocumentSeed]:
+    registry_by_title = {entry.title: entry for entry in REGISTRY}
+    referenced_templates: list[KnowledgeDocumentSeed] = []
+    seen_ids = set()
+    for scene in code_plan.scenes:
+        for subscene in scene.subscenes:
+            for title in subscene.references:
+                doc = registry_by_title.get(title)
+                if (
+                    doc is not None
+                    and doc.doc_type == KnowledgeType.TEMPLATE
+                    and doc.document_id not in seen_ids
+                ):
+                    seen_ids.add(doc.document_id)
+                    referenced_templates.append(doc)
+    return referenced_templates
 
 
 def _select_document_titles(*, request_text: str, plan_text: str) -> list[str]:

@@ -44,6 +44,7 @@ class LlmGateway(Protocol):
         schema: type[StructuredModel],
         max_tokens: int | None = None,
         reasoning_effort: str | None = "high",
+        request_timeout_ms: int | None = None,
     ) -> tuple[StructuredModel, TokenUsage]:
         ...
 
@@ -73,12 +74,14 @@ class RealLlmGateway:
         schema: type[StructuredModel],
         max_tokens: int | None = None,
         reasoning_effort: str | None = "high",
+        request_timeout_ms: int | None = None,
     ) -> tuple[StructuredModel, TokenUsage]:
         client = self._get_client(
             model=model,
             max_tokens=max_tokens,
             reasoning_effort=reasoning_effort,
             require_parameters=True,
+            request_timeout_ms=request_timeout_ms,
         )
         structured_client = client.with_structured_output(
             schema,
@@ -124,6 +127,7 @@ class RealLlmGateway:
         max_tokens: int | None = None,
         reasoning_effort: str | None = "high",
         require_parameters: bool = False,
+        request_timeout_ms: int | None = None,
     ):
         import openrouter
         from langchain_openrouter import ChatOpenRouter
@@ -134,6 +138,7 @@ class RealLlmGateway:
             server_url=OPENROUTER_BASE_URL,
             http_referer=OPENROUTER_HTTP_REFERER,
             x_open_router_title=OPENROUTER_APP_TITLE,
+            timeout_ms=request_timeout_ms,
         )
         kwargs = {
             "model": model,
@@ -223,6 +228,7 @@ class FakeE2ELlmGateway:
         schema: type[StructuredModel],
         max_tokens: int | None = None,
         reasoning_effort: str | None = "high",
+        request_timeout_ms: int | None = None,
     ) -> tuple[StructuredModel, TokenUsage]:
         if schema is CodeQaReport:
             all_text = _all_message_text(messages)

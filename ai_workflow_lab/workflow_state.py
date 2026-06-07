@@ -5,7 +5,7 @@ from typing import Annotated, TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from schemas import CodePlan, VideoPlan
+from schemas import CodePlan, KnowledgeDocumentSeed, VideoPlan
 
 
 class NodeName(StrEnum):
@@ -48,6 +48,7 @@ class WorkflowState(TypedDict):
     request_text: str
     plan: VideoPlan | None
     code_plan: CodePlan | None
+    referenced_templates: list[KnowledgeDocumentSeed]
     messages: Annotated[list[BaseMessage], add_messages]
     code: str
     verification: VerificationResult
@@ -61,6 +62,7 @@ def initial_state(request_text: str) -> WorkflowState:
         "request_text": request_text,
         "plan": None,
         "code_plan": None,
+        "referenced_templates": [],
         "messages": [],
         "code": "",
         "verification": VerificationResult(),

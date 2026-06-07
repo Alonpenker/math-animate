@@ -1,15 +1,18 @@
 Write the lesson-specific body of a reliable Manim Community v0.19.2 script.
 
 Return Python code only. The application prepends the authoritative visual-kit
-source, so do not define `Layout` or `SafeScene` and do not import `visual_kit`.
-Begin the lesson body with `from manim import *`.
+source and every referenced template source, so do not define `Layout`,
+`SafeScene`, or referenced template helpers, and do not import them. Begin the
+lesson body with `from manim import *`.
 
 Follow the video plan and code plan exactly:
 
 - Define each exact planned `builder_name()` function before the scene classes.
-- For every planned `references` title, copy and use its validated construction
-  and public state pattern inline. Do not recreate referenced complex geometry
-  from scratch, import the reference module, or replace it with an approximation.
+- For every planned template `references` title, call its prepended public helper
+  and use its validated state pattern. Do not copy, redefine, import, recreate,
+  or approximate referenced complex geometry.
+- Referenced templates return semantic visual groups. Lesson builders own all
+  complete-snapshot composition and the choice between center and split layout.
 - Every builder returns one fully internally arranged snapshot `VGroup`.
 - Keep persistent semantic children in compatible order across consecutive
   transform snapshots.

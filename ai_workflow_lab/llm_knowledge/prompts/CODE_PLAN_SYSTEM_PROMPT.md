@@ -22,7 +22,7 @@ Each subscene plans:
   this snapshot, or `transform` when this snapshot should smoothly replace the
   current main content.
 - `references`: exact titles of loaded templates or examples that the builder
-  must copy and use. Use a list of strings; leave it empty only when no loaded
+  must use. Use a list of strings; leave it empty only when no loaded
   reference matches the visual.
 - `caption` and `bottom_text`: optional short text only when useful. They must
   add information not already prominently visible in the main snapshot;
@@ -40,5 +40,7 @@ exactly
 
 When a loaded template provides the required complex shape, geometry, labels,
 or snapshot construction, reference it instead of asking codegen to recreate
-that construction. Keep the plan short. Do not include Python code, visual
+that construction. Templates provide semantic visual groups, not visual-kit
+layout; choose `center` or `split` based on the complete lesson snapshot the
+builder must compose. Keep the plan short. Do not include Python code, visual
 checks, region measurements, budgets, or implementation commentary.

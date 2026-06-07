@@ -3,7 +3,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from schemas import CodePlan, VideoPlan
+from llm_knowledge.skill_documents import read_knowledge_file
+from schemas import CodePlan, KnowledgeDocumentSeed, VideoPlan
 from settings import (
     E2E_RUN_NAME,
     PROMPTS_DIR,
@@ -89,9 +90,14 @@ class RunFiles:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def save_attempt_code(self, attempt: int, code: str) -> Path:
+    def save_attempt_code(
+        self,
+        attempt: int,
+        code: str,
+        referenced_templates: list[KnowledgeDocumentSeed],
+    ) -> Path:
         path = self.attempt_dir(attempt) / PathNames.MANIM_CODE
-        self.write_text(path, self.assemble_code(code))
+        self.write_text(path, self.assemble_code(code, referenced_templates))
         return path
 
     def dry_run_media_dir(self, attempt: int) -> Path:
@@ -113,16 +119,34 @@ class RunFiles:
             return None
         return json.loads(path.read_text(encoding="utf-8"))
 
-    def save_final_code(self, code: str) -> Path:
+    def save_final_code(
+        self,
+        code: str,
+        referenced_templates: list[KnowledgeDocumentSeed],
+    ) -> Path:
         path = self.run_dir / RunFolderNames.FINAL / PathNames.MANIM_CODE
-        self.write_text(path, self.assemble_code(code))
+        self.write_text(path, self.assemble_code(code, referenced_templates))
         return path
 
     @staticmethod
-    def assemble_code(lesson_body: str) -> str:
+    def assemble_code(
+        lesson_body: str,
+        referenced_templates: list[KnowledgeDocumentSeed],
+    ) -> str:
         visual_kit = VISUAL_KIT_SOURCE.read_text(encoding="utf-8").rstrip()
+        templates = "\n\n\n".join(
+            (
+                f"# Authoritative template: {template.title}\n\n"
+                f"{read_knowledge_file(template.path).rstrip()}"
+            )
+            for template in referenced_templates
+        )
         body = lesson_body.strip()
-        return f"{visual_kit}\n\n\n# Lesson-specific generated code\n\n{body}\n"
+        sections = [visual_kit]
+        if templates:
+            sections.append(templates)
+        sections.append(f"# Lesson-specific generated code\n\n{body}")
+        return "\n\n\n".join(sections) + "\n"
 
     def relative_paths(self, paths: list[Path]) -> list[str]:
         return [str(path.relative_to(self.run_dir)) for path in paths]

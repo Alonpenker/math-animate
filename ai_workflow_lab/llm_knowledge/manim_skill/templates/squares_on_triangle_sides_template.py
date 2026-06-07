@@ -1,11 +1,9 @@
-from typing import Literal
-
 import numpy as np
 from manim import *
 
 
 def make_squares_on_right_triangle(
-    state: Literal["triangle", "labeled", "squares"] = "squares",
+    state="squares",
     leg_a: float = 2.8,
     leg_b: float = 1.9,
 ) -> VGroup:
@@ -30,14 +28,14 @@ def make_squares_on_right_triangle(
         color=YELLOW,
     )
     side_labels = VGroup(
-        _outside_label("a", right_vertex, a_vertex, center, BLUE_A),
-        _outside_label("b", right_vertex, b_vertex, center, TEAL_A),
-        _outside_label("c", a_vertex, b_vertex, center, RED_A),
+        _side_squares_outside_label("a", right_vertex, a_vertex, center, BLUE_A),
+        _side_squares_outside_label("b", right_vertex, b_vertex, center, TEAL_A),
+        _side_squares_outside_label("c", a_vertex, b_vertex, center, RED_A),
     )
     squares = VGroup(
-        _outward_square(right_vertex, a_vertex, center, BLUE_E),
-        _outward_square(right_vertex, b_vertex, center, TEAL_E),
-        _outward_square(a_vertex, b_vertex, center, RED_E),
+        _side_squares_outward_square(right_vertex, a_vertex, center, BLUE_E),
+        _side_squares_outward_square(right_vertex, b_vertex, center, TEAL_E),
+        _side_squares_outward_square(a_vertex, b_vertex, center, RED_E),
     )
     area_labels = VGroup(
         MathTex("a^2", font_size=28, color=BLUE_A).move_to(squares[0]),
@@ -58,7 +56,7 @@ def make_squares_on_right_triangle(
     return VGroup(triangle, right_angle, side_labels, squares, area_labels)
 
 
-def _outward_square(
+def _side_squares_outward_square(
     start: np.ndarray,
     end: np.ndarray,
     figure_center: np.ndarray,
@@ -82,7 +80,7 @@ def _outward_square(
     )
 
 
-def _outside_label(
+def _side_squares_outside_label(
     text: str,
     start: np.ndarray,
     end: np.ndarray,

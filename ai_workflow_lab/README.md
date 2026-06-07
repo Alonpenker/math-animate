@@ -59,12 +59,12 @@ runs/<name>/
 
 `plan.txt` is the exact plan text passed into code generation. Each attempt and
 final `code.py` is standalone: the application prepends the authoritative
-`llm_knowledge/manim_skill/visual_kit.py` source to the model-produced lesson
-body when saving it.
+`llm_knowledge/manim_skill/visual_kit.py` source and every code-plan-referenced
+template to the model-produced lesson body when saving it.
 
 Attempt numbering is one-based: `attempts/1` is the initial generated code, and
 fixes continue with `attempts/2` through the configured maximum attempt
-number, currently `5`.
+number, currently `3`.
 
 ## Logs And Token Usage
 
@@ -111,7 +111,8 @@ return fully arranged `VGroup`s and `SafeScene` classes with orchestration-only
 `construct()` methods. A show subscene clears and introduces its snapshot; a
 transform subscene smoothly replaces the current main snapshot. Generated
 lesson bodies must not import `visual_kit`. The application prepends the
-authoritative helper source before verification and rendering.
+authoritative visual-kit and referenced-template sources before verification
+and rendering.
 
 Verification owns syntax, static safety checks, Manim API/runtime errors, and
 Docker dry-run behavior. If verification blocks the code, the workflow routes

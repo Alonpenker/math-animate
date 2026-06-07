@@ -91,7 +91,11 @@ def make_fix_code_node(ctx: ExperimentContext, name: NodeName):
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         fixed_code = extract_code(response)
-        ctx.files.save_attempt_code(attempt, fixed_code)
+        ctx.files.save_attempt_code(
+            attempt,
+            fixed_code,
+            state["referenced_templates"],
+        )
         cumulative_usage = ctx.usage.record(
             UsageFileNames.fix_attempt(attempt),
             usage,

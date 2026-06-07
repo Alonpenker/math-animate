@@ -1,11 +1,9 @@
-from typing import Literal
-
 import numpy as np
 from manim import *
 
 
 def make_right_triangle_diagram(
-    state: Literal["base", "labeled", "hypotenuse_highlighted"] = "labeled",
+    state="labeled",
     leg_a: float = 3.2,
     leg_b: float = 2.2,
 ) -> VGroup:
@@ -30,9 +28,9 @@ def make_right_triangle_diagram(
         color=YELLOW,
     )
     labels = VGroup(
-        _outside_side_label("a", right_vertex, a_vertex, center, BLUE_A),
-        _outside_side_label("b", right_vertex, b_vertex, center, TEAL_A),
-        _outside_side_label("c", a_vertex, b_vertex, center, RED_A),
+        _right_triangle_outside_side_label("a", right_vertex, a_vertex, center, BLUE_A),
+        _right_triangle_outside_side_label("b", right_vertex, b_vertex, center, TEAL_A),
+        _right_triangle_outside_side_label("c", a_vertex, b_vertex, center, RED_A),
     )
     hypotenuse = Line(a_vertex, b_vertex, color=YELLOW, stroke_width=6)
     hypotenuse_label = VGroup()
@@ -48,7 +46,7 @@ def make_right_triangle_diagram(
     return VGroup(triangle, right_angle, labels, hypotenuse, hypotenuse_label)
 
 
-def _outside_side_label(
+def _right_triangle_outside_side_label(
     text: str,
     start: np.ndarray,
     end: np.ndarray,
@@ -59,13 +57,13 @@ def _outside_side_label(
     offset: float = 0.34,
 ) -> MathTex:
     midpoint = (start + end) / 2
-    normal = _outward_unit_normal(start, end, figure_center)
+    normal = _right_triangle_outward_unit_normal(start, end, figure_center)
     return MathTex(text, font_size=font_size, color=color).move_to(
         midpoint + normal * offset
     )
 
 
-def _outward_unit_normal(
+def _right_triangle_outward_unit_normal(
     start: np.ndarray,
     end: np.ndarray,
     figure_center: np.ndarray,

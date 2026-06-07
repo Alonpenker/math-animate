@@ -1,24 +1,22 @@
-from typing import Literal
-
 import numpy as np
 from manim import *
 
 
 def make_pythagorean_area_model(
-    state: Literal["c_square", "ab_squares"] = "c_square",
+    state="c_square",
     leg_a: float = 1.35,
     leg_b: float = 2.15,
     include_side_labels: bool = True,
 ) -> VGroup:
-    points = _square_points(leg_a=leg_a, leg_b=leg_b)
+    points = _pythagorean_area_square_points(leg_a=leg_a, leg_b=leg_b)
     if state == "c_square":
-        return _build_c_square_arrangement(points, include_side_labels)
+        return _pythagorean_area_build_c_square_arrangement(points, include_side_labels)
     if state == "ab_squares":
-        return _build_ab_squares_arrangement(points)
+        return _pythagorean_area_build_ab_squares_arrangement(points)
     raise ValueError("state must be 'c_square' or 'ab_squares'.")
 
 
-def _square_points(*, leg_a: float, leg_b: float) -> dict[str, np.ndarray]:
+def _pythagorean_area_square_points(*, leg_a: float, leg_b: float) -> dict[str, np.ndarray]:
     size = leg_a + leg_b
 
     def point(x: float, y: float) -> np.ndarray:
@@ -41,16 +39,16 @@ def _square_points(*, leg_a: float, leg_b: float) -> dict[str, np.ndarray]:
     }
 
 
-def _build_c_square_arrangement(
+def _pythagorean_area_build_c_square_arrangement(
     points: dict[str, np.ndarray],
     include_side_labels: bool,
 ) -> VGroup:
-    outer = _outer_square(points)
+    outer = _pythagorean_area_outer_square(points)
     triangles = VGroup(
-        _proof_triangle(points["bottom_left"], points["bottom_split"], points["left_split"]),
-        _proof_triangle(points["bottom_right"], points["right_split"], points["bottom_split"]),
-        _proof_triangle(points["top_right"], points["top_split"], points["right_split"]),
-        _proof_triangle(points["top_left"], points["left_split"], points["top_split"]),
+        _pythagorean_area_proof_triangle(points["bottom_left"], points["bottom_split"], points["left_split"]),
+        _pythagorean_area_proof_triangle(points["bottom_right"], points["right_split"], points["bottom_split"]),
+        _pythagorean_area_proof_triangle(points["top_right"], points["top_split"], points["right_split"]),
+        _pythagorean_area_proof_triangle(points["top_left"], points["left_split"], points["top_split"]),
     )
     c_square = Polygon(
         points["bottom_split"],
@@ -64,18 +62,18 @@ def _build_c_square_arrangement(
     )
     labels = VGroup(MathTex("c^2", font_size=34).move_to(c_square.get_center()))
     if include_side_labels:
-        labels.add(_c_square_side_labels(points))
+        labels.add(_pythagorean_area_c_square_side_labels(points))
     hidden_second_region = c_square.copy().set_opacity(0)
     return VGroup(outer, triangles, c_square, hidden_second_region, labels)
 
 
-def _build_ab_squares_arrangement(points: dict[str, np.ndarray]) -> VGroup:
-    outer = _outer_square(points)
+def _pythagorean_area_build_ab_squares_arrangement(points: dict[str, np.ndarray]) -> VGroup:
+    outer = _pythagorean_area_outer_square(points)
     triangles = VGroup(
-        _proof_triangle(points["a_bottom"], points["bottom_right"], points["b_right_bottom"]),
-        _proof_triangle(points["a_bottom"], points["a_corner"], points["b_right_bottom"]),
-        _proof_triangle(points["a_left"], points["a_corner"], points["b_left_top"]),
-        _proof_triangle(points["a_left"], points["top_left"], points["b_left_top"]),
+        _pythagorean_area_proof_triangle(points["a_bottom"], points["bottom_right"], points["b_right_bottom"]),
+        _pythagorean_area_proof_triangle(points["a_bottom"], points["a_corner"], points["b_right_bottom"]),
+        _pythagorean_area_proof_triangle(points["a_left"], points["a_corner"], points["b_left_top"]),
+        _pythagorean_area_proof_triangle(points["a_left"], points["top_left"], points["b_left_top"]),
     )
     a_square = Polygon(
         points["bottom_left"],
@@ -104,7 +102,7 @@ def _build_ab_squares_arrangement(points: dict[str, np.ndarray]) -> VGroup:
     return VGroup(outer, triangles, a_square, b_square, labels)
 
 
-def _outer_square(points: dict[str, np.ndarray]) -> Polygon:
+def _pythagorean_area_outer_square(points: dict[str, np.ndarray]) -> Polygon:
     return Polygon(
         points["bottom_left"],
         points["bottom_right"],
@@ -115,7 +113,7 @@ def _outer_square(points: dict[str, np.ndarray]) -> Polygon:
     )
 
 
-def _proof_triangle(*vertices: np.ndarray) -> Polygon:
+def _pythagorean_area_proof_triangle(*vertices: np.ndarray) -> Polygon:
     return Polygon(
         *vertices,
         fill_color=GREY_BROWN,
@@ -125,15 +123,15 @@ def _proof_triangle(*vertices: np.ndarray) -> Polygon:
     )
 
 
-def _c_square_side_labels(points: dict[str, np.ndarray]) -> VGroup:
+def _pythagorean_area_c_square_side_labels(points: dict[str, np.ndarray]) -> VGroup:
     return VGroup(
         MathTex("a", font_size=28, color=BLUE_A).move_to(
-            _midpoint(points["bottom_left"], points["left_split"]) + LEFT * 0.28
+            _pythagorean_area_midpoint(points["bottom_left"], points["left_split"]) + LEFT * 0.28
         ),
         MathTex("b", font_size=28, color=TEAL_A).move_to(
-            _midpoint(points["bottom_left"], points["bottom_split"]) + DOWN * 0.28
+            _pythagorean_area_midpoint(points["bottom_left"], points["bottom_split"]) + DOWN * 0.28
         ),
-        _label_outside_segment(
+        _pythagorean_area_label_outside_segment(
             "c",
             points["bottom_split"],
             points["left_split"],
@@ -142,7 +140,7 @@ def _c_square_side_labels(points: dict[str, np.ndarray]) -> VGroup:
     )
 
 
-def _label_outside_segment(
+def _pythagorean_area_label_outside_segment(
     text: str,
     start: np.ndarray,
     end: np.ndarray,
@@ -152,9 +150,9 @@ def _label_outside_segment(
     normal = np.array([segment[1], -segment[0], 0.0])
     normal = normal / np.linalg.norm(normal)
     return MathTex(text, font_size=28, color=color).move_to(
-        _midpoint(start, end) + normal * 0.32
+        _pythagorean_area_midpoint(start, end) + normal * 0.32
     )
 
 
-def _midpoint(start: np.ndarray, end: np.ndarray) -> np.ndarray:
+def _pythagorean_area_midpoint(start: np.ndarray, end: np.ndarray) -> np.ndarray:
     return (start + end) / 2

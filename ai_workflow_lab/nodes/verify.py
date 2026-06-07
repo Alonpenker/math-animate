@@ -16,7 +16,11 @@ def make_verify_node(ctx: ExperimentContext, name: NodeName):
 
     def node(state: WorkflowState) -> dict:
         attempt = state["attempt"]
-        code_path = ctx.files.save_attempt_code(attempt, state["code"])
+        code_path = ctx.files.save_attempt_code(
+            attempt,
+            state["code"],
+            state["referenced_templates"],
+        )
         ctx.run_logger.info(LabLog(
             operation=operation,
             event="Node started",

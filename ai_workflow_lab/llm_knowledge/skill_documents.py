@@ -95,15 +95,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/rules/geometry-shapes-and-labels.md",
     ),
     KnowledgeDocumentSeed(
-        document_id=UUID("fcfe4aa1-c79d-504d-8178-4e1a91c6a2d1"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Camera and 3D",
-        category=RuleCategory.GENERAL,
-        tags=["camera", "movingcamerascene", "threedscene", "3d", "zoom"],
-        path="manim_skill/rules/camera-and-3d.md",
-    ),
-    KnowledgeDocumentSeed(
         document_id=UUID("383001f1-3d38-5081-b94b-797a0d7aba2a"),
         doc_type=KnowledgeType.RULE,
         priority="recommended",
@@ -149,15 +140,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/rules/matrix-drawing-patterns.md",
     ),
     KnowledgeDocumentSeed(
-        document_id=UUID("44b83051-e2d4-59b7-be38-337a6f1d0090"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Scenes",
-        category=RuleCategory.GENERAL,
-        tags=["scenes", "construct", "setup", "render"],
-        path="manim_skill/rules/scenes.md",
-    ),
-    KnowledgeDocumentSeed(
         document_id=UUID("d309e921-1ad5-5dad-a062-408849cd9bce"),
         doc_type=KnowledgeType.RULE,
         priority="recommended",
@@ -165,15 +147,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         category=RuleCategory.GENERAL,
         tags=["text", "markup", "paragraph", "mathtex", "font-size"],
         path="manim_skill/rules/text.md",
-    ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("bea74d86-fe73-54a3-ab68-2812ecb40f9c"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Updaters",
-        category=RuleCategory.GENERAL,
-        tags=["updaters", "valuetracker", "dynamic", "always_redraw"],
-        path="manim_skill/rules/updaters.md",
     ),
     KnowledgeDocumentSeed(
         document_id=UUID("6b2d8d1a-4e5f-4f20-9c31-2a7f90c51101"),
@@ -231,6 +204,27 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         ),
     ),
     KnowledgeDocumentSeed(
+        document_id=UUID("2f4a7c93-10de-4b6a-a8d1-93f0c6d27e11"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Function Translation Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "functions",
+            "graphing",
+            "translation",
+            "fixed-axes",
+            "horizontal-shift",
+            "vertical-shift",
+        ],
+        path="manim_skill/templates/function_translation_template.py",
+        planning_capability=(
+            "A parent-function graph can move horizontally and vertically on "
+            "fixed axes while an optional meaningful anchor point moves with it, "
+            "then the original and translated graphs can be compared."
+        ),
+    ),
+    KnowledgeDocumentSeed(
         document_id=UUID("f6a7b8c9-d0e1-2345-f012-456789012345"),
         doc_type=KnowledgeType.EXAMPLE,
         priority="recommended",
@@ -238,15 +232,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         category=ExampleCategory.MATHEMATICAL_PROOF,
         tags=["calculus", "derivatives", "limits", "slope", "tangent"],
         path="manim_skill/examples/derivatives_from_limits.py",
-    ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("a7b8c9d0-e1f2-3456-0123-567890123456"),
-        doc_type=KnowledgeType.EXAMPLE,
-        priority="recommended",
-        title="Function Transformations",
-        category=ExampleCategory.VISUALIZATION,
-        tags=["functions", "transformations", "graphing", "shift", "stretch"],
-        path="manim_skill/examples/function_transformations.py",
     ),
     KnowledgeDocumentSeed(
         document_id=UUID("b8c9d0e1-f2a3-4567-1234-678901234567"),

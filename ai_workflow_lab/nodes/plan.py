@@ -10,6 +10,7 @@ from services.knowledge_loader import load_planning_capabilities
 from settings import (
     OPENROUTER_PLAN_MODEL,
     PLAN_OUTPUT_MAX_TOKENS,
+    PLAN_REQUEST_TIMEOUT_MS,
     ArchivedPromptFiles,
     PromptFiles,
     UsageFileNames,
@@ -59,6 +60,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             context={
                 "model": OPENROUTER_PLAN_MODEL,
                 "max_tokens": PLAN_OUTPUT_MAX_TOKENS,
+                "request_timeout_ms": PLAN_REQUEST_TIMEOUT_MS,
             },
         ))
         started_at = time.perf_counter()
@@ -71,6 +73,7 @@ def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
             schema=VideoPlan,
             max_tokens=PLAN_OUTPUT_MAX_TOKENS,
             reasoning_effort=None,
+            request_timeout_ms=PLAN_REQUEST_TIMEOUT_MS,
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         plan_prompt_text = plan.to_prompt_text()

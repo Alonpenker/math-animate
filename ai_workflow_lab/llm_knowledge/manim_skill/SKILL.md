@@ -14,8 +14,10 @@ snapshots.
 - Keep persistent semantic children in compatible order across snapshots that
   transform into each other.
 - Keep one complete visual and explanation snapshot per subscene.
-- When a subscene names references, copy and use their validated construction
-  and public state patterns instead of rebuilding complex geometry.
+- When a subscene names a template reference, use its prepended public helper
+  and validated state pattern instead of copying or rebuilding complex geometry.
+- Treat template results as semantic visual groups. Compose the complete
+  snapshot and choose center or split layout in the lesson builder.
 
 Each `SafeScene.construct()` only shows the title, calls ordered subscene
 methods, and fades out. A show subscene clears existing content before showing

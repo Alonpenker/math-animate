@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from lab_logging import LabLog
 from runtime.context import ExperimentContext
 from schemas import CodePlan, VideoPlan
+from services.knowledge_loader import resolve_referenced_templates
 from settings import (
     CODE_PLAN_OUTPUT_MAX_TOKENS,
     OPENROUTER_CODE_PLAN_MODEL,
@@ -74,6 +75,7 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         code_plan_prompt_text = code_plan.to_prompt_text()
         ctx.files.save_code_plan(code_plan)
+        referenced_templates = resolve_referenced_templates(code_plan)
         validation_warnings = _validate_code_plan(
             code_plan=code_plan,
             required_scene_numbers=required_scene_numbers,
@@ -93,6 +95,7 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
             extra_context={
                 "scene_blueprint_count": len(code_plan.scenes),
                 "code_plan_chars": len(code_plan_prompt_text),
+                "referenced_template_count": len(referenced_templates),
                 "validation_warning_count": len(validation_warnings),
             },
         )
@@ -117,7 +120,10 @@ def make_generate_code_plan_node(ctx: ExperimentContext, name: NodeName):
                     "warning_count": len(validation_warnings),
                 },
             ))
-        return {"code_plan": code_plan}
+        return {
+            "code_plan": code_plan,
+            "referenced_templates": referenced_templates,
+        }
 
     return node
 

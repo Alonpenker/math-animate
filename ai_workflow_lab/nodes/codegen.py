@@ -75,7 +75,7 @@ def make_generate_code_node(ctx: ExperimentContext, name: NodeName):
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         code = extract_code(response)
         attempt = state["attempt"]
-        ctx.files.save_attempt_code(attempt, code)
+        ctx.files.save_attempt_code(attempt, code, state["referenced_templates"])
         cumulative_usage = ctx.usage.record(
             UsageFileNames.GENERATE_CODE,
             usage,
