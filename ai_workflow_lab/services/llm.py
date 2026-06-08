@@ -273,27 +273,52 @@ class FakeE2ELlmGateway:
                             {
                                 "id": "confirmation_start",
                                 "purpose": "Show one clear confirmation line.",
-                                "builder_name": "build_confirmation_start",
-                                "builder_shape": (
-                                    "Return one centered green confirmation line."
-                                ),
                                 "layout": "center",
                                 "transition": "show",
-                                "references": [],
+                                "templates": [
+                                    {
+                                        "name": "status",
+                                        "reference": "Equation Template",
+                                        "parameters": {
+                                            "state": "display",
+                                            "expression": r"\text{Plan}\to\text{code}"
+                                        },
+                                    }
+                                ],
+                                "actions": [],
                                 "caption": None,
                                 "bottom_text": None,
                             },
                             {
                                 "id": "confirmation_complete",
                                 "purpose": "Reveal that rendering completed.",
-                                "builder_name": "build_confirmation_complete",
-                                "builder_shape": (
-                                    "Return the confirmation line plus a second arranged "
-                                    "green completion line."
-                                ),
                                 "layout": "center",
                                 "transition": "transform",
-                                "references": [],
+                                "templates": [
+                                    {
+                                        "name": "status",
+                                        "reference": "Equation Template",
+                                        "parameters": {
+                                            "state": "display",
+                                            "expression": (
+                                                r"\text{Plan}\to\text{code}"
+                                                r"\to\text{verify}"
+                                            )
+                                        },
+                                    }
+                                ],
+                                "actions": [
+                                    {
+                                        "target": "status",
+                                        "action": "set_expression",
+                                        "parameters": {
+                                            "expression": (
+                                                r"\text{Plan}\to\text{code}"
+                                                r"\to\text{verify}\to\text{render}"
+                                            )
+                                        },
+                                    }
+                                ],
                                 "caption": None,
                                 "bottom_text": "The local workflow reached the visual-kit render path.",
                             },
@@ -398,16 +423,6 @@ class Scene1(Scene):
 _E2E_FIXED_CODE = """from manim import *
 
 
-def build_confirmation_start() -> VGroup:
-    return VGroup(Text("Plan -> code -> verify -> fix", font_size=30, color=GREEN))
-
-
-def build_confirmation_complete() -> VGroup:
-    first = Text("Plan -> code -> verify -> fix", font_size=30, color=GREEN)
-    second = Text("Render complete", font_size=28, color=GREEN)
-    return VGroup(first, second).arrange(DOWN, buff=0.4)
-
-
 class Scene1(SafeScene):
     def construct(self):
         self.show_title("E2E workflow")
@@ -417,12 +432,23 @@ class Scene1(SafeScene):
 
     def _subscene_confirmation_start(self):
         self.clear_content()
-        self.show_main(build_confirmation_start(), layout=Layout.CENTER)
+        status = EquationTemplate.build(
+            state="display",
+            expression=r"\\text{Plan}\\to\\text{code}",
+        )
+        self.show_main(status, layout=Layout.CENTER)
         self.set_bottom_text(None)
         self.wait(0.25)
 
     def _subscene_confirmation_complete(self):
-        self.transform_main(build_confirmation_complete(), layout=Layout.CENTER)
+        status = EquationTemplate.build(
+            state="display",
+            expression=r"\\text{Plan}\\to\\text{code}\\to\\text{verify}"
+        )
+        self.transform_main(status, layout=Layout.CENTER)
+        self.play_action(status.set_expression(
+            expression=r"\\text{Plan}\\to\\text{code}\\to\\text{verify}\\to\\text{render}"
+        ))
         self.set_bottom_text("The local workflow reached the visual-kit render path.")
         self.wait(0.5)
 """

@@ -40,9 +40,10 @@ knowledge bundle. Codegen receives its prompt, both plans, and the same bundle.
 This lets the implementation plan use available Manim patterns and references
 before code is written.
 
-Each code-plan subscene records matching exact titles in `references`. Codegen
-and fixing use referenced template public helpers and preserve their state
-patterns instead of copying or recreating complex geometry.
+Each code-plan subscene records matching exact titles in
+`templates[].reference`. Codegen and fixing construct those templates locally
+and preserve their build/action contracts instead of copying or recreating
+complex geometry.
 
 The document selection step chooses exact titles from the registry. Document
 contents are read from this folder.
@@ -55,9 +56,9 @@ same core and selected knowledge messages used by code planning and codegen.
 only lesson-body code and never import or reproduce the helper. The application
 prepends the exact source plus every template referenced by the code plan to
 every attempt and final `code.py`, producing one standalone renderable script.
-Templates provide semantic visual groups; lesson builders own snapshot
-composition and visual-kit layout. The matching compact API contract lives in
-`manim_skill/rules/visual-kit-api.md`.
+Templates are `VisualTemplate` groups with maintained `build(...)` contracts
+and optional safe actions. Subscenes own center/split composition. The matching
+compact API contract lives in `manim_skill/rules/visual-kit-api.md`.
 
 ## Registry and seeding
 

@@ -41,6 +41,29 @@ class Layout(_enum.Enum):
     SPLIT = "split"
 
 
+class VisualTemplate(_m.VGroup):
+    VALID_STATES: frozenset[str] = frozenset()
+
+    @classmethod
+    def build(cls, *, state: str, **parameters):
+        return cls(state=state, **parameters)
+
+    def __init__(self, *mobjects, state: str):
+        self.state = self._validate_state(state)
+        super().__init__(*mobjects)
+
+    @classmethod
+    def _validate_state(cls, state: str) -> str:
+        if not isinstance(state, str):
+            raise TypeError("template state must be a string")
+        if not cls.VALID_STATES:
+            raise TypeError(f"{cls.__name__} must declare VALID_STATES")
+        if state not in cls.VALID_STATES:
+            states = ", ".join(sorted(cls.VALID_STATES))
+            raise ValueError(f"{cls.__name__} state must be one of: {states}")
+        return state
+
+
 def _one_line(text, max_chars):
     text = " ".join(str(text).split())
     return text if len(text) <= max_chars else text[: max_chars - 3].rstrip() + "..."
@@ -166,6 +189,12 @@ class SafeScene(_m.Scene):
         self._main = group
         return group
 
+    def play_action(self, animation):
+        if not isinstance(animation, _m.Animation):
+            raise TypeError("template actions must return a Manim Animation")
+        self.play(animation)
+        return animation
+
     def clear_content(self):
         visible = [m for m in (self._main, self._bottom) if m is not None]
         if visible:
@@ -192,6 +221,8 @@ class SafeScene(_m.Scene):
             content_region, caption_region = _caption_regions(content_region)
 
         if layout is Layout.CENTER:
+            if not isinstance(content, VisualTemplate):
+                raise ValueError("Layout.CENTER content must be one VisualTemplate")
             buff = _FIT["caption_body"] if caption_mobject is not None else _FIT["center"]
             _fit(content, content_region, buff)
         elif layout is Layout.SPLIT:
@@ -203,8 +234,11 @@ class SafeScene(_m.Scene):
 
     def _fit_split(self, content, region):
         children = list(content.submobjects)
-        if len(children) != 2 or not all(isinstance(child, _m.VGroup) for child in children):
-            raise ValueError("Layout.SPLIT content must be VGroup(left_group, right_group)")
+        if len(children) != 2 or not all(isinstance(child, VisualTemplate) for child in children):
+            raise ValueError(
+                "Layout.SPLIT content must be "
+                "VGroup(left_template, right_template)"
+            )
         left_region, right_region = _split_regions(region)
         _fit(children[0], left_region, _FIT["split"])
         _fit(children[1], right_region, _FIT["split"])

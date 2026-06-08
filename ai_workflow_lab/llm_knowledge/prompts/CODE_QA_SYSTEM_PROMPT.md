@@ -14,7 +14,7 @@ You receive:
 - The current attempt number.
 - The full generated Python file with line numbers.
 
-Use the code implementation plan as the expected contract for snapshot builders,
+Use the code implementation plan as the expected contract for local templates,
 internal arrangement, subscene cleanup, and show/transform transitions.
 Block only when the generated code visibly violates that contract in a way that
 strongly predicts bad rendered output.

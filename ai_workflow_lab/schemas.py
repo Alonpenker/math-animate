@@ -1,8 +1,15 @@
-from enum import Enum
-from typing import Annotated, Any, Literal
-from uuid import UUID
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from llm_knowledge.document_models import (
+    KnowledgeDocument,
+    KnowledgeDocumentSeed,
+    KnowledgeType,
+    PriorityType,
+    TemplateDocumentSeed,
+)
+from llm_knowledge.skill_documents import TEMPLATE_TITLES
 
 
 class ScenePlan(BaseModel):
@@ -27,21 +34,58 @@ SubsceneTransition = Literal[
     "show",
     "transform",
 ]
+TemplateReference = Literal[*TEMPLATE_TITLES]
+
+
+class TemplateBlueprint(BaseModel):
+    name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$", max_length=80)
+    reference: TemplateReference
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_state_parameter(self):
+        state = self.parameters.get("state")
+        if not isinstance(state, str) or not state:
+            raise ValueError("template parameters must include a non-empty string state")
+        return self
+
+
+class TemplateActionBlueprint(BaseModel):
+    target: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$", max_length=80)
+    action: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$", max_length=80)
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class SubsceneBlueprint(BaseModel):
     id: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$", max_length=80)
     purpose: str = Field(..., max_length=400)
-    builder_name: str = Field(..., pattern=r"^build_[a-z][a-z0-9_]*$", max_length=80)
-    builder_shape: str = Field(..., max_length=1200)
     layout: VisualKitLayoutTemplate
     transition: SubsceneTransition
-    references: list[Annotated[str, Field(max_length=120)]] = Field(
-        ...,
-        max_length=6,
-    )
+    templates: list[TemplateBlueprint] = Field(..., min_length=1, max_length=2)
+    actions: list[TemplateActionBlueprint] = Field(default_factory=list, max_length=8)
     caption: str | None = Field(default=None, max_length=120)
     bottom_text: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_template_contract(self):
+        expected_count = 1 if self.layout == "center" else 2
+        if len(self.templates) != expected_count:
+            raise ValueError(
+                f"{self.layout} layout requires exactly {expected_count} template(s)"
+            )
+
+        names = [template.name for template in self.templates]
+        if len(names) != len(set(names)):
+            raise ValueError("template names must be unique within a subscene")
+
+        missing_targets = sorted({
+            action.target for action in self.actions if action.target not in names
+        })
+        if missing_targets:
+            raise ValueError(
+                f"action targets must match template names: {missing_targets}"
+            )
+        return self
 
 
 class SceneCodeBlueprint(BaseModel):
@@ -94,36 +138,3 @@ class CodeQaReport(BaseModel):
     summary: str = Field(..., max_length=600)
     issues: list[CodeQaIssue] = Field(default_factory=list, max_length=3)
     fix_instructions: str = Field(..., max_length=800)
-
-
-class KnowledgeType(str, Enum):
-    SKILL = "skill"
-    RULE = "rule"
-    TEMPLATE = "template"
-    EXAMPLE = "example"
-
-
-PriorityType = Literal["core", "recommended", "optional"]
-
-
-class KnowledgeDocument(BaseModel):
-    document_id: UUID
-    doc_type: KnowledgeType
-    title: str
-    category: Any
-    priority: PriorityType = "optional"
-    tags: list[str] = Field(default_factory=list)
-
-    def to_metadata(self) -> str:
-        category = getattr(self.category, "value", self.category)
-        tags = ", ".join(self.tags) if self.tags else "none"
-        return (
-            f"- {self.title} "
-            f"(type={self.doc_type.value}, category={category}, "
-            f"priority={self.priority}, tags={tags})"
-        )
-
-
-class KnowledgeDocumentSeed(KnowledgeDocument):
-    path: str
-    planning_capability: str | None = None

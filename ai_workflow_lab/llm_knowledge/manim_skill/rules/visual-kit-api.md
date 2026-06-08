@@ -1,8 +1,28 @@
 # Visual Kit API
 
-The application prepends the authoritative visual-kit source to the generated
-lesson body. Generated code must not import `visual_kit` or redefine `Layout`
-or `SafeScene`.
+The application prepends the authoritative visual-kit and referenced-template
+sources to the generated lesson body. Generated code must not import or
+redefine `Layout`, `VisualTemplate`, `SafeScene`, or referenced template
+classes/helpers.
+
+Every maintained template inherits `VisualTemplate`, so each constructed
+template instance is a self-contained `VGroup`. A template's `__init__` method
+initializes that group through `super().__init__(..., state=state)`; Python
+constructors do not return a value.
+
+Every template declares named `VALID_STATES` and accepts an explicit `state`.
+Construct it with `TemplateClass.build(state="...", ...)`. State selects the
+object's visual form; other parameters provide its mathematical content or
+dimensions.
+
+Templates own their geometry, labels, markers, and annotations. They must not
+position themselves for center, split, comparison, captions, or any other scene
+layout. To compare an object in two states, construct the same template class
+twice and let `SafeScene` apply the requested layout.
+
+Templates may expose meaningful public action methods. Every exposed action
+must return one Manim `Animation` object and must animate only template-owned
+content.
 
 Every renderable class inherits `SafeScene`. Use only:
 
@@ -10,30 +30,33 @@ Every renderable class inherits `SafeScene`. Use only:
 - `set_bottom_text(text_or_none, color=WHITE)`
 - `show_main(content, layout=Layout.CENTER, caption=None)`
 - `transform_main(content, layout=Layout.CENTER, caption=None)`
+- `play_action(animation)`
 - `clear_content()`
 - `fade_out_all()`
 
-`content` must be one fully internally arranged snapshot `VGroup`. Builders take
-no arguments and return one complete group for each planned subscene.
+Construct templates locally inside each subscene. Do not define snapshot
+builder functions or call compatibility `make_*` wrappers.
 
-`Layout.CENTER` fits that complete group into the main region without changing
-its internal arrangement.
+`Layout.CENTER` requires one template instance passed directly as `content`.
 
 `Layout.SPLIT` requires exactly:
 
 ```python
-VGroup(left_panel, right_panel)
+VGroup(left_template, right_template)
 ```
 
-Both children must be `VGroup`s and must already be internally arranged. The
-visual kit only fits the completed panels into left and right regions.
+Both children must be `VisualTemplate` instances in planned left-to-right
+order. The visual kit only fits them into left and right regions.
 
 For a `show` subscene, call `clear_content()` and then `show_main(...)`. For a
-`transform` subscene, preserve current content and call `transform_main(...)`.
-Keep persistent semantic children in compatible order across snapshots that
-transform into each other so the whole-group replacement remains understandable.
+`transform` subscene, omit `clear_content()` and call `transform_main(...)`.
+After the main transition, execute planned actions sequentially:
 
-Use `caption=` only for a short caption near the main region and
-`set_bottom_text()` only for a short takeaway. Call `set_bottom_text()` for every
-subscene; passing `None` fades out and clears previous bottom text. Generated
-lesson code should not call `self.play(...)` directly.
+```python
+self.play_action(template.safe_action(...))
+```
+
+`play_action(...)` is the only allowed way for lesson code to play
+template-owned animations. Call `set_bottom_text()` for every subscene; passing
+`None` fades out and clears previous bottom text. Generated lesson code must not
+call `self.play(...)` directly.

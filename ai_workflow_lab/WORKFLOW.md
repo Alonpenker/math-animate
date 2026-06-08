@@ -1,4 +1,4 @@
-# AI Workflow Lab
+Doe# AI Workflow Lab
 
 This document describes the current AI-facing workflow that turns a teacher
 request into standalone Manim scene files. It focuses on what each model sees,
@@ -41,7 +41,7 @@ render
 
 The two core documents shared by code planning and codegen are:
 
-- `manim_skill/SKILL.md`: concise scene and builder structure.
+- `manim_skill/SKILL.md`: concise scene and template structure.
 - `manim_skill/rules/visual-kit-api.md`: concise safe-scene API contract.
 
 Static selection uses the request and video plan. General recommended documents
@@ -109,12 +109,23 @@ Manim knowledge bundle later used by code generation.
       "subscenes": [
         {
           "id": "main_diagram",
-          "purpose": "What this snapshot teaches",
-          "builder_name": "build_main_diagram",
-          "builder_shape": "Describe the visible objects, semantic groups, and internal arrangement",
+          "purpose": "What this phase teaches",
           "layout": "center",
           "transition": "show",
-          "references": ["Exact Selected Template Title"],
+          "templates": [
+            {
+              "name": "equation",
+              "reference": "Equation Template",
+              "parameters": {"state": "display", "expression": "a^2+b^2=c^2"}
+            }
+          ],
+          "actions": [
+            {
+              "target": "equation",
+              "action": "set_expression",
+              "parameters": {"expression": "c^2=a^2+b^2"}
+            }
+          ],
           "caption": null,
           "bottom_text": "Optional short takeaway"
         }
@@ -124,16 +135,15 @@ Manim knowledge bundle later used by code generation.
 }
 ```
 
-Each no-argument builder returns one complete, internally arranged snapshot
-`VGroup`. Each subscene chooses `show` to clear and introduce its snapshot or
-`transform` to smoothly replace the current main snapshot. Layouts are only
-`center` and `split`; every split builder returns
-`VGroup(left_panel, right_panel)`. Validation only warns about missing,
-duplicate, or extra scene numbers and a scene whose first subscene transforms.
+Each subscene constructs its named templates locally, chooses `show` to clear
+and introduce them or `transform` to smoothly replace the current main content,
+then executes optional actions sequentially. Center uses one template. Split
+uses exactly `VGroup(left_template, right_template)` in planned order. Template
+names are unique within a subscene and action targets must match them.
 
-`references` contains exact loaded template or example titles. Referenced
-templates are prepended authoritatively, and codegen calls their public helpers
-instead of copying or recreating their geometry.
+`templates[].reference` contains exact loaded template titles. Referenced
+templates are prepended authoritatively, and codegen calls their public
+`build(...)` and safe action methods instead of copying or recreating geometry.
 
 ### Generate Code
 
@@ -151,14 +161,6 @@ Required structure:
 from manim import *
 
 
-def build_initial_diagram() -> VGroup:
-    return arranged_initial_group
-
-
-def build_developed_diagram() -> VGroup:
-    return arranged_developed_group
-
-
 class Scene1(SafeScene):
     def construct(self):
         self.show_title("Scene title")
@@ -168,20 +170,23 @@ class Scene1(SafeScene):
 
     def _subscene_initial_diagram(self):
         self.clear_content()
-        self.show_main(build_initial_diagram(), layout=Layout.CENTER)
+        equation = EquationTemplate.build(state="display", expression=r"a^2+b^2=c^2")
+        self.show_main(equation, layout=Layout.CENTER)
         self.set_bottom_text(None)
         self.wait(1)
 
     def _subscene_developed_diagram(self):
-        self.transform_main(build_developed_diagram(), layout=Layout.CENTER)
+        equation = EquationTemplate.build(state="display", expression=r"c^2=a^2+b^2")
+        self.transform_main(equation, layout=Layout.CENTER)
+        self.play_action(equation.set_expression(expression=r"c=\sqrt{a^2+b^2}"))
         self.set_bottom_text("Optional short takeaway")
         self.wait(2)
 ```
 
-Every builder returns one fully internally arranged snapshot `VGroup`.
-`construct()` only orchestrates ordered subscene methods. Subscenes use safe
-whole-group show or transform transitions and do not call lesson-specific
-`self.play(...)`. Every subscene applies its planned bottom text, including
+`construct()` only orchestrates ordered subscene methods. Each subscene builds
+its planned templates locally, uses the planned safe whole-group show or
+transform transition, then executes actions sequentially through
+`play_action(...)`. Every subscene applies its planned bottom text, including
 `None` to clear previous text.
 
 ### Assemble Standalone Code
@@ -218,8 +223,9 @@ visual-kit API, shared core and selected knowledge, and current lesson body.
 
 **Output:** complete corrected lesson body only. The fixer repairs every
 occurrence of the reported root-cause pattern while preserving mathematical
-invariants and referenced template helper usage. The application assembles it
-with the authoritative helpers before the next verification attempt.
+invariants, local template construction, and ordered safe actions. The
+application assembles it with the authoritative helpers before the next
+verification attempt.
 
 ### Render
 

@@ -1,36 +1,33 @@
 # Manim Scene Structure
 
-Write simple, reliable Manim Community scenes that teach through clear visual
-snapshots.
+Write simple, reliable Manim Community scenes that teach through maintained
+visual templates and safe template-owned actions.
 
 ## Required Shape
 
-- Build lesson visuals in named functions before scene classes.
-- Every builder takes no arguments and returns one fully arranged snapshot
-  `VGroup`.
-- Keep labels, markers, and annotations grouped with the object they describe.
-- Use `.arrange(...)`, `.next_to(...)`, and geometry-derived positions inside
-  builders. Layout fitting does not arrange a group's children.
-- Keep persistent semantic children in compatible order across snapshots that
-  transform into each other.
-- Keep one complete visual and explanation snapshot per subscene.
-- When a subscene names a template reference, use its prepended public helper
-  and validated state pattern instead of copying or rebuilding complex geometry.
-- Treat template results as semantic visual groups. Compose the complete
-  snapshot and choose center or split layout in the lesson builder.
+- Construct planned templates locally inside each subscene with
+  `TemplateClass.build(state="...", ...)`.
+- Every template state describes one self-contained visual object. Construct
+  the same template class more than once when a comparison needs multiple
+  objects or states.
+- Do not define lesson snapshot builder functions.
+- Use the Equation Template for mathematical expressions.
+- Keep labels, markers, and annotations grouped inside their owning template.
+- Use one template for center layout.
+- Use exactly `VGroup(left_template, right_template)` for split layout.
+- Execute planned template actions sequentially after the main show or
+  transform through `SafeScene.play_action(...)`.
 
 Each `SafeScene.construct()` only shows the title, calls ordered subscene
 methods, and fades out. A show subscene clears existing content before showing
-its snapshot. A transform subscene preserves existing content and smoothly
-replaces the current main snapshot.
+its newly constructed templates. A transform subscene preserves existing
+content and smoothly replaces the current main content before actions run.
 
 ## Reliable Manim Choices
 
-- Prefer stable ManimCE primitives, `Text`, `MathTex`, `VGroup`, and safe-scene
-  whole-group transforms.
+- Prefer maintained templates, stable ManimCE primitives, and safe-scene
+  transitions/actions.
 - Use diagrams and notation instead of long explanatory text.
 - Remove stale content before showing a new idea.
-- Preserve continuity across snapshot transforms when objects represent the same
-  semantic roles.
 - Avoid advanced camera work, 3D, updaters, plugins, external files, and custom
   choreography unless the lesson clearly requires them.

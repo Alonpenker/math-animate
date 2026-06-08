@@ -10,6 +10,9 @@ metadata:
 Each subscene owns one complete visual snapshot. Use `show` when the previous
 idea should leave before the new snapshot appears. Use `transform` when visible
 continuity helps explain how the current snapshot becomes the next one.
+Template-owned actions animate sequential changes within the newly shown or
+transformed snapshot. A subscene may contain multiple related actions when they
+develop one teaching idea on the same visual setup.
 
 ## Compatible Transform Snapshots
 
@@ -33,6 +36,13 @@ visual system.
 Each transform should communicate one dominant change. Separate unrelated
 changes into later subscenes. Hold each completed snapshot briefly so the viewer
 can understand the resulting state.
+
+Build a template that receives an action in its lesson-appropriate state
+immediately before that action runs. The action must produce an observable
+change from that state, so do not build the template with the action's target
+state already applied. Starting states may use any valid values required by the
+lesson, not only template defaults. For sequential actions on one template,
+each action starts from the state left by the previous action.
 
 Temporary arrows, highlights, and guides belong inside the snapshot that needs
 them. Remove them in the next snapshot by replacing their stable slots with

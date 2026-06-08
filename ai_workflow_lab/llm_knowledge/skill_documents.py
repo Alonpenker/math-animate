@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .categories import ExampleCategory, RuleCategory, SkillCategory, TemplateCategory
-from schemas import KnowledgeDocumentSeed, KnowledgeType
+from .document_models import KnowledgeDocumentSeed, KnowledgeType, TemplateDocumentSeed
 
 
 LLMKNOWLEDGE_DIR = Path(__file__).resolve().parent
@@ -148,47 +148,42 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         tags=["text", "markup", "paragraph", "mathtex", "font-size"],
         path="manim_skill/rules/text.md",
     ),
-    KnowledgeDocumentSeed(
+    TemplateDocumentSeed(
+        document_id=UUID("e0d7a77c-f1e1-4e99-95a7-6df24d09d0d1"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Equation Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=["equation", "math", "latex", "expression", "transition"],
+        path="manim_skill/templates/equation_template.py",
+        planning_capability=(
+            "A mathematical expression can be shown as a reusable equation "
+            "visual and safely transformed into a new expression."
+        ),
+    ),
+    TemplateDocumentSeed(
         document_id=UUID("6b2d8d1a-4e5f-4f20-9c31-2a7f90c51101"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Right Triangle Diagram Template",
+        title="Triangle Template",
         category=TemplateCategory.TEMPLATES,
-        tags=["right-triangle", "geometry", "labels", "right-angle", "hypotenuse"],
-        path="manim_skill/templates/right_triangle_diagram_template.py",
+        tags=[
+            "triangle",
+            "right-triangle",
+            "non-right-triangle",
+            "geometry",
+            "labels",
+            "squares",
+            "hypotenuse",
+        ],
+        path="manim_skill/templates/triangle_template.py",
         planning_capability=(
-            "A mathematically valid right triangle can be shown with a correct "
-            "right-angle marker, outward side labels, and a highlighted "
-            "hypotenuse opposite the right angle."
+            "One independent triangle object can show right or non-right "
+            "states, labels, right-angle validity, hypotenuse emphasis, or "
+            "outward side squares. Comparisons use two triangle instances."
         ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("7c3e9e2b-5f60-4a31-8d42-3b8091d62202"),
-        doc_type=KnowledgeType.TEMPLATE,
-        priority="recommended",
-        title="Triangle Comparison Template",
-        category=TemplateCategory.TEMPLATES,
-        tags=["triangle", "comparison", "right-triangle", "non-right-triangle"],
-        path="manim_skill/templates/triangle_comparison_template.py",
-        planning_capability=(
-            "A right triangle and a non-right triangle can be compared side by "
-            "side with correct labels and clear valid or invalid emphasis."
-        ),
-    ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("8d4faf3c-6071-4b42-9e53-4c91a2e73303"),
-        doc_type=KnowledgeType.TEMPLATE,
-        priority="recommended",
-        title="Squares On Triangle Sides Template",
-        category=TemplateCategory.TEMPLATES,
-        tags=["triangle", "squares", "area", "geometry", "labels"],
-        path="manim_skill/templates/squares_on_triangle_sides_template.py",
-        planning_capability=(
-            "Squares can be constructed outward from every side of a valid "
-            "right triangle with correct area labels and no inward overlap."
-        ),
-    ),
-    KnowledgeDocumentSeed(
+    TemplateDocumentSeed(
         document_id=UUID("3d8f9c2a-45f2-5525-92f5-2f1e8b94b6ad"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
@@ -203,7 +198,7 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
             "relationship."
         ),
     ),
-    KnowledgeDocumentSeed(
+    TemplateDocumentSeed(
         document_id=UUID("2f4a7c93-10de-4b6a-a8d1-93f0c6d27e11"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
@@ -256,6 +251,10 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
 REGISTRY_BY_ID: dict[UUID, KnowledgeDocumentSeed] = {
     entry.document_id: entry for entry in REGISTRY
 }
+
+TEMPLATE_TITLES: tuple[str, ...] = tuple(
+    entry.title for entry in REGISTRY if isinstance(entry, TemplateDocumentSeed)
+)
 
 CORE_DOCUMENTS: list[KnowledgeDocumentSeed] = [
     entry for entry in REGISTRY if entry.priority == "core"

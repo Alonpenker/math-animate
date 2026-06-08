@@ -154,9 +154,9 @@ def _build_user_prompt(
         f"{plan_json}\n\n"
         "Code implementation plan JSON:\n"
         f"{code_plan_json}\n\n"
-        "Use the code plan to check snapshot builder grouping, internal "
-        "arrangement, subscene cleanup, and show/transform transitions. Do not invent "
-        "requirements beyond the video plan and code plan.\n\n"
+        "Use the code plan to check local template construction, strict center/split "
+        "shape, sequential actions, subscene cleanup, and show/transform transitions. "
+        "Do not invent requirements beyond the video plan and code plan.\n\n"
         "Line-numbered lesson-body Manim code:\n"
         f"{_line_number_code(code)}"
     )

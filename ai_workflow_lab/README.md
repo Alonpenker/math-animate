@@ -101,18 +101,15 @@ generate_plan -> load_static_knowledge -> generate_code_plan -> generate_code ->
 ```
 
 `generate_code_plan` turns the educational scene plan into a short ordered list
-of snapshot subscenes. Each subscene names one no-argument builder, describes
-its complete arranged snapshot, selects `center` or `split`, and chooses `show`
-or `transform` as its entry transition. It also records exact selected reference
-titles for complex visuals that should use validated template construction.
+of template-based subscenes. Each subscene names one center template or exactly
+two ordered split templates, chooses `show` or `transform`, and may define
+ordered safe actions targeting those local names.
 
-The model produces only lesson-body code. It defines no-argument snapshot builders that
-return fully arranged `VGroup`s and `SafeScene` classes with orchestration-only
-`construct()` methods. A show subscene clears and introduces its snapshot; a
-transform subscene smoothly replaces the current main snapshot. Generated
-lesson bodies must not import `visual_kit`. The application prepends the
-authoritative visual-kit and referenced-template sources before verification
-and rendering.
+The model produces only lesson-body code. Each subscene constructs its planned
+templates locally, performs the main show or transform, then runs actions
+sequentially through `SafeScene.play_action(...)`. Generated lesson bodies must
+not import `visual_kit`. The application prepends the authoritative visual-kit
+and referenced-template sources before verification and rendering.
 
 Verification owns syntax, static safety checks, Manim API/runtime errors, and
 Docker dry-run behavior. If verification blocks the code, the workflow routes

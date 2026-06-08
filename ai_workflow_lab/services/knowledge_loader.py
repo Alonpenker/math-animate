@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from langchain_core.messages import SystemMessage
 
 from llm_knowledge.skill_documents import CORE_DOCUMENTS, REGISTRY, read_knowledge_file
-from schemas import CodePlan, KnowledgeDocumentSeed, KnowledgeType
+from schemas import CodePlan, KnowledgeDocumentSeed, TemplateDocumentSeed
 from settings import BASE_SELECTED_DOCUMENT_TITLES, STATIC_DOCUMENT_SELECTION_PROFILES
 
 
@@ -20,7 +20,7 @@ def load_planning_capabilities(*, request_text: str) -> str:
         doc.planning_capability
         for title in _select_document_titles(request_text=request_text, plan_text="")
         if (doc := registry_by_title.get(title)) is not None
-        and doc.planning_capability
+        and isinstance(doc, TemplateDocumentSeed)
     ]
     if not capabilities:
         return ""
@@ -70,13 +70,14 @@ def load_static_knowledge(
             content=(
                 "# Selected Skill Documents\n\n"
                 "Each section heading is its exact reference title. Code plans "
-                "record matching titles in `references`; codegen and fixing "
-                "must use and preserve those validated construction and state "
-                "patterns. Referenced template sources are prepended "
-                "authoritatively; use their public helpers without copying, "
-                "redefining, or importing them. The active workflow contract overrides "
-                "reference scene classes and animation examples: do not import "
-                "references or copy direct `self.play(...)` choreography.\n\n"
+                "record matching titles in `templates[].reference`; codegen and "
+                "fixing must use and preserve those validated build/action "
+                "contracts. Referenced template sources are prepended "
+                "authoritatively; use their template classes without copying, "
+                "redefining, or importing them. The active workflow contract "
+                "overrides reference scene classes and animation examples: do "
+                "not import references or copy direct `self.play(...)` "
+                "choreography.\n\n"
                 f"{selected_content}"
             )
         ),
@@ -94,11 +95,12 @@ def resolve_referenced_templates(code_plan: CodePlan) -> list[KnowledgeDocumentS
     seen_ids = set()
     for scene in code_plan.scenes:
         for subscene in scene.subscenes:
-            for title in subscene.references:
+            for template in subscene.templates:
+                title = template.reference
                 doc = registry_by_title.get(title)
                 if (
                     doc is not None
-                    and doc.doc_type == KnowledgeType.TEMPLATE
+                    and isinstance(doc, TemplateDocumentSeed)
                     and doc.document_id not in seen_ids
                 ):
                     seen_ids.add(doc.document_id)

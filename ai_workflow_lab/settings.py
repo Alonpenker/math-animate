@@ -26,7 +26,7 @@ load_env_file()
 
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_PLAN_MODEL = "openrouter/owl-alpha"
+OPENROUTER_PLAN_MODEL = "google/gemma-4-31b-it"
 OPENROUTER_CODE_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_QA_MODEL = "openrouter/owl-alpha"
 OPENROUTER_CODE_PLAN_MODEL = OPENROUTER_PLAN_MODEL
@@ -73,15 +73,14 @@ BASE_SELECTED_DOCUMENT_TITLES: tuple[str, ...] = (
     "Educational Storyboarding",
     "Animation Patterns",
     "Math Visual Clarity",
+    "Equation Template",
 )
 
 STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (
         ("pythagoras", "pythagorean", "right triangle", "hypotenuse"),
         (
-            "Right Triangle Diagram Template",
-            "Triangle Comparison Template",
-            "Squares On Triangle Sides Template",
+            "Triangle Template",
             "Pythagorean Area Template",
             "Geometry Shapes and Labels",
             "Equation Transitions",
