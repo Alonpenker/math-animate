@@ -157,8 +157,168 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         tags=["equation", "math", "latex", "expression", "transition"],
         path="manim_skill/templates/equation_template.py",
         planning_capability=(
-            "A mathematical expression can be shown as a reusable equation "
-            "visual and safely transformed into a new expression."
+            "A mathematical expression can be shown alone or developed through "
+            "a stable three-line derivation history. New solution steps can "
+            "advance the history, while a statements state shows up to three "
+            "equally important expressions. A displayed or final formula can "
+            "receive a temporary yellow outline highlight."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("14cc02d4-4301-4c9b-a080-09dd819474ad"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Number Line Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "number-line",
+            "integers",
+            "inequalities",
+            "intervals",
+            "absolute-value",
+            "distance",
+        ],
+        path="manim_skill/templates/number_line_template.py",
+        planning_capability=(
+            "A configurable number line can show labeled points, open or closed "
+            "single or multiple intervals with excluded points, arithmetic movement, "
+            "distance between two values, or a center with a fixed radius. An "
+            "optional short title can identify what the number line represents."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("fc301da8-1e26-4eed-a566-f9645558dc83"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Function Graph Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "functions",
+            "graphs",
+            "calculus",
+            "secant",
+            "tangent",
+            "area",
+            "signed-area",
+            "piecewise",
+            "intercepts",
+        ],
+        path="manim_skill/templates/function_graph_template.py",
+        planning_capability=(
+            "Reliable named function families can be plotted on fixed axes with "
+            "marked points, secants, tangents, shaded intervals, intercept "
+            "emphasis, or a second comparison graph. A signed-areas state can "
+            "preserve constant segments, shade positive regions in teal and "
+            "negative regions in red, and label their signed areas."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("49bcf4ce-a2ce-46d1-bb22-e20df320937d"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Matrix Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "matrix",
+            "matrices",
+            "multiplication",
+            "row",
+            "column",
+            "dot-product",
+        ],
+        path="manim_skill/templates/matrix_template.py",
+        planning_capability=(
+            "A matrix can be displayed and highlighted by row, column, or cell. "
+            "Compatible matrix products can show dimensions, select a row-column "
+            "pair, display its dot product, and reveal the computed result cell."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("e9cf8cb7-1456-4c47-9823-c05bb52f41c7"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Linear Transformation Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "vector",
+            "vectors",
+            "linear-transformation",
+            "eigenvector",
+            "eigenvalue",
+            "matrix",
+        ],
+        path="manim_skill/templates/linear_transformation_template.py",
+        planning_capability=(
+            "A numeric 2D matrix transformation can show vectors as arrows from "
+            "the origin, their transformed images, optional span lines, and an "
+            "optional unit square becoming a parallelogram. Comparison and "
+            "eigenvector states distinguish vectors that turn from vectors that "
+            "remain on their span."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("c8a796a1-272c-43af-a897-37122d9034ed"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Fraction Model Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "fraction",
+            "fractions",
+            "equivalent-fraction",
+            "ratio",
+            "percentage",
+            "area-model",
+        ],
+        path="manim_skill/templates/fraction_model_template.py",
+        planning_capability=(
+            "A proper or improper fraction can be represented with partitioned "
+            "bars, grids, or circles. Filled parts and completed wholes can be "
+            "emphasized, and equivalent fractions can refine the same proportion."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("2920a434-7a1b-4961-bf02-92745fa6290e"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Vector Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "vector",
+            "vectors",
+            "components",
+            "addition",
+            "subtraction",
+            "scalar-multiple",
+            "dot-product",
+            "projection",
+        ],
+        path="manim_skill/templates/vector_template.py",
+        planning_capability=(
+            "Numeric 2D vectors can show components, head-to-tail addition or "
+            "subtraction, scalar multiples, dot products, and projections. "
+            "Computed resultants and relationships can be revealed and emphasized."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("46de0a97-5095-46f7-8e80-fd7398b5aba3"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Unit Circle Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "unit-circle",
+            "trigonometry",
+            "sine",
+            "cosine",
+            "reference-angle",
+            "quadrants",
+        ],
+        path="manim_skill/templates/unit_circle_template.py",
+        planning_capability=(
+            "A unit circle can rotate a radius to a numeric angle, reveal its "
+            "coordinate projections and reference triangle, and emphasize the "
+            "active quadrant or sine and cosine projections."
         ),
     ),
     TemplateDocumentSeed(
@@ -175,12 +335,20 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
             "labels",
             "squares",
             "hypotenuse",
+            "altitude",
+            "median",
+            "angle-bisector",
+            "area",
+            "angle-sum",
+            "similarity",
+            "congruence",
         ],
         path="manim_skill/templates/triangle_template.py",
         planning_capability=(
-            "One independent triangle object can show right or non-right "
-            "states, labels, right-angle validity, hypotenuse emphasis, or "
-            "outward side squares. Comparisons use two triangle instances."
+            "One independent triangle can preserve the existing right-triangle "
+            "and Pythagorean visuals or use reliable general presets with custom "
+            "labels, altitudes, medians, angle bisectors, area, angle sums, and "
+            "similarity or congruence markings. Comparisons use two instances."
         ),
     ),
     TemplateDocumentSeed(

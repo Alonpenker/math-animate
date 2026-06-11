@@ -45,8 +45,9 @@ The two core documents shared by code planning and codegen are:
 - `manim_skill/rules/visual-kit-api.md`: concise safe-scene API contract.
 
 Static selection uses the request and video plan. General recommended documents
-are always included, then the first matching topic profile contributes its full
-ordered set of specialized rules, templates, or examples.
+are always included, then every matching topic profile contributes its full
+ordered set of specialized rules and templates. Examples are developer
+references only and are not selected into the workflow.
 
 Before video planning, the same request-based selection exposes only plain
 language capability summaries. The video planner never sees reference titles,

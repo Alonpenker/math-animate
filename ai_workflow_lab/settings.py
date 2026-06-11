@@ -26,7 +26,7 @@ load_env_file()
 
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_PLAN_MODEL = "google/gemma-4-31b-it"
+OPENROUTER_PLAN_MODEL = "openrouter/owl-alpha"
 OPENROUTER_CODE_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_QA_MODEL = "openrouter/owl-alpha"
 OPENROUTER_CODE_PLAN_MODEL = OPENROUTER_PLAN_MODEL
@@ -34,16 +34,16 @@ OPENROUTER_HTTP_REFERER = "http://localhost"
 OPENROUTER_APP_TITLE = "AI Workflow Lab"
 
 
-PLAN_OUTPUT_MAX_TOKENS = 4_000
-CODE_PLAN_OUTPUT_MAX_TOKENS = 4_000
-CODEGEN_OUTPUT_MAX_TOKENS = 8_000
+PLAN_OUTPUT_MAX_TOKENS = 8_000
+CODE_PLAN_OUTPUT_MAX_TOKENS = 8_000
+CODEGEN_OUTPUT_MAX_TOKENS = 16_000
 CODE_QA_OUTPUT_MAX_TOKENS = 4_000
 PLAN_REQUEST_TIMEOUT_MS = 90_000
 CODGEN_REASONING_EFFORT = "low"
 FIX_REASONING_EFFORT = "medium"
 
 MAX_ATTEMPTS = 3
-DRY_RUN_TIMEOUT_SECONDS = 90
+DRY_RUN_TIMEOUT_SECONDS = 120
 RENDER_TIMEOUT_SECONDS = 600
 
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
@@ -88,20 +88,108 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
     ),
     (
         ("derivative", "derivatives", "limit", "limits", "tangent line"),
-        ("Derivatives From Limits", "Axes and Graphing", "Equation Transitions"),
+        ("Function Graph Template", "Axes and Graphing", "Equation Transitions"),
     ),
     (
-        ("function", "functions", "graph", "graphs", "transformation", "transformations"),
+        ("function", "functions", "graph", "graphs"),
+        ("Function Graph Template", "Axes and Graphing"),
+    ),
+    (
+        ("transformation", "transformations", "translation", "translate", "shift"),
         ("Function Translation Template", "Axes and Graphing"),
     ),
     (
-        ("matrix", "matrices", "dot product", "linear algebra"),
-        ("Matrix Multiplication", "Matrix Drawing Patterns"),
+        ("matrix", "matrices", "matrix multiplication"),
+        ("Matrix Template", "Matrix Drawing Patterns"),
     ),
     (
-        ("circle", "tangent", "construction", "compass"),
         (
-            "External Circle Tangent Construction",
+            "eigenvector",
+            "eigenvectors",
+            "eigenvalue",
+            "eigenvalues",
+            "linear transformation",
+            "linear algebra",
+        ),
+        ("Linear Transformation Template", "Matrix Template", "Axes and Graphing"),
+    ),
+    (
+        (
+            "vector",
+            "vectors",
+            "component",
+            "components",
+            "magnitude",
+            "scalar multiple",
+            "dot product",
+            "projection",
+        ),
+        ("Vector Template", "Axes and Graphing", "Lines, Arrows, and Labels"),
+    ),
+    (
+        (
+            "fraction",
+            "fractions",
+            "numerator",
+            "denominator",
+            "equivalent fraction",
+            "mixed number",
+            "improper fraction",
+            "ratio",
+            "proportion",
+            "percent",
+            "percentage",
+        ),
+        ("Fraction Model Template", "Equation Transitions"),
+    ),
+    (
+        (
+            "triangle",
+            "triangles",
+            "similarity",
+            "similar triangles",
+            "congruence",
+            "congruent",
+            "altitude",
+            "median",
+            "angle bisector",
+            "triangle area",
+            "angle sum",
+        ),
+        ("Triangle Template", "Geometry Shapes and Labels", "Lines, Arrows, and Labels"),
+    ),
+    (
+        (
+            "unit circle",
+            "trigonometry",
+            "sine",
+            "cosine",
+            "radians",
+            "reference angle",
+            "quadrant",
+        ),
+        (
+            "Unit Circle Template",
+            "Axes and Graphing",
+            "Geometry Shapes and Labels",
+            "Lines, Arrows, and Labels",
+        ),
+    ),
+    (
+        (
+            "number line",
+            "integer",
+            "integers",
+            "inequality",
+            "inequalities",
+            "interval",
+            "absolute value",
+        ),
+        ("Number Line Template", "Lines, Arrows, and Labels"),
+    ),
+    (
+        ("circle", "external tangent", "tangent construction", "construction", "compass"),
+        (
             "Geometry Shapes and Labels",
             "Lines, Arrows, and Labels",
         ),

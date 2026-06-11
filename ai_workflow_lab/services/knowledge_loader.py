@@ -114,7 +114,6 @@ def _select_document_titles(*, request_text: str, plan_text: str) -> list[str]:
     for keywords, titles in STATIC_DOCUMENT_SELECTION_PROFILES:
         if any(keyword in searchable_text for keyword in keywords):
             selected_titles.extend(titles)
-            break
     return _dedupe_preserving_order(selected_titles)
 
 

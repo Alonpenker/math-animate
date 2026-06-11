@@ -33,7 +33,13 @@ After planning, the lab loads one shared Manim knowledge bundle:
 
 * Compact core documents for scene structure and the visual-kit API.
 * General recommended documents configured for every request.
-* The full ordered document set from the first matching static topic profile.
+* The deduplicated ordered document sets from every matching static topic
+  profile.
+
+Examples are developer reference material only. They are not selected into the
+workflow and do not represent capabilities available to the models. A visual
+approach becomes a workflow capability only after it is implemented and
+registered as a maintained template.
 
 Code planning receives its prompt, the teacher request, the video plan, and this
 knowledge bundle. Codegen receives its prompt, both plans, and the same bundle.

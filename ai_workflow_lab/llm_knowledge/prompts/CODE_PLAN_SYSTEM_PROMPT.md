@@ -57,6 +57,12 @@ different states and use split layout.
 Use the Equation Template for every mathematical expression request. When a
 loaded template provides the required complex visual, reference it instead of
 asking codegen to recreate that construction. Only plan actions explicitly
-provided by the selected template. Keep the plan concise while preserving the
-complete teaching progression. Do not include Python code, builder functions,
-visual checks, region measurements, budgets, or implementation commentary.
+provided by the selected template. Use its derivation state for a related
+multi-step symbolic solution and its formula-highlight action for an important
+main formula or final result. When planning `advance_step` actions, initialize
+the derivation with only the expressions visible before the first action; do
+not pre-load expressions that those actions will reveal. Use its statements
+state, not derivation, when multiple expressions should remain equally
+important. Keep the plan concise while preserving the complete teaching
+progression. Do not include Python code, builder functions, visual checks,
+region measurements, budgets, or implementation commentary.

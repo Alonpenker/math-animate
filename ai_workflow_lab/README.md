@@ -135,11 +135,13 @@ workflow comparisons without adding the QA call to this run path.
 
 Runtime shell/layout helpers live in
 `llm_knowledge/manim_skill/visual_kit.py`. Topic-specific visuals can be added
-as reference templates or examples and registered for static selection. Code
-planning and codegen receive the same core documents and statically selected
-recommended references. Video planning receives only their plain-language
-capability summaries. Fix attempts receive the selected knowledge, compact
-visual-kit API contract, and current lesson body, not the full helper source.
+as maintained reference templates and registered for static selection. Examples
+are developer reference material only and are not selected into the workflow.
+Code planning and codegen receive the same core documents and statically
+selected recommended references. Video planning receives only template
+plain-language capability summaries. Fix attempts receive the selected
+knowledge, compact visual-kit API contract, and current lesson body, not the
+full helper source.
 
 There is no DB, Redis, Celery, MinIO, Docker Compose, RAG, or embedding service
 in this lab.

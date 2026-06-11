@@ -11,7 +11,8 @@ visual templates and safe template-owned actions.
   the same template class more than once when a comparison needs multiple
   objects or states.
 - Do not define lesson snapshot builder functions.
-- Use the Equation Template for mathematical expressions.
+- Use the Equation Template for mathematical expressions, multi-step symbolic
+  derivations, and final-formula highlights.
 - Keep labels, markers, and annotations grouped inside their owning template.
 - Use one template for center layout.
 - Use exactly `VGroup(left_template, right_template)` for split layout.
