@@ -8,7 +8,6 @@ import pytest
 def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> None:
     from app.workers import worker as worker_module
     from app.workers import worker_helpers
-    from app.services import agent_service
     from app.services import openrouter_service
 
     @contextmanager
@@ -21,7 +20,6 @@ def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> 
 
     monkeypatch.setattr(worker_module, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_cursor", fake_cursor_ctx)
-    monkeypatch.setattr(agent_service, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(openrouter_service, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_redis", fake_redis_ctx)
 

@@ -147,18 +147,32 @@ def mock_repositories(monkeypatch: pytest.MonkeyPatch, test_store: dict[str, Any
         return test_store["artifacts"].pop(artifact_id, None) is not None
 
     from app.repositories.job_requests_repository import JobRequestsRepository
+    from app.schemas.user_request import UserRequest
 
     def create_job_request(_cursor, job_id, user_request, job_status) -> None:
-        pass  # job state is tracked via JobsRepository; no separate store needed
+        test_store.setdefault("user_requests", {})[job_id] = user_request
 
     def update_job_request_status(_cursor, job_id, status) -> None:
         pass  # status already recorded by update_job_status above
+
+    def get_user_request(_cursor, job_id):
+        stored = test_store.get("user_requests", {}).get(job_id)
+        if stored is not None:
+            return stored
+        return UserRequest(
+            topic="default-topic",
+            misconceptions=[],
+            constraints=[],
+            examples=[],
+            number_of_scenes=1,
+        )
 
     monkeypatch.setattr(JobsRepository, "create_job", staticmethod(create_job))
     monkeypatch.setattr(JobsRepository, "get_job", staticmethod(get_job))
     monkeypatch.setattr(JobsRepository, "update_job_status", staticmethod(update_job_status))
     monkeypatch.setattr(JobRequestsRepository, "create", staticmethod(create_job_request))
     monkeypatch.setattr(JobRequestsRepository, "update_status", staticmethod(update_job_request_status))
+    monkeypatch.setattr(JobRequestsRepository, "get_user_request", staticmethod(get_user_request))
     monkeypatch.setattr(PlansRepository, "create_plan", staticmethod(create_plan))
     monkeypatch.setattr(PlansRepository, "get_plan", staticmethod(get_plan))
     monkeypatch.setattr(PlansRepository, "approve_plan", staticmethod(approve_plan))
