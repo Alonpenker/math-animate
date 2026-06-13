@@ -42,15 +42,18 @@ class KnowledgeDocumentSeed(KnowledgeDocument):
     path: str
 
 
+class TemplateDocumentSeed(KnowledgeDocumentSeed):
+    planning_capability: str
+
+
 @dataclass
 class CandidateResult:
     candidate_rules: list[KnowledgeDocument]
     candidate_templates: list[KnowledgeDocument]
-    candidate_examples: list[KnowledgeDocument]
 
     @property
     def all_candidates(self) -> list[KnowledgeDocument]:
-        return self.candidate_rules + self.candidate_templates + self.candidate_examples
+        return self.candidate_rules + self.candidate_templates
 
 
 class KnowledgeDocumentResponse(BaseModel):

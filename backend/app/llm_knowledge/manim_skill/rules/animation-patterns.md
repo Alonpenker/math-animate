@@ -1,91 +1,49 @@
 ---
 name: animation-patterns
-description: Core Manim animation choices, sequencing, transforms, and timing
+description: Safe snapshot transitions that make mathematical changes visible
 metadata:
-  tags: animation, animate, create, write, transform, timing, laggedstart
+  tags: animation, snapshot, show, transform, continuity, timing
 ---
 
 # Animation Patterns
 
-Animation should make the mathematical step visible. Choose the simplest motion
-that tells the viewer what changed.
+Each subscene owns one complete visual snapshot. Use `show` when the previous
+idea should leave before the new snapshot appears. Use `transform` when visible
+continuity helps explain how the current snapshot becomes the next one.
+Template-owned actions animate sequential changes within the newly shown or
+transformed snapshot. A subscene may contain multiple related actions when they
+develop one teaching idea on the same visual setup.
 
-## Object Animation
+## Compatible Transform Snapshots
 
-Use `.animate` for direct changes to an existing mobject:
+Whole-snapshot transforms pair children by semantic order. Across consecutive
+transform snapshots:
 
-```python
-self.play(square.animate.shift(RIGHT).set_color(YELLOW), run_time=0.8)
-```
+- Keep persistent objects in the same child slots.
+- Keep unchanged context, such as axes or an outer frame, geometrically
+  identical.
+- Move an object by placing its corresponding target child at the intended new
+  position.
+- Move attached labels and markers with the object they describe.
+- Keep optional content in stable placeholder slots instead of changing the
+  structure unpredictably.
 
-Keep `.animate` calls readable. If a target state is complex, build a target
-object and transform to it instead.
+Use `show` rather than `transform` when the snapshots do not represent the same
+visual system.
 
-## Introduce And Remove
+## Readable Motion
 
-Use the common creation/removal animations deliberately:
+Each transform should communicate one dominant change. Separate unrelated
+changes into later subscenes. Hold each completed snapshot briefly so the viewer
+can understand the resulting state.
 
-- `Create`: draw geometric objects, axes, lines, braces, and outlines.
-- `Write`: reveal `Text`, `Tex`, `MathTex`, and compact labels.
-- `FadeIn`: introduce existing objects or groups without implying drawing.
-- `FadeOut`: remove stale objects and temporary guides.
+Build a template that receives an action in its lesson-appropriate state
+immediately before that action runs. The action must produce an observable
+change from that state, so do not build the template with the action's target
+state already applied. Starting states may use any valid values required by the
+lesson, not only template defaults. For sequential actions on one template,
+each action starts from the state left by the previous action.
 
-```python
-self.play(Create(axes), Write(label))
-self.play(FadeOut(VGroup(label, guide_line)))
-```
-
-## Transform Choices
-
-Use `ReplacementTransform(old, new)` when one object replaces another. Use
-`TransformFromCopy(source, target)` when the source should remain as evidence.
-
-Use `TransformMatchingTex` for related equations with shared LaTeX terms:
-
-```python
-self.play(TransformMatchingTex(eq1, eq2))
-```
-
-If terms do not have clear continuity, use `ReplacementTransform`, fade pieces
-out/in, or place the new value explicitly.
-
-## Sequencing
-
-Use `LaggedStart` when related animations should cascade, such as revealing a
-row of labels or multiple construction marks:
-
-```python
-self.play(LaggedStart(*[Write(label) for label in labels], lag_ratio=0.15))
-```
-
-Use `Succession` when the order itself matters and each action should finish
-before the next begins.
-
-## Timing
-
-Most instructional steps should use `run_time` between `0.5` and `1.5` seconds.
-Use longer durations only for transformations the viewer must track.
-
-`rate_func` controls pacing. Keep it simple:
-
-- `smooth`: default readable easing for most animation.
-- `linear`: constant-rate motion, useful for trackers or scans.
-- `there_and_back`: temporary pulses that return to the original state.
-
-```python
-self.play(region.animate(rate_func=there_and_back).set_fill(YELLOW, opacity=0.35))
-```
-
-Hold important states with `self.wait(0.3)` to `self.wait(1.0)`. Do not turn
-the scene into a transcript of waits; use waits only when comprehension needs a
-beat.
-
-## Cleanup
-
-Temporary labels, arrows, highlights, braces, and guide lines should leave once
-they stop supporting the current step. Group them so cleanup is one animation:
-
-```python
-temporary = VGroup(row_box, col_box, connector)
-self.play(FadeOut(temporary))
-```
+Temporary arrows, highlights, and guides belong inside the snapshot that needs
+them. Remove them in the next snapshot by replacing their stable slots with
+invisible placeholders.

@@ -1,8 +1,8 @@
 from pathlib import Path
 from uuid import UUID
 
-from app.llm_knowledge.categories import ExampleCategory, RuleCategory, SkillCategory, TemplateCategory
-from app.schemas.knowledge import KnowledgeDocumentSeed, KnowledgeType
+from app.llm_knowledge.categories import RuleCategory, SkillCategory, TemplateCategory
+from app.schemas.knowledge import KnowledgeDocumentSeed, KnowledgeType, TemplateDocumentSeed
 
 
 LLMKNOWLEDGE_DIR = Path(__file__).resolve().parent
@@ -23,9 +23,18 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/SKILL.md",
     ),
     KnowledgeDocumentSeed(
-        document_id=UUID("4ea2e34e-32c1-58ae-9060-8ae705d0eb3c"),
+        document_id=UUID("7a2dc7df-0a12-4b31-bd74-9c3bd0fd3a21"),
         doc_type=KnowledgeType.RULE,
         priority="core",
+        title="Visual Kit API",
+        category=RuleCategory.VISUAL_LAYOUT,
+        tags=["visual-kit", "safe-scene", "templates", "helpers", "layout"],
+        path="manim_skill/rules/visual-kit-api.md",
+    ),
+    KnowledgeDocumentSeed(
+        document_id=UUID("4ea2e34e-32c1-58ae-9060-8ae705d0eb3c"),
+        doc_type=KnowledgeType.RULE,
+        priority="recommended",
         title="Layout Composition",
         category=RuleCategory.VISUAL_LAYOUT,
         tags=["layout", "composition", "frame", "positioning", "readability"],
@@ -86,15 +95,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/rules/geometry-shapes-and-labels.md",
     ),
     KnowledgeDocumentSeed(
-        document_id=UUID("fcfe4aa1-c79d-504d-8178-4e1a91c6a2d1"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Camera and 3D",
-        category=RuleCategory.GENERAL,
-        tags=["camera", "movingcamerascene", "threedscene", "3d", "zoom"],
-        path="manim_skill/rules/camera-and-3d.md",
-    ),
-    KnowledgeDocumentSeed(
         document_id=UUID("383001f1-3d38-5081-b94b-797a0d7aba2a"),
         doc_type=KnowledgeType.RULE,
         priority="recommended",
@@ -140,15 +140,6 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         path="manim_skill/rules/matrix-drawing-patterns.md",
     ),
     KnowledgeDocumentSeed(
-        document_id=UUID("44b83051-e2d4-59b7-be38-337a6f1d0090"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Scenes",
-        category=RuleCategory.GENERAL,
-        tags=["scenes", "construct", "setup", "render"],
-        path="manim_skill/rules/scenes.md",
-    ),
-    KnowledgeDocumentSeed(
         document_id=UUID("d309e921-1ad5-5dad-a062-408849cd9bce"),
         doc_type=KnowledgeType.RULE,
         priority="recommended",
@@ -157,92 +148,254 @@ REGISTRY: list[KnowledgeDocumentSeed] = [
         tags=["text", "markup", "paragraph", "mathtex", "font-size"],
         path="manim_skill/rules/text.md",
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("bea74d86-fe73-54a3-ab68-2812ecb40f9c"),
-        doc_type=KnowledgeType.RULE,
-        priority="recommended",
-        title="Updaters",
-        category=RuleCategory.GENERAL,
-        tags=["updaters", "valuetracker", "dynamic", "always_redraw"],
-        path="manim_skill/rules/updaters.md",
-    ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("b5d6ad11-568f-508e-8c53-094810a55cdc"),
+    TemplateDocumentSeed(
+        document_id=UUID("e0d7a77c-f1e1-4e99-95a7-6df24d09d0d1"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Basic Scene Template",
+        title="Equation Template",
         category=TemplateCategory.TEMPLATES,
-        tags=["basic", "scene"],
-        path="manim_skill/templates/basic_scene.py",
+        tags=["equation", "math", "latex", "expression", "transition"],
+        path="manim_skill/templates/equation_template.py",
+        planning_capability=(
+            "A mathematical expression can be shown alone or developed through "
+            "a stable three-line derivation history. New solution steps can "
+            "advance the history, while a statements state shows up to three "
+            "equally important expressions. A displayed or final formula can "
+            "receive a temporary yellow outline highlight."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("eccb31c9-230d-5028-8617-5e64704bf132"),
+    TemplateDocumentSeed(
+        document_id=UUID("14cc02d4-4301-4c9b-a080-09dd819474ad"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Camera Scene Template",
+        title="Number Line Template",
         category=TemplateCategory.TEMPLATES,
-        tags=["camera", "scene"],
-        path="manim_skill/templates/camera_scene.py",
+        tags=[
+            "number-line",
+            "integers",
+            "inequalities",
+            "intervals",
+            "absolute-value",
+            "distance",
+        ],
+        path="manim_skill/templates/number_line_template.py",
+        planning_capability=(
+            "A configurable number line can show labeled points, open or closed "
+            "single or multiple intervals with excluded points, arithmetic movement, "
+            "distance between two values, or a center with a fixed radius. An "
+            "optional short title can identify what the number line represents."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("59fe067e-f8af-5d89-aeb2-2d06b8e1c674"),
+    TemplateDocumentSeed(
+        document_id=UUID("fc301da8-1e26-4eed-a566-f9645558dc83"),
         doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="3D Scene Template",
+        title="Function Graph Template",
         category=TemplateCategory.TEMPLATES,
-        tags=["3d", "scene"],
-        path="manim_skill/templates/threed_scene.py",
+        tags=[
+            "functions",
+            "graphs",
+            "calculus",
+            "secant",
+            "tangent",
+            "area",
+            "signed-area",
+            "piecewise",
+            "intercepts",
+        ],
+        path="manim_skill/templates/function_graph_template.py",
+        planning_capability=(
+            "Reliable named function families can be plotted on fixed axes with "
+            "marked points, secants, tangents, shaded intervals, intercept "
+            "emphasis, or a second comparison graph. A signed-areas state can "
+            "preserve constant segments, shade positive regions in teal and "
+            "negative regions in red, and label their signed areas."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("e5f6a7b8-c9d0-1234-ef01-345678901234"),
-        doc_type=KnowledgeType.EXAMPLE,
+    TemplateDocumentSeed(
+        document_id=UUID("49bcf4ce-a2ce-46d1-bb22-e20df320937d"),
+        doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Pythagorean Theorem Proof",
-        category=ExampleCategory.MATHEMATICAL_PROOF,
-        tags=["geometry", "theorem", "proof", "triangle", "squares"],
-        path="manim_skill/examples/pythagorean_theorem_proof.py",
+        title="Matrix Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "matrix",
+            "matrices",
+            "multiplication",
+            "row",
+            "column",
+            "dot-product",
+        ],
+        path="manim_skill/templates/matrix_template.py",
+        planning_capability=(
+            "A matrix can be displayed and highlighted by row, column, or cell. "
+            "Compatible matrix products can show dimensions, select a row-column "
+            "pair, display its dot product, and reveal the computed result cell."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("f6a7b8c9-d0e1-2345-f012-456789012345"),
-        doc_type=KnowledgeType.EXAMPLE,
+    TemplateDocumentSeed(
+        document_id=UUID("e9cf8cb7-1456-4c47-9823-c05bb52f41c7"),
+        doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Derivatives From Limits",
-        category=ExampleCategory.MATHEMATICAL_PROOF,
-        tags=["calculus", "derivatives", "limits", "slope", "tangent"],
-        path="manim_skill/examples/derivatives_from_limits.py",
+        title="Linear Transformation Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "vector",
+            "vectors",
+            "linear-transformation",
+            "eigenvector",
+            "eigenvalue",
+            "matrix",
+        ],
+        path="manim_skill/templates/linear_transformation_template.py",
+        planning_capability=(
+            "A numeric 2D matrix transformation can show vectors as arrows from "
+            "the origin, their transformed images, optional span lines, and an "
+            "optional unit square becoming a parallelogram. Comparison and "
+            "eigenvector states distinguish vectors that turn from vectors that "
+            "remain on their span."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("a7b8c9d0-e1f2-3456-0123-567890123456"),
-        doc_type=KnowledgeType.EXAMPLE,
+    TemplateDocumentSeed(
+        document_id=UUID("c8a796a1-272c-43af-a897-37122d9034ed"),
+        doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Function Transformations",
-        category=ExampleCategory.VISUALIZATION,
-        tags=["functions", "transformations", "graphing", "shift", "stretch"],
-        path="manim_skill/examples/function_transformations.py",
+        title="Fraction Model Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "fraction",
+            "fractions",
+            "equivalent-fraction",
+            "ratio",
+            "percentage",
+            "area-model",
+        ],
+        path="manim_skill/templates/fraction_model_template.py",
+        planning_capability=(
+            "A proper or improper fraction can be represented with partitioned "
+            "bars, grids, or circles. Filled parts and completed wholes can be "
+            "emphasized, and equivalent fractions can refine the same proportion."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("b8c9d0e1-f2a3-4567-1234-678901234567"),
-        doc_type=KnowledgeType.EXAMPLE,
+    TemplateDocumentSeed(
+        document_id=UUID("2920a434-7a1b-4961-bf02-92745fa6290e"),
+        doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="Matrix Multiplication",
-        category=ExampleCategory.VISUALIZATION,
-        tags=["matrix", "multiplication", "linear-algebra", "dot-product"],
-        path="manim_skill/examples/matrix_multiplication.py",
+        title="Vector Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "vector",
+            "vectors",
+            "components",
+            "addition",
+            "subtraction",
+            "scalar-multiple",
+            "dot-product",
+            "projection",
+        ],
+        path="manim_skill/templates/vector_template.py",
+        planning_capability=(
+            "Numeric 2D vectors can show components, head-to-tail addition or "
+            "subtraction, scalar multiples, dot products, and projections. "
+            "Computed resultants and relationships can be revealed and emphasized."
+        ),
     ),
-    KnowledgeDocumentSeed(
-        document_id=UUID("c9d0e1f2-a3b4-5678-2345-789012345678"),
-        doc_type=KnowledgeType.EXAMPLE,
+    TemplateDocumentSeed(
+        document_id=UUID("46de0a97-5095-46f7-8e80-fd7398b5aba3"),
+        doc_type=KnowledgeType.TEMPLATE,
         priority="recommended",
-        title="External Circle Tangent Construction",
-        category=ExampleCategory.CONSTRUCTION,
-        tags=["geometry", "circle", "tangent", "construction", "compass"],
-        path="manim_skill/examples/external_circle_tangent_construction.py",
+        title="Unit Circle Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "unit-circle",
+            "trigonometry",
+            "sine",
+            "cosine",
+            "reference-angle",
+            "quadrants",
+        ],
+        path="manim_skill/templates/unit_circle_template.py",
+        planning_capability=(
+            "A unit circle can rotate a radius to a numeric angle, reveal its "
+            "coordinate projections and reference triangle, and emphasize the "
+            "active quadrant or sine and cosine projections."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("6b2d8d1a-4e5f-4f20-9c31-2a7f90c51101"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Triangle Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "triangle",
+            "right-triangle",
+            "non-right-triangle",
+            "geometry",
+            "labels",
+            "squares",
+            "hypotenuse",
+            "altitude",
+            "median",
+            "angle-bisector",
+            "area",
+            "angle-sum",
+            "similarity",
+            "congruence",
+        ],
+        path="manim_skill/templates/triangle_template.py",
+        planning_capability=(
+            "One independent triangle can preserve the existing right-triangle "
+            "and Pythagorean visuals or use reliable general presets with custom "
+            "labels, altitudes, medians, angle bisectors, area, angle sums, and "
+            "similarity or congruence markings. Comparisons use two instances."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("3d8f9c2a-45f2-5525-92f5-2f1e8b94b6ad"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Pythagorean Area Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=["pythagorean", "geometry", "template", "area-proof"],
+        path="manim_skill/templates/pythagorean_area_template.py",
+        planning_capability=(
+            "Four identical right triangles can be rearranged inside the same "
+            "outer square, first revealing one central square and then two "
+            "smaller squares, so the unchanged area visually proves their "
+            "relationship."
+        ),
+    ),
+    TemplateDocumentSeed(
+        document_id=UUID("2f4a7c93-10de-4b6a-a8d1-93f0c6d27e11"),
+        doc_type=KnowledgeType.TEMPLATE,
+        priority="recommended",
+        title="Function Translation Template",
+        category=TemplateCategory.TEMPLATES,
+        tags=[
+            "functions",
+            "graphing",
+            "translation",
+            "fixed-axes",
+            "horizontal-shift",
+            "vertical-shift",
+        ],
+        path="manim_skill/templates/function_translation_template.py",
+        planning_capability=(
+            "A parent-function graph can move horizontally and vertically on "
+            "fixed axes while an optional meaningful anchor point moves with it, "
+            "then the original and translated graphs can be compared."
+        ),
     ),
 ]
 
 REGISTRY_BY_ID: dict[UUID, KnowledgeDocumentSeed] = {
     entry.document_id: entry for entry in REGISTRY
 }
+
+TEMPLATE_TITLES: tuple[str, ...] = tuple(
+    entry.title for entry in REGISTRY if isinstance(entry, TemplateDocumentSeed)
+)
 
 CORE_DOCUMENTS: list[KnowledgeDocumentSeed] = [
     entry for entry in REGISTRY if entry.priority == "core"

@@ -1,75 +1,42 @@
 ---
 name: axes-and-graphing
-description: Axes, NumberPlane, coordinate conversion, plotting, labels, and moving points
+description: Fixed-axis graph construction and compatible graph snapshots
 metadata:
-  tags: axes, numberplane, graphing, plot, c2p, p2c, moving-point
+  tags: axes, numberplane, graphing, plot, coordinates, fixed-axes
 ---
 
 # Axes And Graphing
 
-Treat axes, graphs, labels, points, and shaded regions as one plot group.
+Treat axes, axis labels, graphs, graph labels, points, and shaded regions as one
+semantic plot system.
 
-## Axes And NumberPlane
+## Construction
 
-Set ranges and physical size for the intended region:
+Choose ranges and physical dimensions for the intended region. Use sparse labels
+and ticks. Use `NumberPlane` only when the grid supports the explanation.
 
-```python
-axes = Axes(
-    x_range=[-3, 3, 1],
-    y_range=[-2, 6, 2],
-    x_length=6,
-    y_length=4,
-    tips=False,
-)
-axes.to_edge(LEFT, buff=0.7)
-```
+Use coordinate helpers instead of guessed shifts:
 
-Use `NumberPlane` when the grid itself supports the explanation. Keep labels
-sparse; dense tick labels collide with graph annotations.
+- `axes.c2p(x, y)` for mathematical coordinates.
+- `axes.p2c(point)` for scene points.
+- `axes.i2gp(x, graph)` for points on a plotted graph.
+- `axes.plot(...)` for functions.
 
-Complex planes are specialized `NumberPlane` use; retrieve or write that pattern
-only when the lesson is explicitly about complex numbers.
+Create labels, anchor markers, and annotations from the same axes used to create
+the graph.
 
-## Coordinates
+## Fixed-Axis Transform Snapshots
 
-Use coordinate helpers instead of guessing with shifts:
+When a graph should visibly move while axes remain fixed:
 
-- `axes.c2p(x, y)` converts coordinates to scene points.
-- `axes.p2c(point)` converts scene points back to coordinates.
-- `axes.i2gp(x, graph)` gets a point on a plotted graph.
+- Rebuild identical axes in every snapshot.
+- Keep the axes group in the same semantic child slot.
+- Put the source and target graphs in the same graph slot.
+- Put graph labels and meaningful anchor markers in corresponding stable slots.
+- Derive translated graphs and anchor positions from the same mathematical
+  transformation.
+- Keep the plot panel's overall footprint stable so layout fitting does not move
+  the axes between snapshots.
 
-```python
-dot = Dot(axes.c2p(2, 4), color=YELLOW)
-```
-
-## Plotting
-
-Use `axes.plot` for functions:
-
-```python
-graph = axes.plot(lambda x: x**2, x_range=[-2, 2], color=TEAL)
-label = axes.get_graph_label(graph, label="x^2", x_val=1.5, direction=UR)
-self.play(Create(axes), Create(graph), Write(label))
-```
-
-Add graph labels after the axes and graph are positioned.
-
-## Moving Point Pattern
-
-Use `ValueTracker` with `always_redraw` for a point that follows a graph:
-
-```python
-t = ValueTracker(-2)
-dot = always_redraw(lambda: Dot(axes.i2gp(t.get_value(), graph), color=YELLOW))
-label = always_redraw(lambda: MathTex("x").next_to(dot, UP, buff=0.12))
-self.add(dot, label)
-self.play(t.animate.set_value(2), run_time=3, rate_func=linear)
-```
-
-Keep moving labels offset from the point so they do not sit on the graph line.
-
-## Layout
-
-Build `plot_group = VGroup(axes, graph, labels, dots, shaded_regions)` and fit
-or move it as a unit. If an equation or diagram appears beside the plot, reserve
-a separate region before creating labels and callouts.
+Use a comparison snapshot when both original and transformed graphs must remain
+visible. Otherwise keep the reference graph's slot invisible.
