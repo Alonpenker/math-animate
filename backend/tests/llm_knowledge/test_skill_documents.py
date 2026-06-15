@@ -44,6 +44,23 @@ def test_all_rule_categories_are_enum_instances():
         )
 
 
+def test_registry_has_exactly_four_optional_rules():
+    from app.llm_knowledge.skill_documents import REGISTRY
+    from app.schemas.knowledge import KnowledgeType
+
+    optional_rule_titles = {
+        entry.title
+        for entry in REGISTRY
+        if entry.doc_type == KnowledgeType.RULE and entry.priority != "core"
+    }
+    assert optional_rule_titles == {
+        "Layout Composition",
+        "Animation Patterns",
+        "Educational Storyboarding",
+        "Math Visual Clarity",
+    }
+
+
 def test_registry_has_no_example_entries():
     from app.llm_knowledge.skill_documents import REGISTRY
     from app.schemas.knowledge import KnowledgeType

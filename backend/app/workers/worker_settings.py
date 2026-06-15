@@ -4,7 +4,7 @@ SQS_VISIBILITY_TIMEOUT: int = 900   # must exceed RENDER_TIMEOUT_SECONDS
 SQS_POLLING_INTERVAL: int = 2
 
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
-    "manim", "numpy", "math", "colour", "scipy", "random", "typing",
+    "manim", "numpy", "math", "colour", "scipy", "random", "typing", "enum",
 })
 
 DANGEROUS_BUILTINS: frozenset[str] = frozenset({

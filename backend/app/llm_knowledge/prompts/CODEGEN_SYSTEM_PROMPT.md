@@ -24,7 +24,7 @@ Follow the video plan and code plan exactly:
 - After the main transition, execute every planned action sequentially as
   `self.play_action(target.action(...))`.
 - After all actions, always call `set_bottom_text(...)` with the planned string
-  or `None`, then wait briefly.
+  or `None`, then wait long enough for the completed phase to be read.
 - Do not use lesson-specific `self.play(...)`; `play_action(...)` is the only
   allowed way to play template-owned animations.
 - Use only `Layout.CENTER` and `Layout.SPLIT`.
@@ -38,4 +38,4 @@ the final result. Preserve every claimed mathematical invariant. Keep visuals
 readable and self-contained. Do not use external assets, file I/O, network
 access, subprocesses, dynamic execution, plugins, or environment-specific
 resources. Allowed lesson-body imports are `manim`, `numpy`, `math`, `colour`,
-`scipy`, `random`, and `typing`.
+`scipy`, `random`, `typing`, and `enum`.

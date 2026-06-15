@@ -73,41 +73,21 @@ exact title.
 When candidate documents are available:
 
 - Load only documents relevant to the current scene plan.
-- Prefer foundational documents first: Scenes, Mobject Layout Basics, Layout
-  Composition, LaTeX, Animation Patterns, and Math Visual Clarity.
-- Load specialized documents only when the plan needs them, such as Axes and
-  Graphing, Camera and 3D, Updaters, Matrix Drawing Patterns, or Geometry
-  Shapes and Labels.
-- Treat templates as starting structures, not mandatory formats.
+- Use Layout Composition, Animation Patterns, Educational Storyboarding, and
+  Math Visual Clarity as workflow guidance.
+- Prefer selected templates for topic-specific visual construction.
 - Treat examples as optional references. They show reusable scene helper
   patterns, but examples may be absent and are not required frameworks.
 
 ## Useful Document Topics
 
-Core Manim topics commonly worth retrieving:
+Available workflow topics:
 
-- Scenes and scene lifecycle
-- Mobject Layout Basics
-- Layout Composition
-- Animation Patterns
-- MathTex and LaTeX reliability
-- Text
-- Visual Styling
-
-Educational topics commonly worth retrieving:
-
+- Layout composition
+- Animation patterns
 - Educational storyboarding
 - Math visual clarity
-- Equation transitions
-
-Specialized topics should be retrieved only when needed:
-
-- Axes and Graphing
-- Lines, Arrows, and Labels
-- Geometry Shapes and Labels
-- Matrix Drawing Patterns
-- Camera and 3D
-- Updaters and ValueTracker patterns
+- Topic-specific template contracts
 
 ## Common Pitfalls
 

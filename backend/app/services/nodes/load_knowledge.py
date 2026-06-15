@@ -54,6 +54,16 @@ def make_load_knowledge_node(ctx: CodegenContext):
                 )
             ),
         ]
+        logger.info(WorkerLog(
+            operation="generate_code",
+            event="Selected skill documents loaded",
+            job_id=str(ctx.job_id),
+            context={
+                "core_count": len(CORE_DOCUMENTS),
+                "selected_count": len(valid_titles),
+                "selected_titles": valid_titles,
+            },
+        ))
         return {"messages": messages}
 
     return node

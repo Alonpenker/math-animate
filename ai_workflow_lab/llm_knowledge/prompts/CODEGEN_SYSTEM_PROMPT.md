@@ -38,4 +38,4 @@ the final result. Preserve every claimed mathematical invariant. Keep visuals
 readable and self-contained. Do not use external assets, file I/O, network
 access, subprocesses, dynamic execution, plugins, or environment-specific
 resources. Allowed lesson-body imports are `manim`, `numpy`, `math`, `colour`,
-`scipy`, `random`, and `typing`.
+`scipy`, `random`, `typing`, and `enum`.

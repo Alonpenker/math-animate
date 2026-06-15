@@ -33,7 +33,7 @@ def test_skill_document_registry_paths_ids_and_titles_are_integral():
     assert len(document_ids) == len(set(document_ids))
     assert len(titles) == len(set(titles))
 
-def test_registered_rule_files_cover_rules_directory():
+def test_registered_rule_files_exist_in_rules_directory():
     rule_paths = {
         entry.path
         for entry in REGISTRY
@@ -44,7 +44,7 @@ def test_registered_rule_files_cover_rules_directory():
         for path in (LLMKNOWLEDGE_DIR / "manim_skill/rules").glob("*.md")
     }
 
-    assert actual_rule_paths == rule_paths
+    assert rule_paths == actual_rule_paths
 
 
 def test_registered_rule_files_have_front_matter_except_api_reference():

@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 
 from app.domain.job_state import JobStatus
+from app.services.nodes._assemble import extract_lesson_body
 from app.services.nodes._context import CodegenContext
 from app.utils.logging import Logger, WorkerLog
 from app.workers.worker_helpers import (
@@ -29,7 +30,7 @@ def make_verify_node(ctx: CodegenContext):
         code_path.write_text(state["code"], encoding="utf-8")
 
         try:
-            failure = verify_code(state["code"], code_path)
+            failure = verify_code(extract_lesson_body(state["code"]))
             is_fixable = True
 
             if failure is None:

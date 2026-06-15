@@ -54,6 +54,7 @@ ALLOWED_IMPORTS: frozenset[str] = frozenset({
     "scipy",
     "random",
     "typing",
+    "enum",
 })
 
 VISUAL_KIT_LAYOUT_TEMPLATES: frozenset[str] = frozenset({
@@ -70,6 +71,7 @@ DANGEROUS_BUILTINS: frozenset[str] = frozenset({
 })
 
 BASE_SELECTED_DOCUMENT_TITLES: tuple[str, ...] = (
+    "Layout Composition",
     "Educational Storyboarding",
     "Animation Patterns",
     "Math Visual Clarity",
@@ -82,25 +84,23 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
         (
             "Triangle Template",
             "Pythagorean Area Template",
-            "Geometry Shapes and Labels",
-            "Equation Transitions",
         ),
     ),
     (
         ("derivative", "derivatives", "limit", "limits", "tangent line"),
-        ("Function Graph Template", "Axes and Graphing", "Equation Transitions"),
+        ("Function Graph Template",),
     ),
     (
         ("function", "functions", "graph", "graphs"),
-        ("Function Graph Template", "Axes and Graphing"),
+        ("Function Graph Template",),
     ),
     (
         ("transformation", "transformations", "translation", "translate", "shift"),
-        ("Function Translation Template", "Axes and Graphing"),
+        ("Function Translation Template",),
     ),
     (
         ("matrix", "matrices", "matrix multiplication"),
-        ("Matrix Template", "Matrix Drawing Patterns"),
+        ("Matrix Template",),
     ),
     (
         (
@@ -111,7 +111,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "linear transformation",
             "linear algebra",
         ),
-        ("Linear Transformation Template", "Matrix Template", "Axes and Graphing"),
+        ("Linear Transformation Template", "Matrix Template"),
     ),
     (
         (
@@ -124,7 +124,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "dot product",
             "projection",
         ),
-        ("Vector Template", "Axes and Graphing", "Lines, Arrows, and Labels"),
+        ("Vector Template",),
     ),
     (
         (
@@ -140,7 +140,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "percent",
             "percentage",
         ),
-        ("Fraction Model Template", "Equation Transitions"),
+        ("Fraction Model Template",),
     ),
     (
         (
@@ -156,7 +156,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "triangle area",
             "angle sum",
         ),
-        ("Triangle Template", "Geometry Shapes and Labels", "Lines, Arrows, and Labels"),
+        ("Triangle Template",),
     ),
     (
         (
@@ -168,12 +168,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "reference angle",
             "quadrant",
         ),
-        (
-            "Unit Circle Template",
-            "Axes and Graphing",
-            "Geometry Shapes and Labels",
-            "Lines, Arrows, and Labels",
-        ),
+        ("Unit Circle Template",),
     ),
     (
         (
@@ -185,14 +180,7 @@ STATIC_DOCUMENT_SELECTION_PROFILES: tuple[tuple[tuple[str, ...], tuple[str, ...]
             "interval",
             "absolute value",
         ),
-        ("Number Line Template", "Lines, Arrows, and Labels"),
-    ),
-    (
-        ("circle", "external tangent", "tangent construction", "construction", "compass"),
-        (
-            "Geometry Shapes and Labels",
-            "Lines, Arrows, and Labels",
-        ),
+        ("Number Line Template",),
     ),
 )
 

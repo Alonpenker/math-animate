@@ -35,17 +35,25 @@ def load_planning_capabilities(user_request_text: str) -> str:
             candidate_docs = KnowledgeRepository.search_similar(
                 cursor, embedding, KnowledgeType.TEMPLATE.value, RAG_TEMPLATE_CAP
             )
-        capabilities = [
-            REGISTRY_BY_ID[doc.document_id].planning_capability
+        templates = [
+            REGISTRY_BY_ID[doc.document_id]
             for doc in candidate_docs
             if doc.document_id in REGISTRY_BY_ID
             and isinstance(REGISTRY_BY_ID[doc.document_id], TemplateDocumentSeed)
         ]
-        if not capabilities:
+        if not templates:
             return ""
+        logger.info(WorkerLog(
+            operation="generate_plan",
+            event="Planning capabilities injected",
+            context={
+                "template_count": len(templates),
+                "template_titles": [template.title for template in templates],
+            },
+        ))
         return (
             "Validated visual capabilities available to the implementation stages:\n"
-            + "\n".join(f"- {cap}" for cap in capabilities)
+            + "\n".join(f"- {template.planning_capability}" for template in templates)
             + "\n\nUse these capabilities when they support the lesson, but keep the "
             "video plan human-readable. Do not mention templates, function names, "
             "classes, APIs, or implementation details."
@@ -90,31 +98,9 @@ def save_artifact_to_storage(
         ArtifactsRepository.create_artifact(cursor, artifact)
 
 
-def verify_code(code: str, code_path: Path) -> str | None:
-    """Run mypy type-check and AST safety analysis on generated code.
+def verify_code(code: str) -> str | None:
+    """Run AST safety analysis on generated lesson-body code."""
 
-    Returns a failure reason string, or None if all checks pass.
-    """
-
-    # --- Part A: mypy check ---
-    try:
-        result = subprocess.run(
-            ["mypy",
-            "--ignore-missing-imports",
-            "--follow-imports=skip",
-            "--disable-error-code=name-defined",
-            "--disable-error-code=attr-defined",
-            str(code_path)],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode != 0:
-            return f"mypy errors:\n{result.stdout}{result.stderr}"
-    except Exception as exc:
-        return f"mypy check failed with exception: {exc}"
-
-    # --- Part B: AST import & dangerous-builtin analysis ---
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:

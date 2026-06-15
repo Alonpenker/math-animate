@@ -50,6 +50,8 @@ def test_retrieve_calls_search_similar_with_correct_caps_per_doc_type(
         (KnowledgeType.RULE.value, RAG_RULE_CAP),
         (KnowledgeType.TEMPLATE.value, RAG_TEMPLATE_CAP),
     ]
+    assert RAG_RULE_CAP == 4
+    assert RAG_TEMPLATE_CAP == 7
 
 
 def test_retrieve_returns_candidate_result_with_search_results(
