@@ -11,7 +11,7 @@ from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.services.nodes._assemble import assemble_file
 from app.services.nodes._context import CodegenContext
-from app.services.openrouter_service import CallType, OpenRouterService
+from app.services.openrouter_service import CallType, OpenRouterService, OpenRouterTokenUsage
 from app.utils.logging import Logger, WorkerLog
 
 logger = Logger.get_logger("worker")
@@ -62,7 +62,7 @@ def make_codegen_node(ctx: CodegenContext):
     return node
 
 
-def _extract_code(response, usage) -> str:
+def _extract_code(response, usage: OpenRouterTokenUsage) -> str:
     content = response.content
     if isinstance(content, list):
         text_parts = [
@@ -86,4 +86,9 @@ def _extract_code(response, usage) -> str:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         stripped = "\n".join(lines).strip()
+    if not stripped:
+        message = "LLM output validation failed: response did not contain code."
+        if usage.reasoning_tokens > 0 and usage.reasoning_tokens >= usage.output_tokens:
+            message = "LLM output validation failed: provider returned reasoning tokens but no assistant code."
+        raise LLMUsageException(message, total_tokens=usage.total_tokens)
     return stripped

@@ -56,7 +56,11 @@ After the main transition, execute planned actions sequentially:
 self.play_action(template.safe_action(...))
 ```
 
-`play_action(...)` is the only allowed way for lesson code to play
-template-owned animations. Call `set_bottom_text()` for every subscene; passing
+In this general pattern, replace `template` with the planned local template
+instance name and replace `safe_action` with the exact public action method
+named by the code plan. Call that method on the template instance and pass its
+returned animation to `play_action(...)`; `play_action(...)` is the only allowed
+way for lesson code to play template-owned animations. Call `set_bottom_text()`
+for every subscene; passing
 `None` fades out and clears previous bottom text. Generated lesson code must not
 call `self.play(...)` directly.

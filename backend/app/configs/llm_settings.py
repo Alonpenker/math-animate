@@ -11,9 +11,11 @@ LLM_CODE_PLAN_OUTPUT_MAX_TOKENS = 8_000
 LLM_CODEGEN_OUTPUT_MAX_TOKENS = 16_000
 
 class OPENROUTER_MODELS(StrEnum):
-    PLAN_MODEL = "openrouter/owl-alpha"
+    PLAN_MODEL = "google/gemma-4-31b-it"
     CODING_MODEL = "openai/gpt-oss-120b:free"
-    CODE_PLAN_MODEL = "openrouter/owl-alpha"
+    CODE_PLAN_MODEL = "google/gemma-4-31b-it"
+    BETTER_PLAN_MODEL = "google/gemma-4-31b-it"
+    BAD_PLAN_MODEL = "openrouter/owl-alpha"
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_DAILY_CALL_LIMIT = 200
@@ -44,4 +46,4 @@ LLM_EMBEDDING_DIMENSIONS = 768
 
 RAG_MAX_EMBED_CHARS = 4_000
 RAG_RULE_CAP = 4
-RAG_TEMPLATE_CAP = 7
+RAG_TEMPLATE_CAP = 4

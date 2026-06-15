@@ -30,7 +30,11 @@ def make_verify_node(ctx: CodegenContext):
         code_path.write_text(state["code"], encoding="utf-8")
 
         try:
-            failure = verify_code(extract_lesson_body(state["code"]))
+            lesson_body = extract_lesson_body(state["code"])
+            failure = verify_code(
+                lesson_body,
+                expected_scene_count=len(state["plan"].scenes),
+            )
             is_fixable = True
 
             if failure is None:

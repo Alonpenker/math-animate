@@ -35,7 +35,7 @@ def load_planning_capabilities(user_request_text: str) -> str:
             candidate_docs = KnowledgeRepository.search_similar(
                 cursor, embedding, KnowledgeType.TEMPLATE.value, RAG_TEMPLATE_CAP
             )
-        templates = [
+        templates= [
             REGISTRY_BY_ID[doc.document_id]
             for doc in candidate_docs
             if doc.document_id in REGISTRY_BY_ID
@@ -98,13 +98,28 @@ def save_artifact_to_storage(
         ArtifactsRepository.create_artifact(cursor, artifact)
 
 
-def verify_code(code: str) -> str | None:
+def verify_code(
+    code: str,
+    expected_scene_count: int | None = None,
+) -> str | None:
     """Run AST safety analysis on generated lesson-body code."""
 
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
         return f"AST parse syntax error: {exc}"
+
+    if expected_scene_count is not None:
+        class_names = {
+            node.name for node in tree.body if isinstance(node, ast.ClassDef)
+        }
+        missing_scenes = [
+            f"Scene{number}"
+            for number in range(1, expected_scene_count + 1)
+            if f"Scene{number}" not in class_names
+        ]
+        if missing_scenes:
+            return f"Missing expected scene classes: {missing_scenes}."
 
     forbidden_imports: list[str] = []
     dangerous_calls: list[str] = []
