@@ -16,7 +16,7 @@ class OPENROUTER_MODELS(StrEnum):
     CODE_PLAN_MODEL = "openrouter/owl-alpha"
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_DAILY_CALL_LIMIT = 50
+OPENROUTER_DAILY_CALL_LIMIT = 200
 
 class LLM_REASONING_EFFORT(StrEnum):
     NONE = "none"
