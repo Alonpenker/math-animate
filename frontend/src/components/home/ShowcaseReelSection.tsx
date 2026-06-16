@@ -1,0 +1,125 @@
+import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+
+interface ShowcaseClip {
+  id: string;
+  title: string;
+  voiceNotes: string;
+  videoPath: string;
+}
+
+const showcaseClips: ShowcaseClip[] = [
+  {
+    id: 'pythagorean-theorem',
+    title: 'The Pythagorean Theorem',
+    voiceNotes:
+      "Many people think of the Pythagorean theorem as just a formula to memorize. But it's actually a statement about area. Imagine building a square on each side of a right triangle. The area of the square on side 'a' is a-squared, and on side 'b', it's b-squared. The theorem tells us that the combined area of these two smaller squares exactly equals the area of the large square on the hypotenuse, c-squared.",
+    videoPath: '/showcase/pythagorean-theorem.mp4',
+  },
+  {
+    id: 'unit-circle',
+    title: 'The Unit Circle',
+    voiceNotes:
+      "Let's start with the unit circle, where the radius is always one. When we move the radius to 30 degrees, we can drop a perpendicular line to create a right triangle. Using basic trigonometry, since the hypotenuse is one, the opposite side is simply the sine of the angle and the adjacent side is the cosine. Notice how these lengths correspond exactly to the x and y coordinates of the point on the circle.",
+    videoPath: '/showcase/unit-circle.mp4',
+  },
+  {
+    id: 'slope-of-a-curve',
+    title: 'Slope of a Curve',
+    voiceNotes:
+      'To understand the slope of a curve, we start with a secant line. By picking two points, P and Q, we can calculate the average rate of change between them. This is simply the rise over the run—the change in y divided by the change in x. As we move point Q, we can see how this average slope fluctuates depending on the interval we choose.',
+    videoPath: '/showcase/slope-of-a-curve.mp4',
+  },
+];
+
+interface ShowcaseClipTileProps {
+  clip: ShowcaseClip;
+  layout: 'video-left' | 'video-right';
+}
+
+function ShowcaseClipTile({ clip, layout }: ShowcaseClipTileProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.45 }
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
+  const videoEl = !hasError && (
+    <div className="w-full md:w-1/2 shrink-0 rounded-xl overflow-hidden bg-black">
+      <video
+        ref={videoRef}
+        src={clip.videoPath}
+        muted
+        loop
+        playsInline
+        autoPlay
+        onError={() => setHasError(true)}
+        className="w-full h-full object-contain"
+      />
+    </div>
+  );
+
+  const textEl = (
+    <div className="w-full md:w-1/2 flex flex-col justify-center gap-4 py-4">
+      <h3 className="text-2xl font-semibold text-off-white">{clip.title}</h3>
+      <p className="text-off-white/70 leading-relaxed text-sm md:text-base italic">&ldquo;{clip.voiceNotes}&rdquo;</p>
+    </div>
+  );
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/5 p-8">
+        <h3 className="text-2xl font-semibold text-off-white">{clip.title}</h3>
+        <p className="text-off-white/70 leading-relaxed">{clip.voiceNotes}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col gap-8 md:flex-row md:gap-12 md:items-center ${layout === 'video-right' ? 'md:flex-row-reverse' : ''}`}>
+      {videoEl}
+      {textEl}
+    </div>
+  );
+}
+
+export function ShowcaseReelSection() {
+  return (
+    <section className="px-4 py-20">
+      <div className="mx-auto max-w-5xl flex flex-col gap-20">
+        <motion.h2
+          className="mb-4 text-center text-3xl md:text-4xl text-off-white"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          See It In Action
+        </motion.h2>
+        {showcaseClips.map((clip, i) => (
+          <ShowcaseClipTile
+            key={clip.id}
+            clip={clip}
+            layout={i % 2 === 0 ? 'video-left' : 'video-right'}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
