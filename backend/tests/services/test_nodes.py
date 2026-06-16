@@ -138,6 +138,7 @@ def test_verify_node_checks_lesson_body_then_dry_runs_assembled_code(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
     ctx: CodegenContext,
+    sample_video_plan: VideoPlan,
 ):
     import app.services.nodes._context as ctx_module
     import app.services.nodes.verify as verify_module
@@ -153,7 +154,9 @@ def test_verify_node_checks_lesson_body_then_dry_runs_assembled_code(
     monkeypatch.setattr(
         verify_module,
         "verify_code",
-        lambda code: static_inputs.append(code) or None,
+        lambda code, expected_scene_count=None: (
+            static_inputs.append((code, expected_scene_count)) or None
+        ),
     )
 
     def fake_dry_run(code_path, media_dir):
@@ -166,9 +169,10 @@ def test_verify_node_checks_lesson_body_then_dry_runs_assembled_code(
     result = verify_module.make_verify_node(ctx)({
         "code": assembled,
         "fix_attempt": 0,
+        "plan": sample_video_plan,
     })
 
-    assert static_inputs == [lesson_body]
+    assert static_inputs == [(lesson_body, 1)]
     assert dry_run_inputs == [assembled]
     assert result["verification_failure"] == ""
 
