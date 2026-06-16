@@ -123,7 +123,13 @@ def approve_plan(request: Request, job_id: UUID, approved: bool, redis_client=De
         job = Job(job_id=job_id, status=JobStatus.APPROVED)
         JobsRepository.update_job_status(redis_client, job_id, JobStatus.APPROVED)
         JobRequestsRepository.update_status(cursor, job_id, JobStatus.APPROVED)
-        job_request = JobPlanRequest(job=job, plan=plan.plan)
+        user_request = JobRequestsRepository.get_user_request(cursor, job_id)
+        if user_request is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User request not found for this job. (job_id={job_id})",
+            )
+        job_request = JobPlanRequest(job=job, plan=plan.plan, user_request=user_request)
         WorkerRunner.advance(job_request)
         logger.info(APILog(
             operation="approve_job",

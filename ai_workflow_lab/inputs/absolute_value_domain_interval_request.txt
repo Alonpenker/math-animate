@@ -1,0 +1,21 @@
+Topic: Solving an absolute value inequality with a domain restriction
+
+Misconceptions:
+- Students may split |x - 1| < 3 into only one inequality instead of a compound inequality.
+- Students may forget that a denominator restriction can remove a point from an otherwise valid interval.
+- Students may mark every endpoint as closed just because the interval is shaded.
+
+Constraints:
+- First reveal the distance interpretation on a number line before writing the compound inequality.
+- Show how |x - 1| < 3 creates the open interval from -2 to 4.
+- Then introduce the expression (x + 2) / (x - 2) and remove x = 2 from the solution set as a hole, not as a new endpoint of the distance interval.
+- End with both interval notation and a number line visualization with two open circles and one excluded point.
+- Use no more than two short equations visible at once.
+
+Examples:
+- |x - 1| < 3
+- -2 < x < 4
+- x != 2
+- (-2, 2) union (2, 4)
+
+Number of scenes: 3

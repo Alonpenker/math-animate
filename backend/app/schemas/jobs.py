@@ -18,6 +18,7 @@ class JobUserRequest(JobRequest):
     
 class JobPlanRequest(JobRequest):
     plan: VideoPlan
+    user_request: UserRequest
 
 class JobFixAttemptRequest(JobRequest):
     fix_attempt: int = Field(default=0, ge=0)

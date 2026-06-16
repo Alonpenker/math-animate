@@ -1,0 +1,18 @@
+Topic: Horizontal and vertical translations of quadratic functions
+
+Misconceptions:
+- Students may think subtracting 2 inside the function moves the graph left.
+- Students may confuse changes inside the function with vertical movement.
+
+Constraints:
+- Make the graph and its vertex visibly move while the axes remain fixed.
+- Teach the horizontal translation before the vertical translation.
+- Keep the parent graph available as a reference when useful.
+- Use minimal on-screen text.
+
+Examples:
+- y = x^2
+- y = (x - 2)^2
+- y = (x - 2)^2 + 1
+
+Number of scenes: 2

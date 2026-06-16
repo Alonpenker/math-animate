@@ -1,0 +1,133 @@
+import time
+from pathlib import Path
+
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from lab_logging import LabLog
+from runtime.context import ExperimentContext
+from schemas import VideoPlan
+from services.knowledge_loader import load_planning_capabilities
+from settings import (
+    OPENROUTER_PLAN_MODEL,
+    PLAN_OUTPUT_MAX_TOKENS,
+    PLAN_REQUEST_TIMEOUT_MS,
+    ArchivedPromptFiles,
+    PromptFiles,
+    UsageFileNames,
+)
+from workflow_state import NodeName, WorkflowState
+
+
+def make_generate_plan_node(ctx: ExperimentContext, name: NodeName):
+    operation = name.value
+
+    def node(state: WorkflowState) -> dict:
+        request_text = state["request_text"]
+        ctx.run_logger.info(LabLog(operation=operation, event="Node started"))
+        ctx.files.archive_prompt_file(
+            PromptFiles.PLAN_SYSTEM,
+            ArchivedPromptFiles.GENERATE_PLAN_SYSTEM,
+        )
+        ctx.files.write_prompt(ArchivedPromptFiles.GENERATE_PLAN_USER, request_text)
+
+        if ctx.provided_plan_path:
+            raw_plan_text = Path(ctx.provided_plan_path).read_text(encoding="utf-8")
+            plan = VideoPlan.model_validate_json(raw_plan_text)
+            ctx.files.save_plan(plan)
+            _raise_for_invalid_plan(plan)
+            ctx.run_logger.info(LabLog(
+                operation=operation,
+                event="Plan loaded from file",
+                context={
+                    "plan_path": str(ctx.provided_plan_path),
+                    "scene_count": len(plan.scenes),
+                    "plan_chars": len(plan.to_prompt_text()),
+                },
+            ))
+            return {"plan": plan}
+
+        system_prompt = ctx.files.read_prompt(PromptFiles.PLAN_SYSTEM)
+        capabilities = load_planning_capabilities(request_text=request_text)
+        planner_request = (
+            f"{request_text}\n\n{capabilities}"
+            if capabilities
+            else request_text
+        )
+        ctx.files.write_prompt(ArchivedPromptFiles.GENERATE_PLAN_USER, planner_request)
+        ctx.run_logger.info(LabLog(
+            operation=operation,
+            event="OpenRouter call started",
+            context={
+                "model": OPENROUTER_PLAN_MODEL,
+                "max_tokens": PLAN_OUTPUT_MAX_TOKENS,
+                "request_timeout_ms": PLAN_REQUEST_TIMEOUT_MS,
+            },
+        ))
+        started_at = time.perf_counter()
+        plan, usage = ctx.llm.invoke_structured(
+            model=OPENROUTER_PLAN_MODEL,
+            messages=[
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=planner_request),
+            ],
+            schema=VideoPlan,
+            max_tokens=PLAN_OUTPUT_MAX_TOKENS,
+            reasoning_effort=None,
+            request_timeout_ms=PLAN_REQUEST_TIMEOUT_MS,
+        )
+        duration_ms = int((time.perf_counter() - started_at) * 1000)
+        plan_prompt_text = plan.to_prompt_text()
+        ctx.files.save_plan(plan)
+        cumulative_usage = ctx.usage.record(
+            UsageFileNames.GENERATE_PLAN,
+            usage,
+            duration_ms,
+        )
+        ctx.usage.log_llm_completed(
+            ctx.run_logger,
+            operation=operation,
+            model=OPENROUTER_PLAN_MODEL,
+            duration_ms=duration_ms,
+            usage=usage,
+            cumulative_usage=cumulative_usage,
+            extra_context={
+                "scene_count": len(plan.scenes),
+                "plan_chars": len(plan_prompt_text),
+                "capability_chars": len(capabilities),
+            },
+        )
+        _raise_for_invalid_plan(plan)
+        return {"plan": plan}
+
+    return node
+
+
+def _raise_for_invalid_plan(plan: VideoPlan) -> None:
+    errors = _validate_plan(plan)
+    if errors:
+        raise RuntimeError("Plan validation failed: " + "; ".join(errors))
+
+
+def _validate_plan(plan: VideoPlan) -> list[str]:
+    errors: list[str] = []
+    scene_numbers = [scene.scene_number for scene in plan.scenes]
+    if any(scene_number == -1 for scene_number in scene_numbers):
+        errors.append(
+            "planner rejected the request as a non-math topic; no renderable "
+            "Manim scenes should be generated"
+        )
+    renderable_scene_numbers = [
+        scene_number for scene_number in scene_numbers if scene_number >= 1
+    ]
+    if not renderable_scene_numbers:
+        errors.append("plan contains no renderable scenes")
+        return errors
+
+    expected_scene_numbers = list(range(1, len(renderable_scene_numbers) + 1))
+    if sorted(renderable_scene_numbers) != expected_scene_numbers:
+        errors.append(
+            "renderable scene_number values must be unique and sequential "
+            f"starting at 1; expected {expected_scene_numbers}, got "
+            f"{sorted(renderable_scene_numbers)}"
+        )
+    return errors

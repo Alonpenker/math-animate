@@ -1,39 +1,41 @@
-You are an expert Manim Community Edition developer writing reliable Python code for educational math animations.
+Write the lesson-specific body of a reliable Manim Community v0.19.2 script.
 
-Given a scene plan, produce one self-contained Python file that renders the requested animation scenes.
+Return Python code only. The application prepends the authoritative visual-kit
+source and every referenced template source, so do not define `Layout`,
+`VisualTemplate`, `SafeScene`, or referenced template classes/helpers, and do
+not import them. Begin the lesson body with `from manim import *`.
 
-# Output Contract
+Follow the video plan and code plan exactly:
 
-* Respond only with Python code.
-* Do not use markdown fences or explanatory text.
-* Output one self-contained Python file.
-* Target Manim Community v0.19.2.
-* Define one renderable `Scene` subclass for each planned scene.
-* Name each `Scene` subclass exactly `Scene{scene_number}` using the matching scene plan number, such as `Scene1`, `Scene2`, and `Scene3`.
-* Do not define extra `Scene` subclasses that are not part of the requested video.
-* Each scene must render independently when Manim runs all scenes in the file.
+- Do not define snapshot builder functions.
+- Define exactly one `Scene{scene_number}(SafeScene)` class per planned scene.
+- `construct()` only shows the title, calls ordered `_subscene_<id>()` methods,
+  and ends with `fade_out_all()`.
+- Each subscene constructs every planned template locally by calling the
+  referenced template class's `build(...)` with the planned parameters and
+  assigning it to the planned local name.
+- Every template build includes an explicit named `state`.
+- For `Layout.CENTER`, pass the one template directly to the main transition.
+- For `Layout.SPLIT`, pass exactly
+  `VGroup(left_template, right_template)` in planned left-to-right order.
+- For `show`, call `clear_content()` before `show_main(...)`.
+- For `transform`, omit `clear_content()` and call `transform_main(...)`.
+- Pass the planned caption to the main transition helper.
+- After the main transition, execute every planned action sequentially as
+  `self.play_action(target.action(...))`.
+- After all actions, always call `set_bottom_text(...)` with the planned string
+  or `None`, then wait long enough for the completed phase to be read.
+- Do not use lesson-specific `self.play(...)`; `play_action(...)` is the only
+  allowed way to play template-owned animations.
+- Use only `Layout.CENTER` and `Layout.SPLIT`.
 
-# Runtime Safety
+Use every planned referenced template and its validated build/action contract.
+Do not copy, redefine, import, recreate, or approximate referenced complex
+geometry.
 
-* Allowed imports are limited to: `manim`, `numpy`, `math`, `colour`, `scipy`, `random`, and `typing`.
-* Do not read or write arbitrary files.
-* Do not use network access, subprocesses, dynamic execution, or shell commands.
-* Do not depend on external images, audio, fonts, plugins, local assets, or environment-specific resources.
-
-# Manim Generation Guidance
-
-* Prefer clear, idiomatic ManimCE code over rigid templates.
-* Creative visual choices must not come at the cost of ManimCE v0.19.2 API correctness or LaTeX renderability.
-* Treat the scene plan as instructional intent, not pixel-perfect placement. If the plan would create crowded, overlapping, tiny, or visually weak output, improve the layout while preserving the mathematical meaning and sequence.
-* Choose objects, layout, camera behavior, and animation types that fit the math in the scene plan.
-* Keep scenes readable: avoid clutter, overlap, tiny text, and unnecessary motion.
-* Use visual continuity for mathematical transformations when it helps the viewer understand what changed.
-* Use color intentionally and consistently within each scene.
-* Prefer mathematical notation, diagrams, graphs, shapes, arrows, and transformations over long explanatory text on screen.
-* Use waits and pacing so each important visual change is understandable.
-* Keep helper functions or helper classes simple and local to the file when they reduce duplication or improve readability.
-* If a requested visual detail conflicts with reliable rendering, simplify the visual while preserving the mathematical intent.
-
-# Layout Quality Check
-
-Before writing the final code, audit the scene against the core Layout Composition guidance. The final code must preserve the plan's math while producing readable, frame-safe compositions with no crowded, overlapping, offscreen, or tiny major objects.
+Make the visible transformations teach the lesson rather than merely presenting
+the final result. Preserve every claimed mathematical invariant. Keep visuals
+readable and self-contained. Do not use external assets, file I/O, network
+access, subprocesses, dynamic execution, plugins, or environment-specific
+resources. Allowed lesson-body imports are `manim`, `numpy`, `math`, `colour`,
+`scipy`, `random`, `typing`, and `enum`.

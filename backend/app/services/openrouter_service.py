@@ -32,6 +32,7 @@ StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
 
 class CallType(StrEnum):
     PLAN = "plan"
+    CODE_PLAN = "code_plan"
     CODEGEN = "codegen"
     DOCUMENT_SELECTION = "document_selection"
     FIX = "fix"

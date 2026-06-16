@@ -1,0 +1,21 @@
+Topic: Displacement from signed area under a velocity-time graph
+
+Misconceptions:
+- Students may count total shaded area as displacement even when velocity is negative.
+- Students may think crossing the time axis means the object stops permanently.
+- Students may confuse speed, velocity, distance traveled, and displacement.
+
+Constraints:
+- Use a velocity-time graph with one region above the axis and one region below the axis.
+- Shade positive area and negative area in different colors, then combine them to show net displacement.
+- Make clear that the graph is not a position-time graph by showing a small moving object whose position changes according to the signed areas.
+- Include a brief comparison between total distance traveled and net displacement.
+- Avoid calculus notation until the final summary, and keep the lesson accessible for a first introduction to area under a graph.
+
+Examples:
+- v(t) = 2 from t = 0 to 3
+- v(t) = -1 from t = 3 to 7
+- displacement = 6 - 4 = 2
+- distance traveled = 6 + 4 = 10
+
+Number of scenes: 3
