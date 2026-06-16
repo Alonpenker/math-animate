@@ -60,23 +60,33 @@ class VectorTemplate(VisualTemplate):
 
         self.vector_groups = {
             "a": self._vector_bundle((0, 0), self.vector_a, vector_a_label, TEAL_B),
-            "b": VGroup(VectorizedPoint()),
-            "result": VGroup(VectorizedPoint()),
-            "projection": VGroup(VectorizedPoint()),
+            "b": VGroup(),
+            "result": VGroup(),
+            "projection": VGroup(),
         }
         self.components = self._components_bundle(self.vector_a)
-        self.detail = VGroup(VectorizedPoint())
+        self.detail = VGroup()
         self._configure_state(state)
         boundary = Rectangle(width=9.6, height=6).move_to(self.axes).set_opacity(0)
-        super().__init__(
+        template_parts = [
             axes_group,
             self.vector_groups["a"],
-            self.vector_groups["b"],
-            self.vector_groups["result"],
-            self.vector_groups["projection"],
-            self.components,
-            self.detail,
-            boundary,
+        ]
+        template_parts.extend(
+            group
+            for group in (
+                self.vector_groups["b"],
+                self.vector_groups["result"],
+                self.vector_groups["projection"],
+            )
+            if group.submobjects
+        )
+        template_parts.append(self.components)
+        if self.detail.submobjects:
+            template_parts.append(self.detail)
+        template_parts.append(boundary)
+        super().__init__(
+            *template_parts,
             state=state,
         )
 
@@ -118,6 +128,8 @@ class VectorTemplate(VisualTemplate):
         if role not in self.vector_groups:
             raise ValueError("vector role must be a, b, result, or projection")
         target = self.vector_groups[role]
+        if not target.submobjects:
+            raise ValueError(f"{role} vector is not visible in this state")
         if target.width < 1e-9 and target.height < 1e-9:
             raise ValueError(f"{role} vector is not visible in this state")
         return Circumscribe(target, color=YELLOW, buff=0.12, fade_out=True)
