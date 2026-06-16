@@ -1,0 +1,20 @@
+Topic: Eigenvectors of a 2D matrix as directions that do not turn
+
+Misconceptions:
+- Students may think multiplying by a matrix only changes vector length, not direction.
+- Students may think every vector that gets longer is an eigenvector.
+- Students may confuse an eigenvalue with the final coordinates of the transformed vector.
+
+Constraints:
+- Start with the matrix as a rule that transforms the whole plane, not as a row-by-column multiplication exercise.
+- Show several arrows from the origin under the same transformation, then contrast a turning vector with a vector that stays on its original line.
+- Include a lightly drawn unit square or grid cell deforming into a parallelogram to make the plane transformation visible.
+- Derive one eigenvector visually before showing the algebraic check.
+- Use minimal on-screen text and keep the notation suitable for an introductory linear algebra lesson.
+
+Examples:
+- A = [[2, 1], [1, 2]]
+- v = [1, 1] becomes [3, 3]
+- w = [1, 0] becomes [2, 1]
+
+Number of scenes: 3

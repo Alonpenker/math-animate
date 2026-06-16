@@ -33,7 +33,7 @@ def test_skill_document_registry_paths_ids_and_titles_are_integral():
     assert len(document_ids) == len(set(document_ids))
     assert len(titles) == len(set(titles))
 
-def test_registered_rule_files_have_front_matter_and_cover_rules_directory():
+def test_registered_rule_files_exist_in_rules_directory():
     rule_paths = {
         entry.path
         for entry in REGISTRY
@@ -44,11 +44,24 @@ def test_registered_rule_files_have_front_matter_and_cover_rules_directory():
         for path in (LLMKNOWLEDGE_DIR / "manim_skill/rules").glob("*.md")
     }
 
-    assert actual_rule_paths == rule_paths
+    assert rule_paths == actual_rule_paths
 
+
+def test_registered_rule_files_have_front_matter_except_api_reference():
+    NO_FRONT_MATTER_EXCEPTIONS = {"manim_skill/rules/visual-kit-api.md"}
+
+    rule_paths = {
+        entry.path
+        for entry in REGISTRY
+        if entry.doc_type == KnowledgeType.RULE
+    }
     for path in rule_paths:
+        if path in NO_FRONT_MATTER_EXCEPTIONS:
+            continue
         content = (LLMKNOWLEDGE_DIR / path).read_text(encoding="utf-8")
-        assert content.splitlines()[0] == "---"
+        assert content.splitlines()[0] == "---", (
+            f"{path!r} is missing front-matter (first line must be '---')"
+        )
 
 def test_knowledge_type_enum_has_exactly_four_values():
     values = {member.value for member in KnowledgeType}

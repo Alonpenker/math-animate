@@ -7,19 +7,63 @@ import shutil
 import re
 
 from app.configs.app_settings import settings
+from app.configs.llm_settings import RAG_TEMPLATE_CAP
 from app.dependencies.db import get_worker_cursor
 from app.dependencies.redis_client import get_worker_redis
 from app.dependencies.storage import get_storage_client
 from app.domain.job_state import JobStatus, require_transition
+from app.llm_knowledge.skill_documents import REGISTRY_BY_ID
 from app.repositories.jobs_repository import JobsRepository
 from app.repositories.job_requests_repository import JobRequestsRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.artifact import Artifact, ArtifactType
+from app.schemas.knowledge import TemplateDocumentSeed
 from app.services.files_storage_service import FilesStorageService
+from app.services.rag_service import RAGService
 from app.workers.worker_settings import ALLOWED_IMPORTS, DANGEROUS_BUILTINS, DRY_RUN_TIMEOUT_SECONDS, PathNames, DockerCommands
 from app.utils.logging import Logger, WorkerLog, WorkerOperation
 
 logger = Logger.get_logger("worker")
+
+
+def load_planning_capabilities(user_request_text: str) -> str:
+    try:
+        embedding = RAGService.embed_text(user_request_text)
+        with get_worker_cursor() as cursor:
+            from app.repositories.knowledge_repository import KnowledgeRepository
+            from app.schemas.knowledge import KnowledgeType
+            candidate_docs = KnowledgeRepository.search_similar(
+                cursor, embedding, KnowledgeType.TEMPLATE.value, RAG_TEMPLATE_CAP
+            )
+        templates= [
+            REGISTRY_BY_ID[doc.document_id]
+            for doc in candidate_docs
+            if doc.document_id in REGISTRY_BY_ID
+            and isinstance(REGISTRY_BY_ID[doc.document_id], TemplateDocumentSeed)
+        ]
+        if not templates:
+            return ""
+        logger.info(WorkerLog(
+            operation="generate_plan",
+            event="Planning capabilities injected",
+            context={
+                "template_count": len(templates),
+                "template_titles": [template.title for template in templates],
+            },
+        ))
+        return (
+            "Validated visual capabilities available to the implementation stages:\n"
+            + "\n".join(f"- {template.planning_capability}" for template in templates)
+            + "\n\nUse these capabilities when they support the lesson, but keep the "
+            "video plan human-readable. Do not mention templates, function names, "
+            "classes, APIs, or implementation details."
+        )
+    except Exception:
+        logger.warning(WorkerLog(
+            operation="generate_plan",
+            event="Failed to load planning capabilities; continuing without them",
+        ), exc_info=True)
+        return ""
 
 
 def transition_job(job_id, from_status: JobStatus, to_status: JobStatus) -> None:
@@ -54,35 +98,28 @@ def save_artifact_to_storage(
         ArtifactsRepository.create_artifact(cursor, artifact)
 
 
-def verify_code(code: str, code_path: Path) -> str | None:
-    """Run mypy type-check and AST safety analysis on generated code.
+def verify_code(
+    code: str,
+    expected_scene_count: int | None = None,
+) -> str | None:
+    """Run AST safety analysis on generated lesson-body code."""
 
-    Returns a failure reason string, or None if all checks pass.
-    """
-
-    # --- Part A: mypy check ---
-    try:
-        result = subprocess.run(
-            ["mypy",
-            "--ignore-missing-imports",
-            "--follow-imports=skip",
-            "--disable-error-code=name-defined",
-            "--disable-error-code=attr-defined",
-            str(code_path)],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode != 0:
-            return f"mypy errors:\n{result.stdout}{result.stderr}"
-    except Exception as exc:
-        return f"mypy check failed with exception: {exc}"
-
-    # --- Part B: AST import & dangerous-builtin analysis ---
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
         return f"AST parse syntax error: {exc}"
+
+    if expected_scene_count is not None:
+        class_names = {
+            node.name for node in tree.body if isinstance(node, ast.ClassDef)
+        }
+        missing_scenes = [
+            f"Scene{number}"
+            for number in range(1, expected_scene_count + 1)
+            if f"Scene{number}" not in class_names
+        ]
+        if missing_scenes:
+            return f"Missing expected scene classes: {missing_scenes}."
 
     forbidden_imports: list[str] = []
     dangerous_calls: list[str] = []

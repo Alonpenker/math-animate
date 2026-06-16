@@ -12,15 +12,6 @@ from app.schemas.artifact import Artifact, ArtifactType
 from app.schemas.jobs import Job, JobCodeRequest, JobFixRequest, JobPlanRequest, JobRequest, JobUserRequest
 from app.schemas.plan import Plan
 
-def _patch_mypy_pass(monkeypatch):
-    from app.workers import worker_helpers
-
-    monkeypatch.setattr(
-        worker_helpers.subprocess,
-        "run",
-        lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(cmd, 0, "", ""),
-    )
-
 def _setup_dry_run_env(monkeypatch, tmp_path):
     from app.workers import worker_helpers
 
@@ -38,10 +29,9 @@ def _setup_dry_run_env(monkeypatch, tmp_path):
 
     return code_path, media_dir
 
-def test_verify_code_passes_valid_manim_code(monkeypatch):
+def test_verify_code_passes_valid_manim_code():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = (
         "from manim import *\n\n"
         "class Scene1(Scene):\n"
@@ -50,125 +40,131 @@ def test_verify_code_passes_valid_manim_code(monkeypatch):
     )
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is None
 
-def test_verify_code_fails_when_mypy_reports_errors(monkeypatch):
-    # Given
-    from app.workers import worker_helpers
-    from app.workers.worker_helpers import verify_code
-
-    monkeypatch.setattr(
-        worker_helpers.subprocess,
-        "run",
-        lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(
-            cmd, 1, "error: some type error\n", ""
-        ),
-    )
-    code = "from manim import *\n"
-
-    # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
-
-    # Then
-    assert failure is not None
-    assert "mypy errors" in failure
-
-def test_verify_code_fails_on_forbidden_import_os(monkeypatch):
+def test_verify_code_fails_on_forbidden_import_os():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "import os\nfrom manim import *\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is not None
     assert "os" in failure
 
-def test_verify_code_fails_on_from_import_of_forbidden_module(monkeypatch):
+def test_verify_code_fails_on_from_import_of_forbidden_module():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "from subprocess import run\nfrom manim import *\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is not None
     assert "subprocess" in failure
 
-def test_verify_code_fails_on_dangerous_builtin_exec(monkeypatch):
+def test_verify_code_fails_on_dangerous_builtin_exec():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "from manim import *\nexec('print(1)')\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is not None
     assert "exec" in failure
 
-def test_verify_code_fails_on_dangerous_builtin_eval(monkeypatch):
+def test_verify_code_fails_on_dangerous_builtin_eval():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "from manim import *\nx = eval('1+1')\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is not None
     assert "eval" in failure
 
-def test_verify_code_fails_on_syntax_error(monkeypatch):
+def test_verify_code_fails_on_syntax_error():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "from manim import *\ndef broken(:\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is not None
     assert "syntax error" in failure.lower()
 
-def test_verify_code_allows_all_permitted_imports(monkeypatch):
+def test_verify_code_allows_all_permitted_imports():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = (
-        "import math\nimport random\nimport typing\n"
+        "import enum\nimport math\nimport random\nimport typing\n"
         "import numpy as np\nfrom manim import *\nfrom colour import Color\n"
     )
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then
     assert failure is None
 
-def test_verify_code_reports_all_forbidden_modules_in_single_message(monkeypatch):
+def test_verify_code_reports_all_forbidden_modules_in_single_message():
     # Given
     from app.workers.worker_helpers import verify_code
-    _patch_mypy_pass(monkeypatch)
     code = "import os\nimport sys\nfrom manim import *\n"
 
     # When
-    failure = verify_code(code, Path("/tmp/fake.py"))
+    failure = verify_code(code)
 
     # Then — both forbidden modules appear in one combined failure message
     assert failure is not None
     assert "os" in failure
     assert "sys" in failure
+
+
+def test_load_planning_capabilities_logs_template_count_and_titles(
+    monkeypatch,
+    mock_worker_cursor,
+):
+    from types import SimpleNamespace
+
+    from app.llm_knowledge.skill_documents import REGISTRY_BY_ID
+    from app.repositories.knowledge_repository import KnowledgeRepository
+    from app.schemas.knowledge import TemplateDocumentSeed
+    from app.workers import worker_helpers
+
+    template = next(
+        entry for entry in REGISTRY_BY_ID.values()
+        if isinstance(entry, TemplateDocumentSeed)
+    )
+    logs = []
+    monkeypatch.setattr(worker_helpers.RAGService, "embed_text", lambda text: [0.0])
+    monkeypatch.setattr(
+        KnowledgeRepository,
+        "search_similar",
+        lambda *args: [SimpleNamespace(document_id=template.document_id)],
+    )
+    monkeypatch.setattr(worker_helpers.logger, "info", logs.append)
+
+    result = worker_helpers.load_planning_capabilities("show an equation")
+
+    injected_log = next(log for log in logs if log.event == "Planning capabilities injected")
+    assert injected_log.context == {
+        "template_count": 1,
+        "template_titles": [template.title],
+    }
+    assert template.planning_capability in result
 
 def test_extract_traceback_returns_from_marker_to_end():
     # Given

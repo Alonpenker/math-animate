@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 
 from app.configs.llm_settings import (
-    RAG_EXAMPLE_CAP, RAG_RULE_CAP, RAG_TEMPLATE_CAP,
+    RAG_RULE_CAP, RAG_TEMPLATE_CAP,
 )
 from app.llm_knowledge.skill_documents import LLMKNOWLEDGE_DIR, REGISTRY
 from app.llm_knowledge.categories import RuleCategory, TemplateCategory
@@ -39,18 +39,16 @@ def test_retrieve_calls_search_similar_with_correct_caps_per_doc_type(
     )
 
     # When
-    result = SkillRetrievalService.retrieve(cursor=object(), plan_text="some plan")
+    result = SkillRetrievalService.retrieve(cursor=object(), embed_text="some plan")
 
     # Then
     assert isinstance(result, CandidateResult)
     assert result.candidate_rules == []
     assert result.candidate_templates == []
-    assert result.candidate_examples == []
 
     assert calls == [
         (KnowledgeType.RULE.value, RAG_RULE_CAP),
         (KnowledgeType.TEMPLATE.value, RAG_TEMPLATE_CAP),
-        (KnowledgeType.EXAMPLE.value, RAG_EXAMPLE_CAP),
     ]
 
 
@@ -91,12 +89,11 @@ def test_retrieve_returns_candidate_result_with_search_results(
     )
 
     # When
-    result = SkillRetrievalService.retrieve(cursor=object(), plan_text="plan")
+    result = SkillRetrievalService.retrieve(cursor=object(), embed_text="plan")
 
     # Then
     assert result.candidate_rules == [rule_doc]
     assert result.candidate_templates == [template_doc]
-    assert result.candidate_examples == []
     assert result.all_candidates == [rule_doc, template_doc]
 
 
@@ -137,7 +134,7 @@ def test_retrieve_excludes_core_documents(
     )
 
     # When
-    result = SkillRetrievalService.retrieve(cursor=object(), plan_text="plan")
+    result = SkillRetrievalService.retrieve(cursor=object(), embed_text="plan")
 
     # Then — core doc is excluded, non-core doc is present
     assert core_doc not in result.candidate_rules

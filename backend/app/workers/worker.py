@@ -1,8 +1,6 @@
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown, worker_ready, setup_logging
 from pathlib import Path
-from uuid import uuid4
-import tempfile
 import shutil
 import subprocess
 import time
@@ -13,8 +11,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.configs.app_settings import settings
 from app.configs.llm_settings import (
     LLM_PROVIDER,
-    LLM_CODE_MODEL,
-    LLM_PLAN_MODEL,
     LLM_PLAN_OUTPUT_MAX_TOKENS,
     OPENROUTER_MODELS,
     PLAN_SYSTEM_PROMPT,
@@ -25,7 +21,6 @@ from app.workers.worker_settings import (
     RENDER_TIMEOUT_SECONDS,
     SQS_VISIBILITY_TIMEOUT,
     SQS_POLLING_INTERVAL,
-    MAX_FIX_ATTEMPTS,
 )
 from app.dependencies.db import init_db_pool, close_db_pool, get_worker_cursor
 from app.dependencies.redis_client import init_redis_pool, close_redis_pool
@@ -41,9 +36,6 @@ from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.plans_repository import PlansRepository
 from app.repositories.artifacts_repository import ArtifactsRepository
 from app.schemas.jobs import (
-    Job,
-    JobCodeRequest,
-    JobFixRequest,
     JobPlanRequest,
     JobRequest,
     JobUserRequest,
@@ -54,12 +46,11 @@ from app.services.agent_service import AgentService
 from app.services.openrouter_service import CallType, OpenRouterService
 from app.services.rag_service import RAGService
 from app.workers.worker_helpers import (
+    load_planning_capabilities,
     transition_job,
     get_storage,
     save_artifact_to_storage,
     store_render_logs,
-    dry_run_docker,
-    summarize_verification_failure,
 )
 from app.utils.llm_stubs import IS_E2E_MODE
 from app.utils.logging import Logger, WorkerLog
@@ -149,6 +140,11 @@ def generate_plan(job_request_payload: dict) -> None:
 
         system_prompt = PLAN_SYSTEM_PROMPT
         user_query = str(job_request.user_request)
+        planning_capabilities = load_planning_capabilities(user_query)
+        if planning_capabilities:
+            human_content = f"{user_query}\n\n{planning_capabilities}"
+        else:
+            human_content = user_query
         started_at = time.perf_counter()
         plan, usage = OpenRouterService.invoke_structured(
             job_id=job_id,
@@ -157,7 +153,7 @@ def generate_plan(job_request_payload: dict) -> None:
             model=OPENROUTER_MODELS.PLAN_MODEL,
             messages=[
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=user_query),
+                HumanMessage(content=human_content),
             ],
             schema=VideoPlan,
             max_tokens=LLM_PLAN_OUTPUT_MAX_TOKENS,

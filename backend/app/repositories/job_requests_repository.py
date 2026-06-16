@@ -30,6 +30,26 @@ class JobRequestsRepository(Repository):
         )
 
     @classmethod
+    def get_user_request(cls, cursor, job_id: UUID) -> Optional[UserRequest]:
+        cursor.execute(
+            f"SELECT {JobRequestSchema.TOPIC.name}, {JobRequestSchema.MISCONCEPTIONS.name}, "
+            f"{JobRequestSchema.CONSTRAINTS.name}, {JobRequestSchema.EXAMPLES.name}, "
+            f"{JobRequestSchema.NUMBER_OF_SCENES.name} "
+            f"FROM {cls.TABLE_NAME} WHERE {cls.PRIMARY_KEY} = %s",
+            (str(job_id),),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return UserRequest(
+            topic=row[JobRequestSchema.TOPIC.name],
+            misconceptions=row[JobRequestSchema.MISCONCEPTIONS.name],
+            constraints=row[JobRequestSchema.CONSTRAINTS.name],
+            examples=row[JobRequestSchema.EXAMPLES.name],
+            number_of_scenes=row[JobRequestSchema.NUMBER_OF_SCENES.name],
+        )
+
+    @classmethod
     def update_status(cls, cursor, job_id: UUID, status: JobStatus) -> None:
         cursor.execute(
             cls.modify(cls.SCHEMA.STATUS.name),

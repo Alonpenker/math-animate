@@ -9,16 +9,27 @@ from app.domain.job_state import JobStatus
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.jobs import Job, JobPlanRequest
-from app.schemas.video_plan import VideoPlan
 from app.schemas.scene_plan import ScenePlan
-from app.services.agent_service import AgentService, LangGraphCodegenState, NodesNames
-from app.services.openrouter_service import CallType
+from app.schemas.video_plan import VideoPlan
+from app.schemas.user_request import UserRequest
+from app.services.agent_service import AgentService, LangGraphCodegenState, NodesNames, _route_after_verify
 from app.services.openrouter_service import OpenRouterTokenUsage
 
 
 @contextmanager
 def _cursor_ctx():
     yield object()
+
+
+@pytest.fixture
+def sample_user_request():
+    return UserRequest(
+        topic="Solving equations",
+        misconceptions=[],
+        constraints=[],
+        examples=[],
+        number_of_scenes=1,
+    )
 
 
 @pytest.fixture
@@ -36,89 +47,23 @@ def sample_video_plan_for_codegen():
 
 
 @pytest.fixture
-def sample_job_plan_request(sample_video_plan_for_codegen):
+def sample_job_plan_request(sample_video_plan_for_codegen, sample_user_request):
     job = Job(job_id=uuid4(), status=JobStatus.PLANNED)
-    return JobPlanRequest(job=job, plan=sample_video_plan_for_codegen)
-
-
-def test_run_codegen_transitions_job_through_codegen_status(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given
-    from app.services import agent_service as agent_module
-    from app.workers import worker_helpers, worker as worker_module
-    import tempfile
-
-    status_transitions = []
-    skill_retrieval_candidates = type('obj', (), {
-        'all_candidates': []
-    })()
-
-    class FakeStorageService:
-        pass
-
-    class FakeGenerateRender:
-        def delay(self, *args, **kwargs):
-            pass
-
-    def fake_transition(job_id, from_status, to_status):
-        status_transitions.append((from_status, to_status))
-
-    def fake_retrieve(cursor, plan_text):
-        return skill_retrieval_candidates
-
-    def fake_read_knowledge_file(path):
-        return "# Core content"
-
-    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
-    monkeypatch.setattr(agent_module, "read_knowledge_file", fake_read_knowledge_file)
-    monkeypatch.setattr(agent_module, "get_storage", lambda: FakeStorageService())
-    monkeypatch.setattr(agent_module, "save_artifact_to_storage", lambda *args, **kwargs: None)
-
-    # Mock OpenRouter calls
-    def fake_openrouter_invoke_structured(**kwargs):
-        from app.services.agent_service import SelectedSkillDocuments
-        return SelectedSkillDocuments(selected_titles=[]), OpenRouterTokenUsage()
-
-    def fake_openrouter_invoke(**kwargs):
-        return AIMessage(content="from manim import *\nclass Scene(Scene): pass"), OpenRouterTokenUsage()
-
-    monkeypatch.setattr(
-        agent_module.OpenRouterService,
-        "invoke_structured",
-        staticmethod(fake_openrouter_invoke_structured),
-    )
-    monkeypatch.setattr(
-        agent_module.OpenRouterService,
-        "invoke",
-        staticmethod(fake_openrouter_invoke),
+    return JobPlanRequest(
+        job=job,
+        plan=sample_video_plan_for_codegen,
+        user_request=sample_user_request,
     )
 
-    # Mock worker helpers
-    monkeypatch.setattr(worker_helpers, "verify_code", lambda code, path: None)
-    monkeypatch.setattr(worker_helpers, "dry_run_docker", lambda code_path, media_dir: (True, "", True))
-    monkeypatch.setattr(worker_helpers, "get_storage", lambda: FakeStorageService())
-    monkeypatch.setattr(worker_helpers, "save_artifact_to_storage", lambda *args, **kwargs: None)
 
-    # Mock celery task
-    monkeypatch.setattr(worker_module, "generate_render", FakeGenerateRender())
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(agent_module.PathNames, "TMP_RENDER_FOLDER", tmpdir)
-        monkeypatch.setattr(agent_module.PathNames, "ARTIFACTS_FOLDER", tmpdir)
-
-        # When
-        AgentService.run_codegen(sample_job_plan_request)
-
-    # Then
-    assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
-    assert (JobStatus.CODEGEN, JobStatus.CODED) in status_transitions
-
+# ---------------------------------------------------------------------------
+# NodesNames enum
+# ---------------------------------------------------------------------------
 
 def test_nodes_names_enum_has_all_expected_values():
-    # When / Then
     assert NodesNames.DOCUMENT_SELECTION.value == "document_selection"
     assert NodesNames.LOAD_SELECTED_DOCUMENTS.value == "load_selected_documents"
+    assert NodesNames.GENERATE_CODE_PLAN.value == "generate_code_plan"
     assert NodesNames.GENERATE_CODE.value == "generate_code"
     assert NodesNames.VERIFY.value == "verify"
     assert NodesNames.FIX_CODE.value == "fix_code"
@@ -127,13 +72,12 @@ def test_nodes_names_enum_has_all_expected_values():
 
 
 def test_nodes_names_non_loop_nodes_returns_correct_set():
-    # When
     non_loop = NodesNames.non_loop_nodes()
 
-    # Then
-    assert len(non_loop) == 6
+    assert len(non_loop) == 7
     assert NodesNames.DOCUMENT_SELECTION in non_loop
     assert NodesNames.LOAD_SELECTED_DOCUMENTS in non_loop
+    assert NodesNames.GENERATE_CODE_PLAN in non_loop
     assert NodesNames.GENERATE_CODE in non_loop
     assert NodesNames.VERIFY in non_loop
     assert NodesNames.SAVE_AND_RENDER in non_loop
@@ -142,233 +86,289 @@ def test_nodes_names_non_loop_nodes_returns_correct_set():
 
 
 def test_nodes_names_loop_nodes_returns_only_fix_and_verify():
-    # When
     loop_nodes = NodesNames.loop_nodes_per_fix_attempt()
 
-    # Then
     assert len(loop_nodes) == 2
     assert NodesNames.FIX_CODE in loop_nodes
     assert NodesNames.VERIFY in loop_nodes
 
 
-def test_run_codegen_handles_quota_exceeded_error(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given
-    from app.services import agent_service as agent_module
+def _make_state(
+    verification_failure: str = "",
+    verification_fixable: bool = True,
+    fix_attempt: int = 0,
+) -> LangGraphCodegenState:
+    from app.workers.worker_settings import MAX_FIX_ATTEMPTS
+    return {
+        "job_id": uuid4(),
+        "plan": None,
+        "user_request": None,
+        "messages": [],
+        "code": "",
+        "code_plan": None,
+        "referenced_templates": [],
+        "verification_failure": verification_failure,
+        "fix_attempt": fix_attempt,
+        "verification_fixable": verification_fixable,
+    }
+
+
+def test_route_after_verify_routes_to_save_when_no_failure():
+    state = _make_state(verification_failure="")
+    assert _route_after_verify(state) == NodesNames.SAVE_AND_RENDER
+
+
+def test_route_after_verify_routes_to_fail_when_not_fixable():
+    state = _make_state(verification_failure="some error", verification_fixable=False)
+    assert _route_after_verify(state) == NodesNames.FAIL
+
+
+def test_route_after_verify_routes_to_fix_when_fixable_and_attempts_not_exhausted():
+    from app.workers.worker_settings import MAX_FIX_ATTEMPTS
+    state = _make_state(
+        verification_failure="some error",
+        verification_fixable=True,
+        fix_attempt=MAX_FIX_ATTEMPTS - 1,
+    )
+    assert _route_after_verify(state) == NodesNames.FIX_CODE
+
+
+def test_route_after_verify_routes_to_fail_when_fix_attempts_exhausted():
+    from app.workers.worker_settings import MAX_FIX_ATTEMPTS
+    state = _make_state(
+        verification_failure="some error",
+        verification_fixable=True,
+        fix_attempt=MAX_FIX_ATTEMPTS,
+    )
+    assert _route_after_verify(state) == NodesNames.FAIL
+
+
+
+def _make_stub_node_factories(ctx_module, fake_transition, extra_stubs: dict | None = None):
+    """Return a dict of node factory stubs. Each stub simulates the transitions
+    that the real node would make via ctx.set_status()."""
+    import app.services.agent_service as agent_module
+
+    def make_noop(ctx):
+        def node(state): return {}
+        return node
+
+    defaults = {
+        "make_document_selection_node": make_noop,
+        "make_load_knowledge_node": lambda ctx: (lambda state: {"messages": []}),
+        "make_code_plan_node": make_noop,
+        "make_codegen_node": make_noop,
+        "make_verify_node": make_noop,
+        "make_fix_node": make_noop,
+        "make_save_render_node": make_noop,
+        "make_fail_node": make_noop,
+    }
+    if extra_stubs:
+        defaults.update(extra_stubs)
+    return defaults
+
+
+
+def test_run_codegen_transitions_planned_to_codegen(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    """PLANNED → CODEGEN transition happens before the graph runs."""
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
 
     status_transitions = []
 
     def fake_transition(job_id, from_status, to_status):
         status_transitions.append((from_status, to_status))
 
-    def fake_retrieve(cursor, plan_text):
-        raise QuotaExceededError(limit=100, consumed=100, reserved=0, requested=1)
-
     monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
 
-    # When / Then
-    with pytest.raises(QuotaExceededError):
-        AgentService.run_codegen(sample_job_plan_request)
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        monkeypatch.setattr(agent_module, attr, factory)
 
-    # Verify it transitioned to failed quota state
+    AgentService.run_codegen(sample_job_plan_request)
+
     assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
-    assert (JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED) in status_transitions
 
 
-def test_run_codegen_handles_llm_usage_exception(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given
-    from app.services import agent_service as agent_module
-
-    status_transitions = []
-
-    def fake_transition(job_id, from_status, to_status):
-        status_transitions.append((from_status, to_status))
-
-    def fake_retrieve(cursor, plan_text):
-        raise LLMUsageException("Invalid output", total_tokens=100)
-
-    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
-
-    # When / Then
-    with pytest.raises(LLMUsageException):
-        AgentService.run_codegen(sample_job_plan_request)
-
-    # Verify it transitioned to failed LLM usage state
-    assert (JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE) in status_transitions
-
-
-def test_run_codegen_handles_generic_exception(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given
-    from app.services import agent_service as agent_module
+def test_run_codegen_transitions_codegen_to_coded(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    """CODEGEN → CODED transition happens via the codegen node."""
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
 
     status_transitions = []
 
     def fake_transition(job_id, from_status, to_status):
         status_transitions.append((from_status, to_status))
 
-    def fake_retrieve(cursor, plan_text):
-        raise RuntimeError("Unexpected error")
-
     monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
 
-    # When / Then
-    with pytest.raises(RuntimeError):
-        AgentService.run_codegen(sample_job_plan_request)
+    def make_codegen_stub(ctx):
+        def node(state):
+            ctx.set_status(JobStatus.CODEGEN, JobStatus.CODED)
+            return {"code": "from manim import *\n"}
+        return node
 
-    # Verify it transitioned to failed codegen state (because error happened during document selection)
-    assert (JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN) in status_transitions
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    stubs["make_codegen_node"] = make_codegen_stub
+    for attr, factory in stubs.items():
+        monkeypatch.setattr(agent_module, attr, factory)
+
+    AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.CODEGEN, JobStatus.CODED) in status_transitions
 
 
-def test_run_codegen_initializes_langgraph_state_correctly(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given
-    from app.services import agent_service as agent_module
-    from app.workers import worker_helpers
+def test_run_codegen_initializes_langgraph_state_correctly(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    """The initial state passed to the compiled graph has the right fields."""
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+    from langgraph.graph import StateGraph
 
-    captured_initial_state = {}
-
-    original_compile = None
+    captured_initial_state: dict = {}
 
     def fake_transition(job_id, from_status, to_status):
         pass
 
+    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
+
     class FakeCompiledGraph:
         def invoke(self, state, config=None):
             captured_initial_state.update(state)
-            return None
 
-    class FakeGraph:
-        def add_node(self, name, func):
-            pass
+    monkeypatch.setattr(StateGraph, "__init__", lambda self, state_type: None)
+    monkeypatch.setattr(StateGraph, "add_node", lambda self, *args: None)
+    monkeypatch.setattr(StateGraph, "set_entry_point", lambda self, *args: None)
+    monkeypatch.setattr(StateGraph, "add_edge", lambda self, *args: None)
+    monkeypatch.setattr(StateGraph, "add_conditional_edges", lambda self, *args: None)
+    monkeypatch.setattr(StateGraph, "compile", lambda self: FakeCompiledGraph())
 
-        def set_entry_point(self, name):
-            pass
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        monkeypatch.setattr(agent_module, attr, factory)
 
-        def add_edge(self, from_node, to_node):
-            pass
-
-        def add_conditional_edges(self, from_node, func):
-            pass
-
-        def compile(self):
-            return FakeCompiledGraph()
-
-    class FakePath:
-        def __init__(self, path_str):
-            self.path_str = path_str
-
-        def __truediv__(self, other):
-            return FakePath(f"{self.path_str}/{other}")
-
-        def mkdir(self, parents=False, exist_ok=False):
-            pass
-
-    def fake_retrieve(cursor, plan_text):
-        return type('obj', (), {'all_candidates': []})()
-
-    def fake_read_knowledge_file(path):
-        return "content"
-
-    def fake_openrouter_invoke_structured(**kwargs):
-        from app.services.agent_service import SelectedSkillDocuments
-        return SelectedSkillDocuments(selected_titles=[]), OpenRouterTokenUsage()
-
-    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
-    monkeypatch.setattr(agent_module, "read_knowledge_file", fake_read_knowledge_file)
-    monkeypatch.setattr(agent_module, "Path", FakePath)
-    monkeypatch.setattr(agent_module.StateGraph, "__init__", lambda self, state_type: None)
-    monkeypatch.setattr(agent_module.StateGraph, "add_node", lambda self, *args: None)
-    monkeypatch.setattr(agent_module.StateGraph, "set_entry_point", lambda self, *args: None)
-    monkeypatch.setattr(agent_module.StateGraph, "add_edge", lambda self, *args: None)
-    monkeypatch.setattr(agent_module.StateGraph, "add_conditional_edges", lambda self, *args: None)
-    monkeypatch.setattr(agent_module.StateGraph, "compile", lambda self: FakeCompiledGraph())
-    monkeypatch.setattr(
-        agent_module.OpenRouterService,
-        "invoke_structured",
-        staticmethod(fake_openrouter_invoke_structured),
-    )
-
-    # When
     AgentService.run_codegen(sample_job_plan_request)
 
-    # Then
     assert captured_initial_state["job_id"] == sample_job_plan_request.job.job_id
     assert captured_initial_state["plan"] == sample_job_plan_request.plan
+    assert captured_initial_state["user_request"] == sample_job_plan_request.user_request
     assert captured_initial_state["messages"] == []
     assert captured_initial_state["code"] == ""
+    assert captured_initial_state["code_plan"] is None
+    assert captured_initial_state["referenced_templates"] == []
     assert captured_initial_state["verification_failure"] == ""
     assert captured_initial_state["fix_attempt"] == 0
     assert captured_initial_state["verification_fixable"] is True
 
 
-def test_route_after_verify_returns_save_and_render_when_no_failure(monkeypatch: pytest.MonkeyPatch, sample_job_plan_request):
-    # Given - Setup minimal mocks for successful path
-    from app.services import agent_service as agent_module
-    from app.workers import worker_helpers, worker as worker_module
-    import tempfile
+def test_run_codegen_handles_quota_exceeded_error(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+
+    status_transitions = []
 
     def fake_transition(job_id, from_status, to_status):
-        pass
-
-    class FakeGenerateRender:
-        def delay(self, *args, **kwargs):
-            pass
-
-    def fake_retrieve(cursor, plan_text):
-        return type('obj', (), {'all_candidates': []})()
-
-    def fake_read_knowledge_file(path):
-        return "content"
-
-    def fake_openrouter_invoke_structured(**kwargs):
-        from app.services.agent_service import SelectedSkillDocuments
-        return SelectedSkillDocuments(selected_titles=[]), OpenRouterTokenUsage()
-
-    def fake_openrouter_invoke(**kwargs):
-        return AIMessage(content="from manim import *\nclass Scene(Scene): pass"), OpenRouterTokenUsage()
+        status_transitions.append((from_status, to_status))
 
     monkeypatch.setattr(agent_module, "transition_job", fake_transition)
-    monkeypatch.setattr(agent_module, "get_worker_cursor", _cursor_ctx)
-    monkeypatch.setattr(agent_module.SkillRetrievalService, "retrieve", staticmethod(fake_retrieve))
-    monkeypatch.setattr(agent_module, "read_knowledge_file", fake_read_knowledge_file)
-    monkeypatch.setattr(agent_module, "get_storage", lambda: type('obj', (), {})())
-    monkeypatch.setattr(agent_module, "save_artifact_to_storage", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        agent_module.OpenRouterService,
-        "invoke_structured",
-        staticmethod(fake_openrouter_invoke_structured),
-    )
-    monkeypatch.setattr(
-        agent_module.OpenRouterService,
-        "invoke",
-        staticmethod(fake_openrouter_invoke),
-    )
-    monkeypatch.setattr(worker_helpers, "verify_code", lambda code, path: None)
-    monkeypatch.setattr(worker_helpers, "dry_run_docker", lambda code_path, media_dir: (True, "", True))
-    monkeypatch.setattr(worker_helpers, "get_storage", lambda: type('obj', (), {})())
-    monkeypatch.setattr(worker_helpers, "save_artifact_to_storage", lambda *args, **kwargs: None)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
 
-    # Mock the generate_render import that happens inside node_save_and_render
-    monkeypatch.setattr(worker_module, "generate_render", FakeGenerateRender())
+    def make_failing_node(ctx):
+        def node(state):
+            raise QuotaExceededError(limit=100, consumed=100, reserved=0, requested=1)
+        return node
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(agent_module.PathNames, "TMP_RENDER_FOLDER", tmpdir)
-        monkeypatch.setattr(agent_module.PathNames, "ARTIFACTS_FOLDER", tmpdir)
+    monkeypatch.setattr(agent_module, "make_document_selection_node", make_failing_node)
 
-        # When - this should complete without raising
-        try:
-            AgentService.run_codegen(sample_job_plan_request)
-            # If we get here, the routing worked correctly
-            success = True
-        except Exception as e:
-            success = False
-            raise
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        if attr != "make_document_selection_node":
+            monkeypatch.setattr(agent_module, attr, factory)
 
-        # Then
-        assert success
+    with pytest.raises(QuotaExceededError):
+        AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
+    assert (JobStatus.CODEGEN, JobStatus.FAILED_QUOTA_EXCEEDED) in status_transitions
+
+
+def test_run_codegen_handles_llm_usage_exception(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+
+    status_transitions = []
+
+    def fake_transition(job_id, from_status, to_status):
+        status_transitions.append((from_status, to_status))
+
+    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
+
+    def make_failing_node(ctx):
+        def node(state):
+            raise LLMUsageException("Invalid output", total_tokens=100)
+        return node
+
+    monkeypatch.setattr(agent_module, "make_document_selection_node", make_failing_node)
+
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        if attr != "make_document_selection_node":
+            monkeypatch.setattr(agent_module, attr, factory)
+
+    with pytest.raises(LLMUsageException):
+        AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
+    assert (JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE) in status_transitions
+
+
+def test_run_codegen_handles_generic_exception(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+
+    status_transitions = []
+
+    def fake_transition(job_id, from_status, to_status):
+        status_transitions.append((from_status, to_status))
+
+    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
+
+    def make_failing_node(ctx):
+        def node(state):
+            raise RuntimeError("Unexpected error")
+        return node
+
+    monkeypatch.setattr(agent_module, "make_document_selection_node", make_failing_node)
+
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        if attr != "make_document_selection_node":
+            monkeypatch.setattr(agent_module, attr, factory)
+
+    with pytest.raises(RuntimeError):
+        AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
+    assert (JobStatus.CODEGEN, JobStatus.FAILED_CODEGEN) in status_transitions
