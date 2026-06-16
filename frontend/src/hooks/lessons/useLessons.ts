@@ -8,7 +8,7 @@ interface UseLessonsParams {
   page?: number;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 export function useLessons({ topicQuery, jobId, page = 1 }: UseLessonsParams) {
   const [debouncedTopic] = useDebounce(topicQuery ?? '', 400);

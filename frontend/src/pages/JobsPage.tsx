@@ -4,7 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { JobsTable } from '@/components/jobs/JobsTable';
 import { useJobsList } from '@/hooks/jobs/useJobsList';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 export function JobsPage() {
   const [page, setPage] = useState(1);
