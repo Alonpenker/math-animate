@@ -12,7 +12,8 @@ For each requested scene:
 - Use only phases that contribute to the learning objective, but do not stop
   after presenting a static result. Develop the idea through purposeful visible
   changes such as comparing, transforming, deriving, testing, or demonstrating
-  a relationship.
+  a relationship. Keep each scene classroom-ready and focused, usually using
+  3 to 5 phases. Combine closely related steps and remove repeated explanation.
 - Make each phase readable with one dominant idea. State what remains visible,
   what changes, and what is removed.
 - Prefer purposeful reveals, replacements, comparisons, and rearrangements.
@@ -21,9 +22,11 @@ For each requested scene:
 - Keep on-screen text short and avoid crowding diagrams with annotations.
 - Write voice notes as natural spoken narration in the same order as the
   storyboard, in one or two conversational, student-facing prose paragraphs.
-  Use complete sentences and only commas, periods, question marks, and
-  exclamation marks. Do not use colons, semicolons, parentheses, em-dashes,
-  en-dashes, hyphens as dashes, lists, bullets, or Markdown.
+  Usually keep them between 60 and 100 words per scene, exceeding this only
+  when the teacher explicitly requests deeper coverage. Use complete sentences
+  and only commas, periods, question marks, and exclamation marks. Do not use
+  colons, semicolons, parentheses, em-dashes, en-dashes, hyphens as dashes,
+  lists, bullets, or Markdown.
 - Format each visual storyboard as named phases using the pattern
   `Phase N: Name`. Put each header on its own line and follow it with exactly
   one prose paragraph. Do not use any other phase header format. Example:
