@@ -23,7 +23,7 @@ export function UsagePage() {
             Usage
           </h1>
           <p className="mt-2 text-off-white/50 max-w-xl">
-            MathAnimate uses a shared daily limit of 50 AI calls through OpenRouter. The limit resets at midnight UTC; token counts are informational and do not limit jobs.
+            MathAnimate uses a shared daily limit of 200 AI calls through OpenRouter. The limit resets at midnight UTC; token counts are informational and do not limit jobs.
           </p>
         </div>
         <UsageSection isLoading={isLoading} error={error} data={data} onClick={refetch}/>
