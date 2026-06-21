@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_call_exception import LLMCallException
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.artifact import Artifact, ArtifactType
@@ -317,20 +318,54 @@ def test_dry_run_docker_handles_timeout_and_reports_stderr(monkeypatch, tmp_path
     assert is_fixable is False
 
 
+def test_worker_exports_task_functions_as_celery_task_objects():
+    # Given / When
+    from celery import Task
+    from app.workers.worker import generate_code, generate_plan, generate_render, seed_knowledge
+
+    # Then — each export must be a Celery Task, not a plain function
+    assert isinstance(generate_plan, Task)
+    assert isinstance(generate_code, Task)
+    assert isinstance(generate_render, Task)
+    assert isinstance(seed_knowledge, Task)
+
+
+def test_worker_task_names_match_expected_registration_names():
+    # Given / When
+    from app.workers.worker import generate_code, generate_plan, generate_render, seed_knowledge
+
+    # Then
+    assert generate_plan.name == "generate_plan"
+    assert generate_code.name == "generate_code"
+    assert generate_render.name == "generate_render"
+    assert seed_knowledge.name == "seed_knowledge"
+
+
+def test_runner_imports_from_worker_without_error():
+    # Given / When — import must succeed and WorkerRunner must be usable
+    from app.workers.runner import WorkerRunner
+
+    # Then
+    assert hasattr(WorkerRunner, "handle_planning")
+    assert hasattr(WorkerRunner, "handle_codegen")
+    assert hasattr(WorkerRunner, "handle_render")
+
+
 def test_generate_plan_transitions_to_planned_and_persists_plan(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_planning_capabilities,
     sample_user_request,
     sample_video_plan,
     test_store,
 ):
     # Given
-    from app.services.openrouter_service import OpenRouterTokenUsage
+    from app.services.openrouter_service import OpenRouterService, OpenRouterTokenUsage
     from app.workers import worker as worker_module
 
     monkeypatch.setattr(
-        worker_module.OpenRouterService,
+        OpenRouterService,
         "invoke_structured",
         staticmethod(lambda **kwargs: (sample_video_plan, OpenRouterTokenUsage(total_tokens=123))),
     )
@@ -354,14 +389,16 @@ def test_generate_plan_sets_failed_quota_exceeded_and_reraises(
     monkeypatch,
     mock_repositories,
     mock_worker_cursor,
+    mock_planning_capabilities,
     sample_user_request,
     test_store,
 ):
     # Given
+    from app.services.openrouter_service import OpenRouterService
     from app.workers import worker as worker_module
 
     monkeypatch.setattr(
-        worker_module.OpenRouterService,
+        OpenRouterService,
         "invoke_structured",
         staticmethod(lambda **kwargs: (_ for _ in ()).throw(
             QuotaExceededError(limit=50, consumed=50, reserved=0, requested=1)
@@ -378,6 +415,38 @@ def test_generate_plan_sets_failed_quota_exceeded_and_reraises(
 
     assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_QUOTA_EXCEEDED
     assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_QUOTA_EXCEEDED)
+
+def test_generate_plan_sets_failed_llm_call_and_reraises(
+    monkeypatch,
+    mock_repositories,
+    mock_worker_cursor,
+    mock_planning_capabilities,
+    sample_user_request,
+    test_store,
+):
+    # Given
+    from app.services.openrouter_service import OpenRouterService
+    from app.workers import worker as worker_module
+
+    monkeypatch.setattr(
+        OpenRouterService,
+        "invoke_structured",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(
+            LLMCallException("provider unavailable", total_tokens=0)
+        )),
+    )
+
+    job = Job(status=JobStatus.CREATED)
+    test_store["jobs"][job.job_id] = job
+    payload = JobUserRequest(job=job, user_request=sample_user_request).model_dump(mode="json")
+
+    # When / Then
+    with pytest.raises(LLMCallException):
+        worker_module.generate_plan(payload)
+
+    assert test_store["jobs"][job.job_id].status == JobStatus.FAILED_LLM_CALL
+    assert test_store["status_updates"][-1] == (job.job_id, JobStatus.FAILED_LLM_CALL)
+
 
 def test_worker_runner_routes_created_jobs_to_planning(monkeypatch):
     # Given
@@ -451,6 +520,7 @@ def test_generate_render_invokes_docker_and_persists_mp4_and_log_artifacts(
 ):
     # Given
     from app.workers import worker as worker_module
+    from app.workers.tasks import render as render_module
 
     job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
@@ -462,16 +532,16 @@ def test_generate_render_invokes_docker_and_persists_mp4_and_log_artifacts(
         code_path = Path(command[-1])
         videos_dir = (
             media_dir
-            / worker_module.PathNames.VIDEOS_FOLDER
+            / render_module.PathNames.VIDEOS_FOLDER
             / code_path.stem
-            / worker_module.PathNames.RESOLUTION_FOLDER
+            / render_module.PathNames.RESOLUTION_FOLDER
         )
         videos_dir.mkdir(parents=True, exist_ok=True)
         for index, _ in enumerate(sample_video_plan.scenes, start=1):
             (videos_dir / f"scene_{index}.mp4").write_bytes(b"mp4-bytes")
         return subprocess.CompletedProcess(command, 0, "render stdout", "render stderr")
 
-    monkeypatch.setattr(worker_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(render_module.subprocess, "run", fake_run)
 
     # When
     worker_module.generate_render(payload)
@@ -514,13 +584,14 @@ def test_generate_render_sets_failed_render_and_stores_logs_on_docker_nonzero_ex
 ):
     # Given
     from app.workers import worker as worker_module
+    from app.workers.tasks import render as render_module
 
     job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 
     monkeypatch.setattr(
-        worker_module.subprocess, "run",
+        render_module.subprocess, "run",
         lambda cmd, *, capture_output, text, timeout: subprocess.CompletedProcess(
             cmd, 1, "error stdout", "error stderr"
         ),
@@ -548,13 +619,14 @@ def test_generate_render_sets_failed_render_on_subprocess_timeout(
 ):
     # Given
     from app.workers import worker as worker_module
+    from app.workers.tasks import render as render_module
 
     job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
     payload = _make_render_payload(job, sample_video_plan, test_store)
 
     monkeypatch.setattr(
-        worker_module.subprocess, "run",
+        render_module.subprocess, "run",
         lambda cmd, *, capture_output, text, timeout: (_ for _ in ()).throw(
             subprocess.TimeoutExpired(cmd=cmd, timeout=timeout, output="", stderr="")
         ),
@@ -624,6 +696,7 @@ def test_generate_render_succeeds_even_when_log_storage_raises(
     # Given — store_render_logs is best-effort; MinIO write failures must not block RENDERED status
     from app.workers import worker as worker_module
     from app.workers import worker_helpers
+    from app.workers.tasks import render as render_module
 
     job = Job(status=JobStatus.VERIFIED)
     test_store["jobs"][job.job_id] = job
@@ -634,16 +707,16 @@ def test_generate_render_succeeds_even_when_log_storage_raises(
         code_path = Path(command[-1])
         videos_dir = (
             media_dir
-            / worker_module.PathNames.VIDEOS_FOLDER
+            / render_module.PathNames.VIDEOS_FOLDER
             / code_path.stem
-            / worker_module.PathNames.RESOLUTION_FOLDER
+            / render_module.PathNames.RESOLUTION_FOLDER
         )
         videos_dir.mkdir(parents=True, exist_ok=True)
         for index, _ in enumerate(sample_video_plan.scenes, start=1):
             (videos_dir / f"scene_{index}.mp4").write_bytes(b"mp4-bytes")
         return subprocess.CompletedProcess(command, 0, "stdout", "stderr")
 
-    monkeypatch.setattr(worker_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(render_module.subprocess, "run", fake_run)
 
     original_save = worker_helpers.FilesStorageService.save_artifact
 

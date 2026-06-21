@@ -18,6 +18,7 @@ class JobStatus(str, Enum):
     FAILED_RENDER = "FAILED_RENDER"
     FAILED_QUOTA_EXCEEDED = "FAILED_QUOTA_EXCEEDED"
     FAILED_LLM_USAGE = "FAILED_LLM_USAGE"
+    FAILED_LLM_CALL = "FAILED_LLM_CALL"
     VERIFYING = "VERIFYING"
     VERIFIED = "VERIFIED"
     FIXING = "FIXING"
@@ -31,6 +32,7 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
         JobStatus.FAILED_PLANNING,
         JobStatus.FAILED_QUOTA_EXCEEDED,
         JobStatus.FAILED_LLM_USAGE,
+        JobStatus.FAILED_LLM_CALL,
     }),
     JobStatus.PLANNED: frozenset({JobStatus.APPROVED, JobStatus.CANCELLED}),
     JobStatus.APPROVED: frozenset({JobStatus.CODEGEN}),
@@ -39,6 +41,7 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
         JobStatus.FAILED_CODEGEN,
         JobStatus.FAILED_QUOTA_EXCEEDED,
         JobStatus.FAILED_LLM_USAGE,
+        JobStatus.FAILED_LLM_CALL,
     }),
     JobStatus.CODED: frozenset({JobStatus.VERIFYING, JobStatus.FAILED_VERIFICATION}),
     JobStatus.VERIFYING: frozenset({JobStatus.VERIFIED, JobStatus.FIXING, JobStatus.FAILED_VERIFICATION}),
@@ -48,6 +51,7 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
         JobStatus.FAILED_VERIFICATION,
         JobStatus.FAILED_QUOTA_EXCEEDED,
         JobStatus.FAILED_LLM_USAGE,
+        JobStatus.FAILED_LLM_CALL,
     }),
     JobStatus.RENDERING: frozenset({JobStatus.RENDERED, JobStatus.FAILED_RENDER}),
     JobStatus.RENDERED: frozenset(),
@@ -56,10 +60,14 @@ ALLOWED_TRANSITIONS: Dict[JobStatus, FrozenSet[JobStatus]] = {
     JobStatus.FAILED_RENDER: frozenset(),
     JobStatus.FAILED_QUOTA_EXCEEDED: frozenset(),
     JobStatus.FAILED_LLM_USAGE: frozenset(),
+    JobStatus.FAILED_LLM_CALL: frozenset(),
     JobStatus.FAILED_VERIFICATION: frozenset(),
     JobStatus.CANCELLED: frozenset()
 }
 
+
+def is_terminal(status: JobStatus) -> bool:
+    return len(ALLOWED_TRANSITIONS.get(status, frozenset())) == 0
 
 def can_transition(current: JobStatus, target: JobStatus) -> bool:
     return target in ALLOWED_TRANSITIONS.get(current, frozenset())

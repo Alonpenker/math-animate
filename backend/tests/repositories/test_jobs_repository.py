@@ -1,8 +1,8 @@
 from uuid import uuid4
 
 from app.dependencies.redis_client import TERMINAL_JOB_TTL_SECONDS
-from app.domain.job_state import JobStatus
-from app.repositories.jobs_repository import JobsRepository, TERMINAL_STATUSES
+from app.domain.job_state import JobStatus, is_terminal
+from app.repositories.jobs_repository import JobsRepository
 from app.schemas.jobs import Job
 
 from tests.repositories.conftest import FakeRedis
@@ -72,7 +72,7 @@ def test_update_job_status_applies_ttl_for_every_terminal_status():
     r = FakeRedis()
 
     # When / Then
-    for status in TERMINAL_STATUSES:
+    for status in filter(is_terminal, JobStatus):
         job_id = uuid4()
         JobsRepository.update_job_status(r, job_id, status)
         assert r.get_ttl(f"job:{job_id}") == TERMINAL_JOB_TTL_SECONDS, (

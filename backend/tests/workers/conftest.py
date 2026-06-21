@@ -6,9 +6,10 @@ import pytest
 
 @pytest.fixture
 def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> None:
-    from app.workers import worker as worker_module
     from app.workers import worker_helpers
     from app.services import openrouter_service
+    from app.workers.tasks import plan as plan_module
+    from app.workers.tasks import render as render_module
 
     @contextmanager
     def fake_cursor_ctx():
@@ -18,22 +19,28 @@ def mock_worker_cursor(monkeypatch: pytest.MonkeyPatch, fake_cursor: object) -> 
     def fake_redis_ctx():
         yield object()  # ignored — JobsRepository methods are patched
 
-    monkeypatch.setattr(worker_module, "get_worker_cursor", fake_cursor_ctx)
+    monkeypatch.setattr(plan_module, "get_worker_cursor", fake_cursor_ctx)
+    monkeypatch.setattr(render_module, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(openrouter_service, "get_worker_cursor", fake_cursor_ctx)
     monkeypatch.setattr(worker_helpers, "get_worker_redis", fake_redis_ctx)
 
 @pytest.fixture
+def mock_planning_capabilities(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.workers.tasks import plan as plan_module
+
+    monkeypatch.setattr(plan_module, "load_planning_capabilities", lambda _text: "")
+
+@pytest.fixture
 def mock_worker_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    from app.workers import worker as worker_module
+    from app.workers.tasks import render as render_module
 
     artifacts_root = tmp_path / "job_artifacts"
     render_root = tmp_path / "render_root"
     artifacts_root.mkdir(parents=True, exist_ok=True)
     render_root.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr(worker_module.PathNames, "ARTIFACTS_FOLDER", str(artifacts_root))
-    monkeypatch.setattr(worker_module.PathNames, "TMP_RENDER_FOLDER", str(render_root))
+    monkeypatch.setattr(render_module.PathNames, "TMP_RENDER_FOLDER", str(render_root))
     return {"artifacts_root": artifacts_root, "render_root": render_root}
 
 @pytest.fixture

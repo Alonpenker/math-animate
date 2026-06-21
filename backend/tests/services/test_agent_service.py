@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.configs.llm_settings import OPENROUTER_MODELS
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_call_exception import LLMCallException
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.jobs import Job, JobPlanRequest
@@ -338,6 +339,93 @@ def test_run_codegen_handles_llm_usage_exception(
 
     assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
     assert (JobStatus.CODEGEN, JobStatus.FAILED_LLM_USAGE) in status_transitions
+
+
+def test_run_codegen_handles_llm_call_exception_during_codegen(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    # Given — LLMCallException raised while ctx.current_status is CODEGEN
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+
+    status_transitions = []
+
+    def fake_transition(job_id, from_status, to_status):
+        status_transitions.append((from_status, to_status))
+
+    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
+
+    def make_failing_node(ctx):
+        def node(state):
+            raise LLMCallException("provider unavailable", total_tokens=0)
+        return node
+
+    monkeypatch.setattr(agent_module, "make_document_selection_node", make_failing_node)
+
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    for attr, factory in stubs.items():
+        if attr != "make_document_selection_node":
+            monkeypatch.setattr(agent_module, attr, factory)
+
+    # When / Then
+    with pytest.raises(LLMCallException):
+        AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.PLANNED, JobStatus.CODEGEN) in status_transitions
+    assert (JobStatus.CODEGEN, JobStatus.FAILED_LLM_CALL) in status_transitions
+
+
+def test_run_codegen_handles_llm_call_exception_during_fixing(
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_plan_request,
+):
+    # Given — LLMCallException raised while ctx.current_status is FIXING
+    import app.services.agent_service as agent_module
+    import app.services.nodes._context as ctx_module
+
+    status_transitions = []
+
+    def fake_transition(job_id, from_status, to_status):
+        status_transitions.append((from_status, to_status))
+
+    monkeypatch.setattr(agent_module, "transition_job", fake_transition)
+    monkeypatch.setattr(ctx_module, "transition_job", fake_transition)
+
+    # Codegen node advances ctx to CODED
+    def make_codegen_stub(ctx):
+        def node(state):
+            ctx.set_status(JobStatus.CODEGEN, JobStatus.CODED)
+            return {"code": "from manim import *\n"}
+        return node
+
+    # Verify node marks failure so router sends to FIX_CODE
+    def make_verify_stub(ctx):
+        def node(state):
+            ctx.set_status(JobStatus.CODED, JobStatus.VERIFYING)
+            return {"verification_failure": "bad code", "verification_fixable": True, "fix_attempt": 0}
+        return node
+
+    # Fix node advances ctx to FIXING then raises LLMCallException
+    def make_fix_stub(ctx):
+        def node(state):
+            ctx.current_status = JobStatus.FIXING  # simulate the real fix node's status update
+            raise LLMCallException("provider unavailable during fix", total_tokens=0)
+        return node
+
+    stubs = _make_stub_node_factories(ctx_module, fake_transition)
+    stubs["make_codegen_node"] = make_codegen_stub
+    stubs["make_verify_node"] = make_verify_stub
+    stubs["make_fix_node"] = make_fix_stub
+    for attr, factory in stubs.items():
+        monkeypatch.setattr(agent_module, attr, factory)
+
+    # When / Then
+    with pytest.raises(LLMCallException):
+        AgentService.run_codegen(sample_job_plan_request)
+
+    assert (JobStatus.FIXING, JobStatus.FAILED_LLM_CALL) in status_transitions
 
 
 def test_run_codegen_handles_generic_exception(
