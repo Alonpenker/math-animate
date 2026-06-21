@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EXAMPLE_BRIEFS } from '@/data/exampleBriefs';
 import { TagInput } from './TagInput';
 import type { UserRequest } from '@/services/api';
 
@@ -11,53 +12,6 @@ interface CreateFormProps {
 }
 
 const TOPIC_MAX_LENGTH = 70;
-
-const EXAMPLE_BRIEFS: UserRequest[] = [
-  {
-    topic: 'Pythagorean Theorem Proof',
-    misconceptions: ['Students think the theorem only works for specific triangle shapes'],
-    constraints: [],
-    examples: [],
-    number_of_scenes: 1,
-  },
-  {
-    topic: 'Derivatives From Limits',
-    misconceptions: [
-      'Students memorize the power rule without understanding where it comes from',
-      'Students confuse the slope of a secant with the slope of a tangent',
-    ],
-    constraints: [],
-    examples: [],
-    number_of_scenes: 1,
-  },
-  {
-    topic: 'Function Transformations',
-    misconceptions: [
-      'Students think f(x) + k shifts the graph horizontally',
-      'Students confuse vertical and horizontal stretches',
-    ],
-    constraints: [],
-    examples: [],
-    number_of_scenes: 1,
-  },
-  {
-    topic: 'Matrix Multiplication',
-    misconceptions: [
-      'Students multiply element-by-element instead of using dot products',
-      'Students think matrix multiplication is commutative',
-    ],
-    constraints: [],
-    examples: [],
-    number_of_scenes: 1,
-  },
-  {
-    topic: 'External Circle Tangent Construction',
-    misconceptions: ['Students think any line touching a circle is a tangent'],
-    constraints: [],
-    examples: [],
-    number_of_scenes: 1,
-  },
-];
 
 export function CreateForm({ onSubmit, error }: CreateFormProps) {
   const [topic, setTopic] = useState('');
