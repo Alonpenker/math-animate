@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.configs.llm_settings import OPENROUTER_DAILY_CALL_LIMIT, OPENROUTER_MODELS
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_call_exception import LLMCallException
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.services.openrouter_service import CallType
@@ -273,7 +274,7 @@ def test_invoke_structured_raises_when_parsed_value_does_not_match_schema(monkey
     monkeypatch.setattr(service_module, "get_worker_cursor", _cursor_ctx)
 
     # When / Then
-    with pytest.raises(LLMUsageException) as exc_info:
+    with pytest.raises(LLMCallException) as exc_info:
         OpenRouterService.invoke_structured(
             job_id=uuid4(),
             stage=JobStatus.CODEGEN,
@@ -531,7 +532,45 @@ def test_get_client_includes_reasoning_when_effort_provided():
     assert client is not None
 
 
-def test_invoke_raises_llm_usage_exception_on_client_failure(monkeypatch: pytest.MonkeyPatch):
+def test_invoke_raises_llm_usage_exception_on_length_finish_reason_error(monkeypatch: pytest.MonkeyPatch):
+    # Given — LengthFinishReasonError means the provider cut the response short due to token budget
+    from app.services import openrouter_service as service_module
+
+    class FakeLengthFinishReasonError(Exception):
+        def __init__(self):
+            super().__init__("length")
+            self.response = None
+            self.body = None
+            self.data = None
+            self.usage = None
+
+    class FakeClient:
+        def invoke(self, messages):
+            raise FakeLengthFinishReasonError()
+
+    monkeypatch.setattr(service_module, "LengthFinishReasonError", FakeLengthFinishReasonError)
+    monkeypatch.setattr(OpenRouterService, "claim_call", staticmethod(lambda **kwargs: uuid4()))
+    monkeypatch.setattr(OpenRouterService, "get_client", staticmethod(lambda **kwargs: FakeClient()))
+    monkeypatch.setattr(
+        service_module.TokenLedgerRepository,
+        "record_openrouter_usage",
+        staticmethod(lambda cursor, **kwargs: None),
+    )
+    monkeypatch.setattr(service_module, "get_worker_cursor", _cursor_ctx)
+
+    # When / Then
+    with pytest.raises(LLMUsageException, match="exhausted"):
+        OpenRouterService.invoke(
+            job_id=uuid4(),
+            stage=JobStatus.CODEGEN,
+            call_type=CallType.CODEGEN,
+            model=OPENROUTER_MODELS.CODING_MODEL,
+            messages=[HumanMessage(content="test")],
+            max_tokens=100,
+        )
+
+
+def test_invoke_raises_llm_call_exception_on_client_failure(monkeypatch: pytest.MonkeyPatch):
     # Given
     from app.services import openrouter_service as service_module
 
@@ -562,7 +601,7 @@ def test_invoke_raises_llm_usage_exception_on_client_failure(monkeypatch: pytest
     monkeypatch.setattr(service_module, "get_worker_cursor", _cursor_ctx)
 
     # When / Then
-    with pytest.raises(LLMUsageException, match="failed before producing usable output"):
+    with pytest.raises(LLMCallException, match="failed before producing usable output"):
         OpenRouterService.invoke(
             job_id=uuid4(),
             stage=JobStatus.CODEGEN,
@@ -571,3 +610,5 @@ def test_invoke_raises_llm_usage_exception_on_client_failure(monkeypatch: pytest
             messages=[HumanMessage(content="test")],
             max_tokens=100,
         )
+
+
