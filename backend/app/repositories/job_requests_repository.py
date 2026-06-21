@@ -50,6 +50,18 @@ class JobRequestsRepository(Repository):
         )
 
     @classmethod
+    def get_status(cls, cursor, job_id: UUID) -> Optional[JobStatus]:
+        cursor.execute(
+            f"SELECT {JobRequestSchema.STATUS.name} "
+            f"FROM {cls.TABLE_NAME} WHERE {cls.PRIMARY_KEY} = %s",
+            (str(job_id),),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return JobStatus(row[JobRequestSchema.STATUS.name])
+
+    @classmethod
     def update_status(cls, cursor, job_id: UUID, status: JobStatus) -> None:
         cursor.execute(
             cls.modify(cls.SCHEMA.STATUS.name),

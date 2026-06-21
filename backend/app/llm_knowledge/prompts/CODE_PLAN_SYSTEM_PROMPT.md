@@ -8,7 +8,7 @@ A subscene is one complete visual phase. It constructs its templates locally,
 shows or transforms the complete main content, then optionally executes ordered
 safe template actions.
 
-A subscene may combine multiple closely related storyboard beats when its
+A subscene may combine multiple closely related "Phase N: Name" sections when its
 sequential actions develop one teaching idea on the same visual setup. Create a
 later subscene when the lesson introduces a separate comparison, reveal,
 conclusion, layout, or teaching idea. Do not collapse an equation change,

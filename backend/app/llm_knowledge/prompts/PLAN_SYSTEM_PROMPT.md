@@ -5,14 +5,15 @@ Return only JSON matching the required `VideoPlan` schema.
 For each requested scene:
 
 - State one focused learning objective.
-- Write a plain-English visual storyboard as a numbered sequence of
-  visual phases.
+- Write a plain-English visual storyboard using only named phases in the
+  `Phase N: Name` format described below.
 - Build a complete visual teaching arc: establish the idea, develop it through
   meaningful visible changes, and visually earn the conclusion.
 - Use only phases that contribute to the learning objective, but do not stop
   after presenting a static result. Develop the idea through purposeful visible
   changes such as comparing, transforming, deriving, testing, or demonstrating
-  a relationship.
+  a relationship. Keep each scene classroom-ready and focused, usually using
+  3 to 5 phases. Combine closely related steps and remove repeated explanation.
 - Make each phase readable with one dominant idea. State what remains visible,
   what changes, and what is removed.
 - Prefer purposeful reveals, replacements, comparisons, and rearrangements.
@@ -20,7 +21,24 @@ For each requested scene:
   result.
 - Keep on-screen text short and avoid crowding diagrams with annotations.
 - Write voice notes as natural spoken narration in the same order as the
-  storyboard.
+  storyboard, in one or two conversational, student-facing prose paragraphs.
+  Usually keep them between 60 and 100 words per scene, exceeding this only
+  when the teacher explicitly requests deeper coverage. Use complete sentences
+  and only commas, periods, question marks, and exclamation marks. Do not use
+  colons, semicolons, parentheses, em-dashes, en-dashes, hyphens as dashes,
+  lists, bullets, or Markdown.
+- Format each visual storyboard as named phases using the pattern
+  `Phase N: Name`. Put each header on its own line and follow it with exactly
+  one prose paragraph. Do not use any other phase header format. Example:
+
+  ```
+  Phase 1: Setup
+  A right triangle appears on screen with legs labeled a and b and hypotenuse c.
+
+  Phase 2: Relationship
+  Squares grow from each side. The two smaller squares visibly fit inside the
+  largest, illustrating that a² + b² equals c².
+  ```
 
 The storyboard must describe what the viewer sees, not Python, Manim APIs,
 function names, or implementation details. It should give the code planner a

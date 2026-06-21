@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { LessonCodeTab } from '@/components/lessons/LessonCodeTab';
+import { LessonPlanTab } from '@/components/lessons/LessonPlanTab';
 import { LessonVideosTab } from '@/components/lessons/LessonVideosTab';
 import { useLessonCode } from '@/hooks/lessons/useLessonCode';
 import { useLessonScenes } from '@/hooks/lessons/useLessonScenes';
@@ -18,14 +19,22 @@ interface LessonDialogProps {
   topic: string;
 }
 
-type LessonDialogTab = 'videos' | 'code';
+type LessonDialogTab = 'videos' | 'plan' | 'code';
 
 export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
-  const [selectedScene, setSelectedScene] = useState<LessonScene | null>(null);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<LessonDialogTab>('videos');
-  const { scenes, isLoading: scenesLoading, error: scenesError, refetch: refetchScenes } = useLessonScenes({
-    jobId,
-  });
+  const {
+    scenes,
+    plan,
+    isLoading: scenesLoading,
+    error: scenesError,
+    refetch: refetchScenes,
+    isPlanLoading,
+    planError,
+    refetchPlan,
+  } = useLessonScenes({ jobId });
+  const selectedScene = scenes.find((scene) => scene.artifactId === selectedArtifactId) ?? null;
   const { code, isEmpty: codeIsEmpty, isLoading: codeLoading, error: codeError, refetch: refetchCode } = useLessonCode({
     jobId,
     enabled: activeTab === 'code',
@@ -45,11 +54,12 @@ export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
 
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value === 'code' ? 'code' : 'videos')}
+          onValueChange={(value) => setActiveTab(value === 'code' ? 'code' : value === 'plan' ? 'plan' : 'videos')}
           className="min-h-0 overflow-hidden"
         >
           <TabsList>
             <TabsTrigger value="videos">Videos</TabsTrigger>
+            <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="code">Code</TabsTrigger>
           </TabsList>
 
@@ -60,8 +70,17 @@ export function LessonDialog({ onClose, jobId, topic }: LessonDialogProps) {
               error={scenesError}
               selectedScene={selectedScene}
               onRetry={refetchScenes}
-              onSelectScene={setSelectedScene}
-              onBack={() => setSelectedScene(null)}
+              onSelectScene={(scene: LessonScene) => setSelectedArtifactId(scene.artifactId)}
+              onBack={() => setSelectedArtifactId(null)}
+            />
+          </TabsContent>
+
+          <TabsContent value="plan" className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+            <LessonPlanTab
+              plan={plan}
+              isLoading={isPlanLoading}
+              error={planError}
+              onRetry={refetchPlan}
             />
           </TabsContent>
 

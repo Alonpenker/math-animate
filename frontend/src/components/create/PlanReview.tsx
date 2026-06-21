@@ -4,6 +4,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { parseStoryboard } from '@/utils/parseStoryboard';
 import type { VideoPlan } from '@/services/api';
 
 interface PlanReviewProps {
@@ -38,29 +39,50 @@ export function PlanReview({ plan, onApprove, onReject, error }: PlanReviewProps
             Plan data is unavailable. Please refresh and try again.
           </div>
         )}
-        {scenes.map((scene) => (
-          <div
-            key={scene.scene_number}
-            className="rounded-md p-5"
-            style={{ border: '1px solid rgba(245,240,232,0.16)', background: 'rgba(245,240,232,0.04)' }}
-          >
-            <h3 className="mb-4 text-lg text-off-white">
-              Scene {scene.scene_number}
-            </h3>
-            <div className="space-y-4">
-              {[
-                { label: 'Learning Objective', value: scene.learning_objective },
-                { label: 'Visual Storyboard', value: scene.visual_storyboard },
-                { label: 'Voice Notes', value: scene.voice_notes },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-off-white/45">{label}</p>
-                  <p className="mt-1 text-sm text-off-white/80">{value}</p>
+        {scenes.map((scene) => {
+          const storyboard = parseStoryboard(scene.visual_storyboard);
+          return (
+            <div
+              key={scene.scene_number}
+              className="rounded-md p-5"
+              style={{ border: '1px solid rgba(245,240,232,0.16)', background: 'rgba(245,240,232,0.04)' }}
+            >
+              <h3 className="mb-4 text-lg text-off-white">
+                Scene {scene.scene_number}
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-off-white/45">Learning Objective</p>
+                  <p className="mt-1 text-sm text-off-white/80">{scene.learning_objective}</p>
                 </div>
-              ))}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-off-white/45">Visual Storyboard</p>
+                  {!storyboard.ok ? (
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-off-white/80">
+                      {scene.visual_storyboard}
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-3">
+                      {storyboard.phases.map((phase) => (
+                        <div
+                          key={phase.header}
+                          className="rounded-md border border-off-white/10 bg-black/10 p-3"
+                        >
+                          <p className="text-sm font-semibold text-off-white">{phase.header}</p>
+                          <p className="mt-1 text-sm leading-relaxed text-off-white/80">{phase.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-off-white/45">Voice Notes</p>
+                  <p className="mt-1 text-sm text-off-white/80">{scene.voice_notes}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {error && (
