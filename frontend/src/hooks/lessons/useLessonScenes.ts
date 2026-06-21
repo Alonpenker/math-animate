@@ -45,26 +45,49 @@ function buildLessonScenes(artifacts: ArtifactResponse[], plan: VideoPlan | null
     .sort((firstScene, secondScene) => firstScene.sceneNumber - secondScene.sceneNumber);
 }
 
+function isValidVideoPlan(plan: VideoPlan | null): plan is VideoPlan {
+  return plan !== null
+    && plan.scenes.length > 0
+    && plan.scenes.every((scene) => (
+      Number.isInteger(scene.scene_number)
+      && typeof scene.learning_objective === 'string'
+      && typeof scene.visual_storyboard === 'string'
+      && typeof scene.voice_notes === 'string'
+    ));
+}
+
 export function useLessonScenes({ jobId, enabled = true }: UseLessonScenesParams) {
-  const query = useQuery({
+  const artifactsQuery = useQuery({
     queryKey: ['lesson-scenes', jobId],
     enabled,
     retry: false,
-    queryFn: async () => {
-      const [artifacts, planResponse] = await Promise.all([
-        listArtifacts({ job_id: jobId, artifact_type: 'mp4' }),
-        getJobPlan(jobId).catch(() => null),
-      ]);
+    queryFn: () => listArtifacts({ job_id: jobId, artifact_type: 'mp4' }),
+  });
 
-      const plan = planResponse ? extractVideoPlan(planResponse.data) : null;
-      return buildLessonScenes(artifacts, plan);
+  const planQuery = useQuery({
+    queryKey: ['lesson-plan', jobId],
+    enabled,
+    retry: false,
+    queryFn: async () => {
+      const planResponse = await getJobPlan(jobId);
+      const plan = extractVideoPlan(planResponse.data);
+      if (!isValidVideoPlan(plan)) {
+        throw new Error('Invalid plan response.');
+      }
+      return plan;
     },
   });
 
+  const plan = planQuery.data ?? null;
+
   return {
-    scenes: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.data ? null : query.error,
-    refetch: query.refetch,
+    scenes: buildLessonScenes(artifactsQuery.data ?? [], plan),
+    plan,
+    isLoading: artifactsQuery.isLoading,
+    error: artifactsQuery.error,
+    refetch: artifactsQuery.refetch,
+    isPlanLoading: planQuery.isLoading,
+    planError: planQuery.error,
+    refetchPlan: planQuery.refetch,
   };
 }
