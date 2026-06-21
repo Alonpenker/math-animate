@@ -82,9 +82,9 @@ def get_job_status(request: Request, job_id: UUID, redis_client=Depends(get_redi
 
 @router.get("/{job_id}/plan")
 @limiter.limit(LimitConfig.NORMAL)
-def get_plan(request: Request, job_id: UUID, redis_client=Depends(get_redis_client), cursor=Depends(get_cursor)) -> JobResponse:
-    job = JobsRepository.get_job(redis_client, job_id)
-    if job is None:
+def get_plan(request: Request, job_id: UUID, cursor=Depends(get_cursor)) -> JobResponse:
+    job_status = JobRequestsRepository.get_status(cursor, job_id)
+    if job_status is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job not found. (job_id={job_id})",
@@ -95,7 +95,7 @@ def get_plan(request: Request, job_id: UUID, redis_client=Depends(get_redis_clie
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Plan not found for this job. (job_id={job_id})",
         )
-    job = Job(job_id=job_id, status=job.status)
+    job = Job(job_id=job_id, status=job_status)
     return JobResponse(job=job, data=plan)
 
 

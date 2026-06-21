@@ -79,7 +79,7 @@ def test_get_plan_returns_job_and_plan_data(
 
     # When
     response = jobs_routes_with_runner_mock.get_plan(
-        request=object(), job_id=job.job_id, redis_client=object(), cursor=fake_cursor
+        request=object(), job_id=job.job_id, cursor=fake_cursor
     )
 
     # Then
@@ -99,7 +99,7 @@ def test_get_plan_raises_404_when_plan_not_yet_created(
     # When / Then
     with pytest.raises(HTTPException) as exc_info:
         jobs_routes_with_runner_mock.get_plan(
-            request=object(), job_id=job.job_id, redis_client=object(), cursor=fake_cursor
+            request=object(), job_id=job.job_id, cursor=fake_cursor
         )
 
     assert exc_info.value.status_code == 404
