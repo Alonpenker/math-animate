@@ -4,19 +4,8 @@ from uuid import UUID
 import redis
 
 from app.schemas.jobs import Job
-from app.domain.job_state import JobStatus
+from app.domain.job_state import JobStatus, is_terminal
 from app.dependencies.redis_client import TERMINAL_JOB_TTL_SECONDS
-
-TERMINAL_STATUSES: frozenset[JobStatus] = frozenset({
-    JobStatus.RENDERED,
-    JobStatus.FAILED_PLANNING,
-    JobStatus.FAILED_CODEGEN,
-    JobStatus.FAILED_QUOTA_EXCEEDED,
-    JobStatus.FAILED_LLM_USAGE,
-    JobStatus.FAILED_VERIFICATION,
-    JobStatus.FAILED_RENDER,
-    JobStatus.CANCELLED,
-})
 
 
 class JobsRepository:
@@ -40,7 +29,7 @@ class JobsRepository:
 
     @classmethod
     def update_job_status(cls, r: redis.Redis, job_id: UUID, status: JobStatus) -> None:
-        if status in TERMINAL_STATUSES:
+        if is_terminal(status):
             r.set(cls._key(job_id), status.value, ex=TERMINAL_JOB_TTL_SECONDS)
         else:
             r.set(cls._key(job_id), status.value)

@@ -20,6 +20,7 @@ from app.configs.llm_settings import (
 )
 from app.dependencies.db import get_worker_cursor
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_call_exception import LLMCallException
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.repositories.token_repository import TokenLedgerRepository
@@ -300,7 +301,7 @@ class OpenRouterService:
                 "LLM output validation failed: provider returned reasoning tokens "
                 f"but no assistant content to parse (expected {schema.__name__})."
             )
-        exception = LLMUsageException(
+        exception = LLMCallException(
             message,
             total_tokens=usage.total_tokens,
         )
@@ -367,12 +368,6 @@ class OpenRouterService:
                     call_id=str(call_id),
                     context={"call_type": call_type.value},
                 ), exc_info=True)
-            message = (
-                f"LLM call '{call_type.value}' exhausted its output token budget "
-                f"({max_tokens}) before producing usable output."
-                if isinstance(exc, LengthFinishReasonError)
-                else f"LLM call '{call_type.value}' failed before producing usable output."
-            )
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             logger.warning(WorkerLog(
                 operation=operation,
@@ -382,7 +377,15 @@ class OpenRouterService:
                 error=Logger.serialize_error(exc),
                 context={"call_type": call_type.value, "duration_ms": duration_ms},
             ), exc_info=exc)
-            raise LLMUsageException(message, total_tokens=usage.total_tokens) from exc
+            if isinstance(exc, LengthFinishReasonError):
+                message = (
+                    f"LLM call '{call_type.value}' exhausted its output token budget "
+                    f"({max_tokens}) before producing usable output."
+                )
+                raise LLMUsageException(message, total_tokens=usage.total_tokens) from exc
+            else:
+                message = f"LLM call '{call_type.value}' failed before producing usable output."
+                raise LLMCallException(message, total_tokens=usage.total_tokens) from exc
 
         try:
             usage = OpenRouterService._usage_from_response(response)
@@ -479,12 +482,6 @@ class OpenRouterService:
                     call_id=str(call_id),
                     context={"call_type": call_type.value},
                 ), exc_info=True)
-            message = (
-                f"LLM call '{call_type.value}' exhausted its output token budget "
-                f"({max_tokens}) before producing usable output."
-                if isinstance(exc, LengthFinishReasonError)
-                else f"LLM call '{call_type.value}' failed before producing usable output."
-            )
             duration_ms = int((time.perf_counter() - started_at) * 1000)
             logger.warning(WorkerLog(
                 operation=operation,
@@ -494,7 +491,15 @@ class OpenRouterService:
                 error=Logger.serialize_error(exc),
                 context={"call_type": call_type.value, "duration_ms": duration_ms},
             ), exc_info=exc)
-            raise LLMUsageException(message, total_tokens=usage.total_tokens) from exc
+            if isinstance(exc, LengthFinishReasonError):
+                message = (
+                    f"LLM call '{call_type.value}' exhausted its output token budget "
+                    f"({max_tokens}) before producing usable output."
+                )
+                raise LLMUsageException(message, total_tokens=usage.total_tokens) from exc
+            else:
+                message = f"LLM call '{call_type.value}' failed before producing usable output."
+                raise LLMCallException(message, total_tokens=usage.total_tokens) from exc
 
         raw_response = result.get("raw") if isinstance(result, dict) else result
         try:

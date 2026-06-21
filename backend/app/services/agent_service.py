@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
 from app.domain.job_state import JobStatus
+from app.exceptions.llm_call_exception import LLMCallException
 from app.exceptions.llm_usage_exception import LLMUsageException
 from app.exceptions.quota_exceeded_error import QuotaExceededError
 from app.schemas.code_plan import CodePlan
@@ -100,6 +101,10 @@ class AgentService:
             JobStatus.VERIFYING: JobStatus.FAILED_VERIFICATION,
             JobStatus.FIXING: JobStatus.FAILED_VERIFICATION,
         }
+        lm_call_exception_statuses = {
+            JobStatus.CODEGEN: JobStatus.FAILED_LLM_CALL,
+            JobStatus.FIXING: JobStatus.FAILED_LLM_CALL,
+        }
         llm_call_failure_statuses = {
             JobStatus.CODEGEN: JobStatus.FAILED_LLM_USAGE,
             JobStatus.FIXING: JobStatus.FAILED_LLM_USAGE,
@@ -177,6 +182,22 @@ class AgentService:
             logger.error(WorkerLog(
                 operation="generate_code",
                 event="LangGraph quota exceeded",
+                job_id=str(job_id),
+                error=Logger.serialize_error(exc),
+            ), exc_info=exc)
+            raise
+        except LLMCallException as exc:
+            try:
+                mark_failed(lm_call_exception_statuses)
+            except Exception:
+                logger.warning(WorkerLog(
+                    operation="generate_code",
+                    event="Failed to transition job after LangGraph LLM call exception",
+                    job_id=str(job_id),
+                ), exc_info=True)
+            logger.error(WorkerLog(
+                operation="generate_code",
+                event="LangGraph failed due to LLM call error",
                 job_id=str(job_id),
                 error=Logger.serialize_error(exc),
             ), exc_info=exc)

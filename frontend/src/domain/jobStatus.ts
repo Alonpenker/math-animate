@@ -16,6 +16,7 @@ export const JOB_STATUSES = [
   'FAILED_RENDER',
   'FAILED_QUOTA_EXCEEDED',
   'FAILED_LLM_USAGE',
+  'FAILED_LLM_CALL',
   'CANCELLED',
 ] as const;
 
@@ -189,6 +190,18 @@ export const JOB_STATUS_DEFS: Record<JobStatus, JobStatusDef> = {
       explanation: 'The model used its available response budget while reasoning and did not produce a usable answer. Try a smaller or more direct request.',
     },
   },
+  FAILED_LLM_CALL: {
+    icon: 'ServerCrash',
+    color: 'orange',
+    label: 'AI Provider Error',
+    diagramLabel: 'Provider Error',
+    kind: 'failure',
+    terminal: {
+      icon: 'ServerCrash',
+      heading: 'AI Provider Unavailable',
+      explanation: 'The AI provider was unavailable or returned an unexpected error. Please try again shortly.',
+    },
+  },
   CANCELLED: {
     icon: 'Ban',
     color: 'muted',
@@ -222,6 +235,7 @@ export const PLANNING_TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   'FAILED_PLANNING',
   'FAILED_QUOTA_EXCEEDED',
   'FAILED_LLM_USAGE',
+  'FAILED_LLM_CALL',
   'CANCELLED',
 ]);
 
@@ -232,6 +246,7 @@ export const RENDERING_TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   'FAILED_RENDER',
   'FAILED_QUOTA_EXCEEDED',
   'FAILED_LLM_USAGE',
+  'FAILED_LLM_CALL',
 ]);
 
 export const PLANNING_ACTIVE_STATUSES: ReadonlySet<JobStatus> = new Set([
