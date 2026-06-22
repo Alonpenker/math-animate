@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export function AboutSection() {
   return (
     <section className="px-6 py-16">
@@ -20,12 +22,12 @@ export function AboutSection() {
           >
             View on GitHub →
           </a>
-          <a
-            href="/about"
+          <Link
+            to="/about"
             className="text-sm text-off-white/40 hover:text-off-white/60 transition-colors"
           >
             How it works →
-          </a>
+          </Link>
         </div>
       </div>
     </section>
