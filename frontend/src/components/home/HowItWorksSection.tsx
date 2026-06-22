@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Pencil, Brain, CheckCircle, Code, Play, BookOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,13 +43,15 @@ const FEATURES: Feature[] = [
 ];
 
 export function HowItWorksSection() {
+  const shouldReduce = useReducedMotion();
+
   return (
     <section className="pt-8 pb-20 px-6 relative overflow-hidden">
       <div className="mx-auto max-w-5xl" style={{ position: 'relative', zIndex: 1 }}>
         <motion.h2
           className="mb-4 text-center text-3xl md:text-4xl text-off-white"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={shouldReduce ? false : { opacity: 0, y: 20 }}
+          whileInView={shouldReduce ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
@@ -57,8 +59,8 @@ export function HowItWorksSection() {
         </motion.h2>
         <motion.p
           className="mb-12 text-center text-off-white/50 text-base"
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={shouldReduce ? false : { opacity: 0, y: 12 }}
+          whileInView={shouldReduce ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
@@ -69,18 +71,20 @@ export function HowItWorksSection() {
           {FEATURES.map((feature, i) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              className="group"
+              initial={shouldReduce ? false : { opacity: 0, y: 20 }}
+              whileInView={shouldReduce ? undefined : { opacity: 1, y: 0 }}
+              whileHover={shouldReduce ? undefined : { y: -4, transition: { duration: 0.2 } }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: i * 0.08 }}
             >
-              <Card className="border-border h-full" style={{ background: '#221a12' }}>
+              <Card className="border-border h-full bg-[#221a12] group-hover:bg-[#2d2218] transition-colors">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold bg-off-white/10 text-off-white">
                       {i + 1}
                     </span>
-                    <feature.icon className="h-6 w-6 text-off-white/70" />
+                    <feature.icon className="h-6 w-6 text-off-white/70 group-hover:scale-110 transition-transform" />
                   </div>
                   <h3 className="mb-2 text-xl font-bold text-off-white">
                     {feature.title}
