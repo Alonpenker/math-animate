@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify confirmation input
         run: |
@@ -52,14 +52,14 @@ jobs:
           echo "Confirmation accepted. Proceeding with teardown..."
 
       - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-north-1
           role-session-name: github-destroy-${{ github.run_id }}
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
