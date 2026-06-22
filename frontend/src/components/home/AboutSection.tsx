@@ -6,19 +6,27 @@ export function AboutSection() {
         <p className="text-off-white/60 leading-relaxed">
           MathAnimate is an open-source website that turns math lesson briefs into animated videos.
           Powered by{' '}
-          <a href="https://www.manim.community/" target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline">
+          <a href="https://www.manim.community/" target="_blank" rel="noopener noreferrer" className="text-accent-orange hover:underline">
             Manim
           </a>
           , it generates scene-by-scene animations that teachers and students can use right away.
         </p>
-        <a
-          href="https://github.com/Alonpenker/math-animate"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-block text-sm text-off-white/40 hover:text-off-white/60 transition-colors"
-        >
-          View on GitHub →
-        </a>
+        <div className="mt-4 flex items-center justify-center gap-6">
+          <a
+            href="https://github.com/Alonpenker/math-animate"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-off-white/40 hover:text-off-white/60 transition-colors"
+          >
+            View on GitHub →
+          </a>
+          <a
+            href="/about"
+            className="text-sm text-off-white/40 hover:text-off-white/60 transition-colors"
+          >
+            How it works →
+          </a>
+        </div>
       </div>
     </section>
   );
