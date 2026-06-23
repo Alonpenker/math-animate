@@ -1,5 +1,6 @@
 import ReactPlayer from 'react-player';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { MathLoader } from '@/components/ui/MathLoader';
 import { useArtifactVideoUrl } from '@/hooks/lessons/useArtifactVideoUrl';
 import type { ScenePlan } from '@/services/api';
 
@@ -16,8 +17,8 @@ export function ScenePlayer({ artifactId, sceneNumber, scenePlan, onBack }: Scen
 
   if (isLoading) {
     playerContent = (
-      <div className="flex h-full min-h-60 items-center justify-center text-accent-cyan">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-full min-h-60 items-center justify-center">
+        <MathLoader size={48} />
       </div>
     );
   } else if (error) {
