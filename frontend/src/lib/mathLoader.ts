@@ -96,15 +96,3 @@ export function polygonMorphKeyframes(
     durationMs,
   };
 }
-
-/**
- * Pick a random index in [0, length) that is not `prev`.
- * Returns 0 when `length <= 1`. `rand` is injectable for deterministic tests.
- */
-export function pickNextIndex(length: number, prev: number, rand: () => number = Math.random): number {
-  if (length <= 1) return 0;
-  let next = Math.floor(rand() * length);
-  if (next >= length) next = length - 1;
-  if (next === prev) next = (next + 1) % length;
-  return next;
-}
