@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ScrollToTop } from '@/components/layout/ScrollToTop';
 import { GlassNavbar } from '@/components/layout/GlassNavbar';
 import { Footer } from '@/components/layout/Footer';
 import { HomePage } from '@/pages/HomePage';
@@ -12,6 +13,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <ErrorBoundary>
         <div className="flex min-h-screen flex-col">
           <GlassNavbar />
