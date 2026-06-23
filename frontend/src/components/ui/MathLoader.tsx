@@ -11,7 +11,7 @@ interface MathLoaderProps {
 
 // Bouncing vertex sequence: 3 → 4 → 5 → 6 → 5 → 4 → 3 → …
 const SIDE_SEQUENCE = [3, 4, 5, 6, 5, 4];
-const DWELL_MS = 650;
+const DWELL_MS = 4000;
 const MORPH_MS = 550;
 const ROTATION_PERIOD_MS = 7000;
 const STROKE_RATIO = 0.06; 
@@ -110,7 +110,6 @@ export function MathLoader({ size = 56, className, label = 'Loading' }: MathLoad
             </>
           )}
         </path>
-        <circle cx={cx} cy={cy} r={Math.max(1.5, size * 0.03)} fill="var(--color-accent-cyan)" />
       </svg>
       <span className="sr-only">{label}</span>
     </div>
